@@ -1,0 +1,405 @@
+/* Responsive layout — AEP & shared */
+
+/* Tablet landscape */
+@media (max-width: 1280px) {
+  .aep-widget-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .aep-quick-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tealium-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .aep-header-search {
+    max-width: 420px;
+  }
+
+  .aep-env-text {
+    display: none;
+  }
+}
+
+/* Tablet portrait */
+@media (max-width: 1024px) {
+  .aep-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .aep-kpi-card:nth-child(2) {
+    border-right: none;
+  }
+
+  .aep-kpi-card:nth-child(1),
+  .aep-kpi-card:nth-child(2) {
+    border-bottom: 1px solid #e1e1e1;
+  }
+
+  .aep-recent-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .aep-recent-col:nth-child(2) {
+    border-right: none;
+  }
+
+  .aep-recent-col:nth-child(1),
+  .aep-recent-col:nth-child(2) {
+    border-bottom: 1px solid #e1e1e1;
+  }
+
+  .aep-widget-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-chart-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aep-toolbar-left {
+    flex-wrap: wrap;
+  }
+
+  .aep-toolbar-meta {
+    margin-left: 0;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .aep-hero-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .aep-mini-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-data-table-header,
+  .aep-data-table-row {
+    grid-template-columns: 1.5fr 1fr 1fr !important;
+    font-size: 12px;
+  }
+
+  .aep-audience-table-header,
+  .aep-audience-table-row {
+    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.7fr !important;
+  }
+
+  .aep-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .aep-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .aep-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tealium-flow {
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+  }
+
+  .tealium-flow-arrow {
+    display: none;
+  }
+
+  .tealium-flow-step {
+    min-width: 140px;
+    flex: 0 1 calc(33% - 12px);
+  }
+
+  .tealium-tables {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile — collapsible sidebar */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 260px;
+  }
+
+  .aep-menu-btn {
+    display: flex;
+  }
+
+  .aep-sidebar {
+    transform: translate3d(-100%, 0, 0);
+    transition: transform var(--duration-normal) var(--ease-out-expo);
+    box-shadow: none;
+    width: var(--sidebar-width);
+    z-index: 200;
+  }
+
+  .aep-sidebar.is-open {
+    transform: translate3d(0, 0, 0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.15);
+    animation: sidebarIn var(--duration-normal) var(--ease-out-expo) both;
+  }
+
+  .aep-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: var(--header-height);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 150;
+    animation: overlayIn var(--duration-fast) var(--ease-smooth) both;
+  }
+
+  .aep-main {
+    margin-left: 0;
+  }
+
+  .aep-header-brand span:not(.aep-adobe-logo) {
+    display: none;
+  }
+
+  .aep-header-brand {
+    min-width: auto;
+  }
+
+  .aep-sandbox-select {
+    display: none;
+  }
+
+  .aep-header-search {
+    max-width: none;
+    flex: 1;
+    margin: 0 8px;
+  }
+
+  .aep-page {
+    padding: 16px 16px 32px;
+  }
+
+  .aep-greeting,
+  .aep-page-title {
+    font-size: 22px;
+  }
+
+  .aep-page-header-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .aep-edit-btn-top {
+    float: none;
+    margin-top: 0;
+    align-self: flex-end;
+  }
+
+  .aep-kpi-row {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-kpi-card {
+    border-right: none !important;
+    border-bottom: 1px solid #e1e1e1;
+  }
+
+  .aep-kpi-card:last-child {
+    border-bottom: none;
+  }
+
+  .aep-kpi-value {
+    font-size: 28px;
+  }
+
+  .aep-recent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-recent-col {
+    border-right: none !important;
+    border-bottom: 1px solid #e1e1e1;
+  }
+
+  .aep-recent-col:last-child {
+    border-bottom: none;
+  }
+
+  .aep-widget-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-widget {
+    min-height: 280px;
+  }
+
+  .aep-widget-chart {
+    height: 220px;
+  }
+
+  .aep-tabs-right {
+    margin-left: 0;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .aep-datalake-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .aep-monitoring-card {
+    min-width: 160px;
+  }
+
+  .aep-quick-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tealium-summary-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .aep-hero-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .aep-mini-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tealium mobile */
+  .tealium-menu-btn {
+    display: flex;
+  }
+
+  .tealium-sidebar {
+    transform: translate3d(-100%, 0, 0);
+    transition: transform var(--duration-normal) var(--ease-out-expo);
+    z-index: 200;
+    width: 260px;
+  }
+
+  .tealium-sidebar.is-open {
+    transform: translate3d(0, 0, 0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .tealium-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: 48px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 150;
+    animation: overlayIn var(--duration-fast) ease both;
+  }
+
+  .tealium-main {
+    margin-left: 0;
+    padding: 16px;
+  }
+
+  .tealium-topbar-brand span:not(.tealium-logo) {
+    display: none;
+  }
+
+  .tealium-topbar-brand {
+    min-width: auto;
+  }
+
+  .tealium-flow-step {
+    flex: 0 1 calc(50% - 8px);
+  }
+
+  .tealium-filters {
+    flex-wrap: wrap;
+  }
+
+  .tealium-time-select {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .tealium-connector-header,
+  .tealium-connector-row {
+    grid-template-columns: 1fr auto auto;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .aep-header-right .aep-badge-dev {
+    display: none;
+  }
+
+  .aep-quick-stats,
+  .tealium-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .aep-hero-banner .aep-greeting {
+    font-size: 20px;
+  }
+
+  .aep-data-table-header {
+    display: none;
+  }
+
+  .aep-data-table-row,
+  .aep-audience-table-row {
+    grid-template-columns: 1fr !important;
+    gap: 4px;
+  }
+
+  .aep-kpi-value {
+    font-size: 24px;
+  }
+
+  .aep-toolbar-right {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .tealium-flow-step {
+    flex: 0 1 100%;
+  }
+
+  .tealium-btn-save {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+/* Desktop — hide mobile controls */
+.aep-menu-btn,
+.aep-sidebar-overlay,
+.tealium-menu-btn,
+.tealium-sidebar-overlay {
+  display: none;
+}
+
+.aep-sidebar,
+.tealium-sidebar {
+  transition: transform var(--duration-normal) var(--ease-out-expo),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+}
