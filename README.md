@@ -1,70 +1,67 @@
-# Getting Started with Create React App
+![](docs/screenshots/00-abc-dashboard.png)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+![](docs/screenshots/01-home.png)
 
-## Available Scripts
+![](docs/screenshots/02-ingestion.png)
 
-In the project directory, you can run:
+![](docs/screenshots/03-transformation.png)
 
-### `npm start`
+![](docs/screenshots/04-standardization.png)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+![](docs/screenshots/05-workflows.png)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+![](docs/screenshots/06-dashboards.png)
 
-### `npm test`
+![](docs/screenshots/07-playbooks.png)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+![](docs/screenshots/08-sources.png)
 
-### `npm run build`
+![](docs/screenshots/09-destinations.png)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+![](docs/screenshots/10-profiles.png)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+![](docs/screenshots/11-audiences.png)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+![](docs/screenshots/12-identities.png)
 
-### `npm run eject`
+![](docs/screenshots/13-account-profiles.png)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+![](docs/screenshots/14-account-audiences.png)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+![](docs/screenshots/15-prospects.png)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+![](docs/screenshots/16-schemas.png)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+![](docs/screenshots/17-places.png)
 
-## Learn More
+![](docs/screenshots/18-datasets.png)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+![](docs/screenshots/19-queries.png)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+![](docs/screenshots/20-monitoring.png)
 
-### Code Splitting
+![](docs/screenshots/21-offers.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+![](docs/screenshots/22-components.png)
 
-### Analyzing the Bundle Size
+![](docs/screenshots/23-alerts.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+![](docs/screenshots/24-sandboxes.png)
 
-### Making a Progressive Web App
+![](docs/screenshots/25-license.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+![](docs/screenshots/26-encryption.png)
 
-### Advanced Configuration
+![](docs/screenshots/27-tealium-supply-chain.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+![](docs/screenshots/28-tealium-usage.png)
 
-### Deployment
+![](docs/screenshots/29-tealium-sources.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+![](docs/screenshots/30-tealium-eventstream.png)
 
-### `npm run build` fails to minify
+![](docs/screenshots/31-tealium-audiencestream.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+![](docs/screenshots/32-tealium-dataaccess.png)
+
+![](docs/screenshots/33-tealium-trace.png)

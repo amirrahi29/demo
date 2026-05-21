@@ -1,0 +1,189 @@
+{
+  "header": {
+    "title": "Product Resiliency: ADP Wide Metrics FYTD March 2026",
+    "subtitle": "Enterprise Operations Dashboard · Real-time Resiliency Intelligence",
+    "liveBadge": "Live Data · FYTD March 2026"
+  },
+  "colors": {
+    "headerOrange": "#c9542a",
+    "headerOrangeDark": "#a84422",
+    "green": "#027a48",
+    "red": "#b42318",
+    "fy25Line": "#1d2939",
+    "fy26Line": "#8b1a1a",
+    "goalLine": "#daa520",
+    "textDark": "#101828",
+    "textMuted": "#667085"
+  },
+  "metricsSection": {
+    "title": "Monthly Metrics",
+    "subtitle": "Key resiliency indicators for FYTD March 2026",
+    "liveTag": "Updated Live"
+  },
+  "metricCards": [
+    {
+      "type": "availability",
+      "title": "Client Availability",
+      "description": "Uptime across all client-facing services",
+      "value": 99.9964,
+      "target": 99.99,
+      "decimals": 4,
+      "suffix": "%",
+      "accent": "#027a48",
+      "icon": "shield",
+      "badge": "On Target",
+      "badgeStatus": "success",
+      "thresholds": [
+        { "color": "#f04438", "label": "Red < 99.90%" },
+        { "color": "#f79009", "label": "Yellow 99.90% – 99.99%" },
+        { "color": "#027a48", "label": "Green 99.99%+" }
+      ]
+    },
+    {
+      "type": "count",
+      "title": "Critical Incident Volume",
+      "description": "Total critical incidents reported",
+      "value": 29,
+      "max": 50,
+      "valueLabel": "Total Count",
+      "accent": "#c9542a",
+      "icon": "alert",
+      "badge": "Incidents",
+      "badgeStatus": "warning"
+    },
+    {
+      "type": "count",
+      "title": "Critical Incidents Due to Change",
+      "description": "Incidents triggered by system changes",
+      "value": 16,
+      "max": 50,
+      "valueLabel": "Count",
+      "accent": "#b42318",
+      "icon": "change",
+      "badge": "Change Related",
+      "badgeStatus": "danger"
+    },
+    {
+      "type": "time",
+      "title": "Mean Time to Detect",
+      "shortLabel": "MTTD",
+      "description": "Average & median detection time",
+      "meanLabel": "Mean",
+      "meanValue": "4.38 Hrs.",
+      "meanNumeric": 4.38,
+      "medianLabel": "Median",
+      "medianValue": "0.85 Hrs.",
+      "medianNumeric": 0.85,
+      "accent": "#1d4ed8",
+      "icon": "detect"
+    },
+    {
+      "type": "time",
+      "title": "Mean Time to Engage",
+      "shortLabel": "MTTE",
+      "description": "Average & median engagement time",
+      "meanLabel": "Mean",
+      "meanValue": "1.71 Hrs.",
+      "meanNumeric": 1.71,
+      "medianLabel": "Median",
+      "medianValue": "0.78 Hrs.",
+      "medianNumeric": 0.78,
+      "accent": "#7c3aed",
+      "icon": "engage"
+    },
+    {
+      "type": "time",
+      "title": "Mean Time to Resolve",
+      "shortLabel": "MTTR",
+      "description": "Average & median resolution time",
+      "meanLabel": "Mean",
+      "meanValue": "12.15 Hrs.",
+      "meanNumeric": 12.15,
+      "medianLabel": "Median",
+      "medianValue": "7.10 Hrs.",
+      "medianNumeric": 7.10,
+      "accent": "#0d9488",
+      "icon": "resolve"
+    }
+  ],
+  "charts": {
+    "mttd": {
+      "title": "Mean Time to Detect (hrs)",
+      "goal": 7.42,
+      "yMax": 18,
+      "fytdPercent": "41.39%",
+      "fytdColorKey": "green",
+      "headerStats": {
+        "fy25": "8.73 hrs",
+        "fy25JulMar": "9.47 hrs",
+        "fy26Goal": "7.42 hrs",
+        "fy26Current": "5.55 hrs"
+      },
+      "data": [
+        { "month": "Jul", "fy25": 12.06, "fy26": 5.75 },
+        { "month": "Aug", "fy25": 6.08, "fy26": 4.28 },
+        { "month": "Sep", "fy25": 11.83, "fy26": 5.79 },
+        { "month": "Oct", "fy25": 6.24, "fy26": 5.44 },
+        { "month": "Nov", "fy25": 7.54, "fy26": 4.86 },
+        { "month": "Dec", "fy25": 8.82, "fy26": 4.96 },
+        { "month": "Jan", "fy25": 6.98, "fy26": 4.72 },
+        { "month": "Feb", "fy25": 24.17, "fy26": 5.44 },
+        { "month": "Mar", "fy25": 11.92, "fy26": 3.95 }
+      ]
+    },
+    "mtte": {
+      "title": "Mean Time to Engage (hrs)",
+      "goal": 2.47,
+      "yMax": 18,
+      "fytdPercent": "12.46%",
+      "fytdColorKey": "red",
+      "headerStats": {
+        "fy25": "2.90 hrs",
+        "fy25JulMar": "3.53 hrs",
+        "fy26Goal": "2.47 hrs",
+        "fy26Current": "3.97 hrs"
+      },
+      "data": [
+        { "month": "Jul", "fy25": 3.86, "fy26": 2.47 },
+        { "month": "Aug", "fy25": 3.08, "fy26": 2.47 },
+        { "month": "Sep", "fy25": 0.25, "fy26": 2.97 },
+        { "month": "Oct", "fy25": 4.45, "fy26": 17.82 },
+        { "month": "Nov", "fy25": 3.08, "fy26": 2.97 },
+        { "month": "Dec", "fy25": 3.44, "fy26": 3.44 },
+        { "month": "Jan", "fy25": 3.86, "fy26": 3.86 },
+        { "month": "Feb", "fy25": 4.28, "fy26": 4.28 },
+        { "month": "Mar", "fy25": 3.08, "fy26": 3.44 }
+      ]
+    },
+    "mttr": {
+      "title": "Mean Time to Restore (hrs)",
+      "goal": 19.43,
+      "yMax": 30,
+      "fytdPercent": "10.21%",
+      "fytdColorKey": "green",
+      "headerStats": {
+        "fy25": "22.86 hrs",
+        "fy25JulMar": "22.88 hrs",
+        "fy26Goal": "19.43 hrs",
+        "fy26Current": "20.52 hrs"
+      },
+      "data": [
+        { "month": "Jul", "fy25": 28.5, "fy26": 21.5 },
+        { "month": "Aug", "fy25": 21.5, "fy26": 19.0 },
+        { "month": "Sep", "fy25": 18.0, "fy26": 20.0 },
+        { "month": "Oct", "fy25": 25.0, "fy26": 21.0 },
+        { "month": "Nov", "fy25": 20.0, "fy26": 19.0 },
+        { "month": "Dec", "fy25": 25.0, "fy26": 22.0 },
+        { "month": "Jan", "fy25": 22.0, "fy26": 20.0 },
+        { "month": "Feb", "fy25": 20.0, "fy26": 21.0 },
+        { "month": "Mar", "fy25": 22.0, "fy26": 19.5 }
+      ]
+    }
+  },
+  "footer": {
+    "note": "Gold line represents FY26 Goal; Rose line represents FY26 Current.",
+    "goalLabel": "FY26 Goal",
+    "currentLabel": "FY26 Current",
+    "brand": "ADP"
+  }
+}
