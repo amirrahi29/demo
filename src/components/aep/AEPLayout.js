@@ -4,9 +4,13 @@ import AEPHeader from './AEPHeader';
 import AEPSidebar from './AEPSidebar';
 import '../../styles/animations.css';
 import '../../styles/aep.css';
+import '../../styles/interactions.css';
 import '../../styles/responsive.css';
+import '../../styles/monitoring.css';
+import '../../styles/clean.css';
+import '../../styles/enterprise-motion.css';
 
-const AEPLayout = ({ children, sidebarVariant = 'default' }) => {
+const AEPLayout = ({ children }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -35,7 +39,6 @@ const AEPLayout = ({ children, sidebarVariant = 'default' }) => {
       )}
       <div className="aep-shell">
         <AEPSidebar
-          variant={sidebarVariant}
           isOpen={sidebarOpen}
           onNavigate={() => setSidebarOpen(false)}
         />

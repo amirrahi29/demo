@@ -1,6 +1,7 @@
 {
   "short_name": "Codex Copilot",
-  "name": "Codex Copilot",
+  "name": "Codex Copilot — Data Pipeline Platform",
+  "description": "Ingestion, transformation, and standardization dashboards",
   "icons": [
     {
       "src": "favicon.ico",

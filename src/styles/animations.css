@@ -97,9 +97,39 @@
   to { opacity: 1; }
 }
 
-@keyframes sidebarIn {
-  from { transform: translate3d(-100%, 0, 0); }
-  to { transform: translate3d(0, 0, 0); }
+@keyframes monitoringSelectPulse {
+  0%, 100% {
+    box-shadow: 0 8px 28px rgba(20, 115, 230, 0.14), inset 0 0 0 2px #1473e6;
+  }
+  50% {
+    box-shadow: 0 14px 40px rgba(20, 115, 230, 0.24), inset 0 0 0 2px #2680eb;
+  }
+}
+
+@keyframes detailPanelIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes iconPop {
+  0%, 100% { transform: scale3d(1, 1, 1); }
+  50% { transform: scale3d(1.14, 1.14, 1); }
+}
+
+@keyframes borderShimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes metricFlash {
+  from { background: rgba(20, 115, 230, 0.12); }
+  to { background: transparent; }
 }
 
 .page-enter {

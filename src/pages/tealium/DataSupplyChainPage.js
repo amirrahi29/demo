@@ -1,126 +1,183 @@
+import { useState, useMemo } from 'react';
 import TealiumLayout from '../../components/tealium/TealiumLayout';
-import { tealiumSources, monitoringMetrics } from '../../data/platformData';
+import MiniSparkline from '../../components/charts/MiniSparkline';
+import KpiGrid from '../../components/aep/KpiGrid';
+import EmptyState from '../../components/aep/EmptyState';
+import { tealiumSources } from '../../data/platformData';
+import {
+  supplyChainFlowSteps, landingZones, publishConnectors,
+} from '../../data/tealiumData';
+import {
+  tealiumProducts, tealiumTimeRanges,
+  TEALIUM_PRODUCT_OPTIONS, TEALIUM_TIME_OPTIONS,
+  scaleVolume, scaleFlowNumber,
+} from '../../data/dropdownData';
 
-const dataAccess = [
-  { name: 'EventStore', status: 'Enabled', detail: '53 Linked Feeds', volume: '200K' },
-  { name: 'EventDB', status: 'Enabled', detail: '12 partitions', volume: '400K' },
-  { name: 'AudienceStore', status: 'Enabled', detail: 'Real-time sync', volume: '350K' },
-  { name: 'AudienceDB', status: 'Enabled', detail: 'Batch export', volume: '500K' },
-];
+const DataSupplyChainPage = () => {
+  const [product, setProduct] = useState('all');
+  const [timeRange, setTimeRange] = useState('1h');
 
-const connectors = [
-  { name: 'Google Ads ID', success: '88.8k', failed: '24.8k', icon: 'G' },
-  { name: 'DV Twitter', success: '45.2k', failed: '12.1k', icon: 'T' },
-  { name: 'Drift (2)', success: '32.5k', failed: '8.4k', icon: 'D' },
-  { name: 'Google Analytics (3)', success: '120.3k', failed: '15.6k', icon: 'GA' },
-  { name: 'Google Sheets (2)', success: '18.7k', failed: '2.3k', icon: 'GS' },
-  { name: 'Salesforce MC', success: '56.4k', failed: '3.2k', icon: 'SF' },
-];
+  const productConfig = tealiumProducts[product];
+  const timeConfig = tealiumTimeRanges[timeRange];
+  const scale = timeConfig.scale;
 
-const DataSupplyChainPage = () => (
-  <TealiumLayout>
-    <div className="tealium-breadcrumb">Data Supply Chain &gt; <span>Overview</span></div>
+  const filteredSources = useMemo(
+    () => tealiumSources.filter(productConfig.sourceFilter),
+    [productConfig],
+  );
 
-    <div className="tealium-summary-row">
-      <div className="tealium-summary-card"><span className="tealium-summary-value">98.4%</span><span className="tealium-summary-label">Ingestion success</span></div>
-      <div className="tealium-summary-card"><span className="tealium-summary-value">{monitoringMetrics.datalake.received}</span><span className="tealium-summary-label">Events today</span></div>
-      <div className="tealium-summary-card"><span className="tealium-summary-value">19</span><span className="tealium-summary-label">Active connectors</span></div>
-      <div className="tealium-summary-card"><span className="tealium-summary-value">7</span><span className="tealium-summary-label">Running jobs</span></div>
-    </div>
+  const summary = productConfig.summary;
+  const flow = productConfig.flow;
 
-    <div className="tealium-page-header">
-      <div className="tealium-filters">
-        <button type="button" className="tealium-pill active">All Products</button>
-        <button type="button" className="tealium-pill">EventStream</button>
-        <button type="button" className="tealium-pill">AudienceStream</button>
-        <button type="button" className="tealium-pill">DataAccess</button>
-        <select className="tealium-time-select" defaultValue="1h">
-          <option value="1h">within Last Hour</option>
-          <option value="24h">within Last 24 Hours</option>
-        </select>
-      </div>
-    </div>
+  const flowValues = {
+    sources: flow.sources,
+    received: scaleFlowNumber(flow.received, scale),
+    transformed: scaleFlowNumber(flow.transformed || flow.received, scale * 0.98),
+    standardized: scaleFlowNumber(flow.standardized || flow.received, scale * 0.95),
+    published: flow.published || flow.actions,
+  };
 
-    <div className="tealium-flow">
-      <div className="tealium-flow-step">
-        <div className="tealium-flow-icon">🌐</div>
-        <div className="tealium-flow-label">Data Sources</div>
-        <div className="tealium-flow-value">10 Sources</div>
-      </div>
-      <div className="tealium-flow-arrow">→</div>
-      <div className="tealium-flow-step">
-        <div className="tealium-flow-icon">📥</div>
-        <div className="tealium-flow-label">Events Received</div>
-        <div className="tealium-flow-value">432.4k</div>
-      </div>
-      <div className="tealium-flow-arrow">→</div>
-      <div className="tealium-flow-step">
-        <div className="tealium-flow-icon">📦</div>
-        <div className="tealium-flow-label">Events Inspected</div>
-        <div className="tealium-inspected">
-          <span className="green">342</span><span>/</span>
-          <span className="yellow">22</span><span>/</span>
-          <span className="red">2.3k</span>
+  return (
+    <TealiumLayout>
+      <div className="tealium-page-hero stagger-1">
+        <div>
+          <div className="tealium-breadcrumb">Data Supply Chain &gt; <span>Pipeline overview</span></div>
+          <h1 className="tealium-page-title">End-to-end data supply chain</h1>
+          <p className="tealium-page-subtitle">
+            Monitor ingestion, transformation, and standardization across batch and streaming pipelines.
+          </p>
         </div>
       </div>
-      <div className="tealium-flow-arrow">→</div>
-      <div className="tealium-flow-step">
-        <div className="tealium-flow-icon">⚡</div>
-        <div className="tealium-flow-label">Actions Triggered</div>
-        <div className="tealium-flow-value">59.7M / 62.3M</div>
-      </div>
-      <div className="tealium-flow-arrow">→</div>
-      <div className="tealium-flow-step">
-        <div className="tealium-flow-icon">🔌</div>
-        <div className="tealium-flow-label">Connectors</div>
-        <div className="tealium-flow-value">19 · 18 active</div>
-      </div>
-    </div>
 
-    <div className="tealium-tables">
-      <div className="tealium-table-card">
-        <div className="tealium-table-header">Sources</div>
-        <div className="tealium-table-subheader"><span>Data Sources</span><span>Volume · Trend</span></div>
-        {tealiumSources.map((src) => (
-          <div key={src.name} className="tealium-table-row">
-            <div className="tealium-row-name">
-              <span className="tealium-row-icon">{src.icon}</span>
-              {src.name}
+      <KpiGrid
+        variant="summary"
+        items={[
+          { value: summary.success, label: 'Pipeline success' },
+          { value: scaleFlowNumber(summary.events, scale), label: `Records (${timeConfig.label})` },
+          { value: String(summary.connectors), label: 'Publish connectors' },
+          { value: String(summary.jobs), label: 'Running jobs' },
+        ]}
+        className="aep-data-transition stagger-2"
+        key={`summary-${product}-${timeRange}`}
+      />
+
+      <div className="tealium-page-header stagger-2">
+        <div className="tealium-filters">
+          {TEALIUM_PRODUCT_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`tealium-pill${product === opt.id ? ' active' : ''}`}
+              onClick={() => setProduct(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <select
+            className="tealium-time-select"
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            aria-label="Time range"
+          >
+            {TEALIUM_TIME_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="tealium-flow tealium-pipeline-flow aep-data-transition stagger-3" key={`flow-${product}-${timeRange}`}>
+        {supplyChainFlowSteps.map((step, index) => (
+          <div key={step.key} className="tealium-flow-item-wrap">
+            <div className="tealium-flow-step">
+              <div className="tealium-flow-icon">{step.icon}</div>
+              <div className="tealium-flow-label">{step.label}</div>
+              <div className="tealium-flow-value">{flowValues[step.key]}</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="tealium-sparkline" />
-              <span className="tealium-volume">{src.volume}</span>
-              <span className={`tealium-trend${src.trend.startsWith('+') ? ' up' : ' down'}`}>{src.trend}</span>
-            </div>
+            {index < supplyChainFlowSteps.length - 1 && (
+              <div className="tealium-flow-arrow" aria-hidden>→</div>
+            )}
           </div>
         ))}
       </div>
-      <div className="tealium-table-card">
-        <div className="tealium-table-header">Destinations</div>
-        <div className="tealium-section-title">DataAccess</div>
-        {dataAccess.map((item) => (
-          <div key={item.name} className="tealium-table-row">
-            <div className="tealium-row-name">
-              <span className="tealium-row-icon">💾</span>
-              <div><div>{item.name}</div>{item.detail && <div style={{ fontSize: 11, color: '#78909c' }}>{item.detail}</div>}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="tealium-status-enabled">{item.status}</div>
-              <div className="tealium-volume">{item.volume}</div>
-            </div>
-          </div>
-        ))}
-        <div className="tealium-section-title">Connectors</div>
-        <div className="tealium-connector-header"><span>Connectors</span><span className="tealium-dot-green">Success</span><span className="tealium-dot-red">Failed</span></div>
-        {connectors.map((c) => (
-          <div key={c.name} className="tealium-connector-row">
-            <div className="tealium-row-name"><span className="tealium-row-icon">{c.icon}</span>{c.name}</div>
-            <span>{c.success}</span><span>{c.failed}</span>
-          </div>
-        ))}
+
+      <div className="tealium-quality-bar aep-data-transition stagger-4" key={`quality-${product}-${timeRange}`}>
+        <span className="tealium-quality-label">Validation breakdown</span>
+        <div className="tealium-inspected">
+          <span className="green">{Math.round(flow.inspected.green * scale)} passed</span>
+          <span className="yellow">{Math.round(flow.inspected.yellow * scale)} warnings</span>
+          <span className="red">{scale === 1 ? flow.inspected.red : scaleFlowNumber(String(flow.inspected.red), scale)} failed</span>
+        </div>
       </div>
-    </div>
-  </TealiumLayout>
-);
+
+      <div className="tealium-tables aep-data-transition stagger-5" key={`tables-${product}-${timeRange}`}>
+        <div className="tealium-table-card">
+          <div className="tealium-table-header">Ingestion sources · {productConfig.label}</div>
+          <div className="tealium-table-subheader">
+            <span>Source</span>
+            <span>Volume · Trend</span>
+          </div>
+          <div className="tealium-table-body">
+            {filteredSources.length === 0 ? (
+              <EmptyState message="No sources for this filter" hint="Try All Pipelines or another time range." icon="🔍" />
+            ) : filteredSources.map((src, i) => (
+              <div key={src.name} className="tealium-table-row" style={{ '--row-index': i }}>
+                <div className="tealium-row-name">
+                  <span className="tealium-row-icon">{src.icon}</span>
+                  <span className="tealium-row-text">{src.name}</span>
+                </div>
+                <div className="tealium-row-metrics">
+                  <MiniSparkline data={src.sparkline} />
+                  <span className="tealium-volume">{scaleVolume(src.volume, scale)}</span>
+                  <span className={`tealium-trend${src.trend.startsWith('+') ? ' up' : ' down'}`}>{src.trend}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="tealium-table-card">
+          <div className="tealium-table-header">Publish destinations</div>
+          <div className="tealium-section-title">Landing zones</div>
+          <div className="tealium-table-body">
+            {landingZones.map((item, i) => (
+              <div key={item.name} className="tealium-table-row" style={{ '--row-index': i }}>
+                <div className="tealium-row-name">
+                  <span className="tealium-row-icon">💾</span>
+                  <div>
+                    <div className="tealium-row-text">{item.name}</div>
+                    {item.detail && <div className="tealium-row-detail">{item.detail}</div>}
+                  </div>
+                </div>
+                <div className="tealium-row-metrics tealium-row-metrics-end">
+                  <span className="tealium-status-enabled">{item.status}</span>
+                  <span className="tealium-volume">{scaleVolume(item.volume, scale)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="tealium-section-title">Publish connectors</div>
+          <div className="tealium-connector-header">
+            <span>Connector</span>
+            <span className="tealium-dot-green">Success</span>
+            <span className="tealium-dot-red">Failed</span>
+          </div>
+          <div className="tealium-table-body">
+            {publishConnectors.map((c, i) => (
+              <div key={c.name} className="tealium-connector-row" style={{ '--row-index': i }}>
+                <div className="tealium-row-name">
+                  <span className="tealium-row-icon">{c.icon}</span>
+                  <span className="tealium-row-text">{c.name}</span>
+                </div>
+                <span className="tealium-connector-stat">{scaleFlowNumber(c.success, scale)}</span>
+                <span className="tealium-connector-stat tealium-connector-fail">{scaleFlowNumber(c.failed, scale)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </TealiumLayout>
+  );
+};
 
 export default DataSupplyChainPage;

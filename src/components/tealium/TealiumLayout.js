@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { SearchIcon, BellIcon, MenuIcon, CloseIcon } from '../../components/aep/icons';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { SearchIcon, BellIcon, MenuIcon, CloseIcon, ChevronIcon } from '../aep/icons';
+import { tealiumNavGroups } from '../../data/tealiumData';
 import '../../styles/animations.css';
 import '../../styles/tealium.css';
+import '../../styles/interactions.css';
 import '../../styles/responsive.css';
+import '../../styles/clean.css';
+import '../../styles/enterprise-motion.css';
 
 const TealiumLayout = ({ children }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState({
+    overview: true,
+    ingestion: true,
+    transformation: true,
+    standardization: true,
+  });
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -17,6 +27,10 @@ const TealiumLayout = ({ children }) => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
+
+  const toggleGroup = (id) => {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
     <div className="tealium-app">
@@ -30,18 +44,18 @@ const TealiumLayout = ({ children }) => {
         >
           {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
         </button>
-        <div className="tealium-topbar-brand">
+        <Link to="/tealium" className="tealium-topbar-brand">
           <span className="tealium-logo">C</span>
-          Codex Copilot Data Hub
-        </div>
+          <span className="tealium-brand-text">Codex Data Supply Chain</span>
+        </Link>
         <div className="tealium-topbar-search">
           <SearchIcon />
-          <input type="text" placeholder="Search..." readOnly />
+          <input type="text" placeholder="Search pipelines, sources, schemas…" readOnly />
         </div>
         <div className="tealium-topbar-right">
-          <button type="button" className="tealium-btn-save">Save / Publish</button>
-          <span className="tealium-topbar-icon"><BellIcon /></span>
-          <span className="tealium-topbar-icon">👤</span>
+          <button type="button" className="tealium-btn-save">Deploy pipeline</button>
+          <button type="button" className="tealium-topbar-icon" aria-label="Notifications"><BellIcon /></button>
+          <div className="tealium-avatar" aria-hidden>AN</div>
         </div>
       </header>
 
@@ -56,27 +70,40 @@ const TealiumLayout = ({ children }) => {
 
       <div className="tealium-shell">
         <aside className={`tealium-sidebar gpu-smooth${sidebarOpen ? ' is-open' : ''}`}>
-          <div className="tealium-nav-item">iQ Tag Management</div>
-          <div className="tealium-nav-group">Data Supply Chain</div>
-          <div className="tealium-nav-sub">
-            <Link to="/tealium" className="tealium-nav-item active" onClick={() => setSidebarOpen(false)}>Overview</Link>
-            <div className="tealium-nav-item">Usage Reports</div>
-            <div className="tealium-nav-item">Sources</div>
-            <div className="tealium-nav-item">EventStream</div>
-            <div className="tealium-nav-item">AudienceStream</div>
-            <div className="tealium-nav-item">DataAccess</div>
-            <div className="tealium-nav-item">Trace</div>
-          </div>
-          <div className="tealium-nav-item">Server-Side Experiments</div>
-          <div className="tealium-nav-item">Server-Side Tools</div>
-          <div className="tealium-nav-item">Server-Side Versions</div>
-          <div className="tealium-nav-item">Help &amp; Support</div>
+          {tealiumNavGroups.map((group) => (
+            <div key={group.id} className="tealium-nav-section">
+              <button
+                type="button"
+                className={`tealium-nav-group-toggle${openGroups[group.id] ? ' open' : ''}`}
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={openGroups[group.id]}
+              >
+                {group.label}
+                <ChevronIcon />
+              </button>
+              {openGroups[group.id] && (
+                <div className="tealium-nav-sub">
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) => `tealium-nav-item${isActive ? ' active' : ''}`}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
           <Link
             to="/"
             className="tealium-nav-item tealium-platform-link"
             onClick={() => setSidebarOpen(false)}
           >
-            Codex Copilot
+            ← Codex Copilot Platform
           </Link>
         </aside>
         <main className="tealium-main">
