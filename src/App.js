@@ -1,19 +1,4 @@
-/**
- * ═══════════════════════════════════════════════════════════════
- *  PORTABLE MIGRATION DASHBOARD — Enterprise Edition
- * ═══════════════════════════════════════════════════════════════
- *
- *  Copy this ENTIRE file → paste as App.js in any React project.
- *
- *  Only extra step in new project:
- *    npm install recharts
- *
- *  ALL CSS is embedded below (global reset + dashboard styles).
- *  No App.css / index.css / external stylesheet needed.
- * ═══════════════════════════════════════════════════════════════
- */
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ComposedChart,
   Bar,
@@ -28,9 +13,44 @@ import {
   LabelList,
 } from 'recharts';
 
-// ── ALL CSS embedded here (global + dashboard) ──
+const DATA_SOURCE = 'json';
+const JSON_DATA_URL = `${process.env.PUBLIC_URL}/dashboardData.json`;
+const API_DATA_URL = '/api/dashboard';
+
+async function fetchDashboardData() {
+  const url = DATA_SOURCE === 'api' ? API_DATA_URL : JSON_DATA_URL;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      DATA_SOURCE === 'api'
+        ? `API error: ${response.status} (${API_DATA_URL})`
+        : 'Could not load public/dashboardData.json'
+    );
+  }
+
+  const json = await response.json();
+  return validateDashboardData(json);
+}
+
+function validateDashboardData(data) {
+  const missing = [];
+
+  if (!data?.header) missing.push('header');
+  if (!data?.colors) missing.push('colors');
+  if (!Array.isArray(data?.metricCards)) missing.push('metricCards');
+  if (!data?.charts?.dcLocation) missing.push('charts.dcLocation');
+  if (!data?.charts?.bu) missing.push('charts.bu');
+  if (!data?.charts?.monthlyProgress) missing.push('charts.monthlyProgress');
+
+  if (missing.length) {
+    throw new Error(`Invalid dashboard data. Missing: ${missing.join(', ')}`);
+  }
+
+  return data;
+}
+
 const DASHBOARD_STYLES = `
-  /* Global Reset */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { min-height: 100vh; }
   body {
@@ -88,7 +108,6 @@ const DASHBOARD_STYLES = `
   .md-root *, .md-root *::before, .md-root *::after { box-sizing: border-box; }
   .md-content { position: relative; z-index: 1; }
 
-  /* Header */
   .md-header {
     display: flex;
     align-items: center;
@@ -134,7 +153,6 @@ const DASHBOARD_STYLES = `
     box-shadow: 0 0 6px rgba(34,197,94,0.6);
   }
 
-  /* Metric Cards */
   .md-metric-cards {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -238,7 +256,6 @@ const DASHBOARD_STYLES = `
   }
   .md-metric-card:hover .md-metric-value { color: var(--accent); }
 
-  /* Charts */
   .md-charts-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -278,7 +295,6 @@ const DASHBOARD_STYLES = `
     margin: -4px 0 8px;
   }
 
-  /* Custom Tooltip */
   .md-tooltip {
     background: rgba(26,58,107,0.95);
     backdrop-filter: blur(8px);
@@ -309,226 +325,9 @@ const DASHBOARD_STYLES = `
     flex-shrink: 0;
   }
 
-  /* Table */
-  .md-table-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    animation: mdFadeInUp 0.6s ease 0.55s both;
-  }
-  .md-table-header h2 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1a3a6b;
-  }
-  .md-table-count {
-    font-size: 12px;
-    color: #8fa3bb;
-    background: #fff;
-    border: 1px solid #c8d9ea;
-    border-radius: 20px;
-    padding: 4px 12px;
-    font-weight: 600;
-  }
-  .md-table-section {
-    background: #ffffff;
-    border: 1px solid rgba(26,58,107,0.12);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(26,58,107,0.06);
-    transition: box-shadow 0.35s ease;
-    animation: mdFadeInUp 0.7s ease 0.60s both;
-  }
-  .md-table-section:hover {
-    box-shadow: 0 8px 24px rgba(26,58,107,0.10);
-  }
-  .md-table-scroll {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: #b8cde0 transparent;
-  }
-  .md-table-scroll::-webkit-scrollbar { height: 6px; }
-  .md-table-scroll::-webkit-scrollbar-thumb {
-    background: #b8cde0;
-    border-radius: 10px;
-  }
-  .md-table-scroll-hint {
-    display: none;
-    text-align: center;
-    font-size: 11px;
-    color: #8fa3bb;
-    padding: 6px 0 2px;
-    font-weight: 600;
-  }
-
-  /* Mobile Table Cards */
-  .md-table-mobile { display: none; }
-  .md-mobile-card {
-    background: #fff;
-    border: 1px solid #dde6f0;
-    border-radius: 12px;
-    padding: 14px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 6px rgba(26,58,107,0.05);
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
-    animation: mdFadeInUp 0.5s ease both;
-  }
-  .md-mobile-card:active { transform: scale(0.99); }
-  .md-mobile-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #e8eef5;
-  }
-  .md-mobile-card-header strong {
-    font-size: 14px;
-    color: #1a3a6b;
-    display: block;
-  }
-  .md-mobile-card-id {
-    font-size: 11px;
-    color: #8fa3bb;
-    margin-top: 2px;
-  }
-  .md-mobile-card-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 0;
-    font-size: 12px;
-    gap: 8px;
-  }
-  .md-mobile-card-label {
-    color: #8fa3bb;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    flex-shrink: 0;
-  }
-  .md-mobile-card-value {
-    color: #1a3a6b;
-    font-weight: 600;
-    text-align: right;
-    word-break: break-word;
-  }
-  .md-mobile-card-row .md-progress-cell {
-    width: 130px;
-    justify-content: flex-end;
-  }
   .md-chart-inner {
     width: 100%;
     min-height: 240px;
-  }
-  .md-migration-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-  .md-migration-table thead tr {
-    background: linear-gradient(135deg, #1a3a6b 0%, #254d85 100%);
-  }
-  .md-migration-table th {
-    color: #ffffff;
-    font-weight: 700;
-    padding: 13px 16px;
-    text-align: left;
-    white-space: nowrap;
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-  }
-  .md-migration-table td {
-    padding: 12px 16px;
-    color: #1a3a6b;
-    border-bottom: 1px solid #e8eef5;
-    transition: background 0.25s ease, padding-left 0.25s ease;
-  }
-  .md-migration-table tbody tr {
-    transition: background 0.25s ease;
-    animation: mdFadeIn 0.5s ease both;
-  }
-  .md-migration-table tbody tr:nth-child(1) { animation-delay: 0.65s; }
-  .md-migration-table tbody tr:nth-child(2) { animation-delay: 0.70s; }
-  .md-migration-table tbody tr:nth-child(3) { animation-delay: 0.75s; }
-  .md-migration-table tbody tr:nth-child(4) { animation-delay: 0.80s; }
-  .md-migration-table tbody tr:nth-child(5) { animation-delay: 0.85s; }
-  .md-migration-table tbody tr:nth-child(6) { animation-delay: 0.90s; }
-  .md-migration-table tbody tr:nth-child(even) { background: #f4f8fc; }
-  .md-migration-table tbody tr:nth-child(odd)  { background: #ffffff; }
-  .md-migration-table tbody tr:hover {
-    background: #dceaf8 !important;
-  }
-  .md-migration-table tbody tr:hover td:first-child {
-    box-shadow: inset 3px 0 0 #2563eb;
-  }
-
-  /* Status Badge */
-  .md-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .md-badge:hover { transform: scale(1.05); }
-  .md-badge-on-track {
-    background: #dcfce7;
-    color: #15803d;
-    border: 1px solid #bbf7d0;
-  }
-  .md-badge-completed {
-    background: #dbeafe;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
-  }
-  .md-badge-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  /* Progress Bar in Table */
-  .md-progress-cell {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .md-progress-bar {
-    flex: 1;
-    height: 6px;
-    background: #e2eaf3;
-    border-radius: 10px;
-    overflow: hidden;
-    min-width: 60px;
-  }
-  .md-progress-fill {
-    height: 100%;
-    border-radius: 10px;
-    background: linear-gradient(90deg, #1a3a6b, #2563eb);
-    transform-origin: left;
-    animation: mdBarGrow 1s ease both;
-    transition: width 0.6s ease;
-  }
-  .md-progress-fill.complete {
-    background: linear-gradient(90deg, #059669, #34d399);
-  }
-  .md-progress-text {
-    font-weight: 700;
-    font-size: 11.5px;
-    min-width: 32px;
-    text-align: right;
   }
 
   @media (max-width: 1400px) {
@@ -547,9 +346,6 @@ const DASHBOARD_STYLES = `
     .md-metric-cards { grid-template-columns: repeat(2, 1fr); }
     .md-charts-row { grid-template-columns: 1fr; }
     .md-charts-row .md-chart-box:last-child { grid-column: auto; }
-    .md-migration-table { min-width: 720px; }
-    .md-table-scroll-hint { display: block; }
-    .md-table-header { flex-wrap: wrap; gap: 8px; }
   }
 
   @media (max-width: 768px) {
@@ -569,15 +365,6 @@ const DASHBOARD_STYLES = `
     .md-chart-box { padding: 12px 8px 6px; }
     .md-chart-title { font-size: 12px; }
     .md-chart-subtitle { font-size: 10px; }
-    .md-table-header h2 { font-size: 15px; }
-    .md-progress-bar { min-width: 48px; }
-  }
-
-  @media (max-width: 640px) {
-    .md-table-desktop { display: none; }
-    .md-table-mobile { display: block; padding: 12px; }
-    .md-table-scroll-hint { display: none; }
-    .md-migration-table { min-width: unset; }
   }
 
   @media (max-width: 576px) {
@@ -604,14 +391,12 @@ const DASHBOARD_STYLES = `
     .md-header-left h1 { font-size: 16px; }
     .md-live-badge { font-size: 11px; padding: 6px 12px; }
     .md-metric-value { font-size: 22px; }
-    .md-mobile-card { padding: 12px; }
   }
 
   @media (hover: hover) {
     .md-metric-card:hover { transform: translateY(-6px); }
     .md-chart-box:hover { transform: translateY(-4px); }
     .md-live-badge:hover { transform: translateY(-1px); }
-    .md-badge:hover { transform: scale(1.05); }
   }
 
   @media (hover: none) {
@@ -626,63 +411,83 @@ const DASHBOARD_STYLES = `
       transition-duration: 0.01ms !important;
     }
   }
+
+  .md-state-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #e8edf4 0%, #eef2f7 100%);
+    padding: 24px;
+    text-align: center;
+  }
+  .md-spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid #c8d9ea;
+    border-top-color: #1a3a6b;
+    border-radius: 50%;
+    animation: mdSpin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes mdSpin {
+    to { transform: rotate(360deg); }
+  }
+  .md-state-title {
+    color: #1a3a6b;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .md-state-text {
+    color: #5a7291;
+    font-size: 13px;
+  }
+  .md-retry-btn {
+    margin-top: 16px;
+    padding: 10px 20px;
+    background: #1a3a6b;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .md-retry-btn:hover {
+    background: #254d85;
+    transform: translateY(-1px);
+  }
 `;
 
 function DashboardStyles() {
   return <style>{DASHBOARD_STYLES}</style>;
 }
 
-// ── Data ──
-const colors = {
-  orange: '#e07a3a',
-  orangeLight: '#f09658',
-  line1: '#0b2f6b',
-  line2: '#1d4ed8',
-  line3: '#5b9bd5',
-  line4: '#7ec8e3',
-};
+function useDashboardData() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const metricCards = [
-  { title: '% Applications Migrated', value: 13, icon: 'migrate', suffix: '%' },
-  { title: 'Cloud Spend Contribution to Total Growth', value: 24, icon: 'cloud', suffix: '%' },
-  { title: '% idle (zombie) Resources', value: 20, icon: 'idle', suffix: '%' },
-  { title: 'Cloud Cost Reduction (%)', value: 16, icon: 'savings', suffix: '%' },
-  { title: 'BF wise Migrations %', value: 13, icon: 'analytics', suffix: '%' },
-];
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(null);
 
-const dcLocationData = [
-  { location: 'DC1 and 2', apps: 18, completion: 18 },
-  { location: 'DC10 and 11', apps: 587, completion: 20 },
-  { location: 'DC12 and 13', apps: 77, completion: 100 },
-  { location: 'DC14 and 15', apps: 33, completion: 100 },
-  { location: 'DC4 and 5', apps: 44, completion: 55 },
-];
+    fetchDashboardData()
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-const buData = [
-  { bu: 'SM...', apps: 6, completion: 4 },
-  { bu: 'AD...', apps: 33, completion: 44 },
-  { bu: 'NAS', apps: 21, completion: 12 },
-  { bu: 'ESI', apps: 33, completion: 100 },
-  { bu: 'Out...', apps: 44, completion: 55 },
-];
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-const monthlyProgressData = [
-  { month: 'Jan-26', appMigrated: 8, bfWise: 6, cloudSpend: 12, costReduction: 5 },
-  { month: 'Feb-26', appMigrated: 18, bfWise: 14, cloudSpend: 22, costReduction: 12 },
-  { month: 'Mar-26', appMigrated: 32, bfWise: 26, cloudSpend: 38, costReduction: 22 },
-  { month: 'Apr-26', appMigrated: 48, bfWise: 40, cloudSpend: 55, costReduction: 35 },
-];
+  return { data, loading, error, reload: loadData };
+}
 
-const migrationTableData = [
-  { dcLocation: 'DC1 and 2', productId: '10001', productName: 'RLIN', completion: 2, migrationStatus: 'On Track', migrationPhase: '' },
-  { dcLocation: 'DC1 and 2', productId: '10002', productName: 'CA Service Desk', completion: 0, migrationStatus: 'On Track', migrationPhase: '3- Non-Prod Migration & testing' },
-  { dcLocation: 'DC10 and 11', productId: '10003', productName: 'Enterprise Portal', completion: 45, migrationStatus: 'On Track', migrationPhase: '2- Assessment' },
-  { dcLocation: 'DC12 and 13', productId: '10004', productName: 'Data Analytics Hub', completion: 100, migrationStatus: 'Completed', migrationPhase: '5- Production Migration' },
-  { dcLocation: 'DC14 and 15', productId: '10005', productName: 'CRM Platform', completion: 100, migrationStatus: 'Completed', migrationPhase: '5- Production Migration' },
-  { dcLocation: 'DC4 and 5', productId: '10006', productName: 'HR Management System', completion: 55, migrationStatus: 'On Track', migrationPhase: '4- Prod Migration Planning' },
-];
-
-// ── Hooks & Helpers ──
 function useResponsive() {
   const [width, setWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1200
@@ -759,14 +564,14 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-const renderBarLabel = ({ x, y, width, value }) => (
-  <text x={x + width / 2} y={y - 6} fill={colors.orange} textAnchor="middle" fontSize={11} fontWeight={700}>
+const createBarLabel = (color) => ({ x, y, width, value }) => (
+  <text x={x + width / 2} y={y - 6} fill={color} textAnchor="middle" fontSize={11} fontWeight={700}>
     {value}
   </text>
 );
 
-const renderLineLabel = ({ x, y, value }) => (
-  <text x={x} y={y - 10} fill={colors.orange} textAnchor="middle" fontSize={11} fontWeight={700}>
+const createLineLabel = (color) => ({ x, y, value }) => (
+  <text x={x} y={y - 10} fill={color} textAnchor="middle" fontSize={11} fontWeight={700}>
     {`${value}%`}
   </text>
 );
@@ -833,17 +638,36 @@ function MetricIcon({ type }) {
   }
 }
 
-// ── Components ──
-function DashboardHeader() {
+function LoadingScreen() {
+  return (
+    <div className="md-state-screen">
+      <div className="md-spinner" />
+      <p className="md-state-title">Loading Dashboard</p>
+      <p className="md-state-text">Loading from {DATA_SOURCE === 'api' ? API_DATA_URL : 'dashboardData.json'}...</p>
+    </div>
+  );
+}
+
+function ErrorScreen({ message, onRetry }) {
+  return (
+    <div className="md-state-screen">
+      <p className="md-state-title">Failed to Load Data</p>
+      <p className="md-state-text">{message}</p>
+      <button type="button" className="md-retry-btn" onClick={onRetry}>Retry</button>
+    </div>
+  );
+}
+
+function DashboardHeader({ header }) {
   return (
     <div className="md-header">
       <div className="md-header-left">
-        <h1>Cloud Migration Dashboard</h1>
-        <p>Real-time overview of application migration progress & cloud optimization</p>
+        <h1>{header.title}</h1>
+        <p>{header.subtitle}</p>
       </div>
       <div className="md-live-badge">
         <span className="md-live-dot" />
-        Live Data · May 2026
+        {header.liveBadge}
       </div>
     </div>
   );
@@ -862,20 +686,20 @@ function MetricCard({ card }) {
   );
 }
 
-function MetricCards() {
+function MetricCards({ cards }) {
   return (
     <div className="md-metric-cards">
-      {metricCards.map((card) => (
+      {cards.map((card) => (
         <MetricCard key={card.title} card={card} />
       ))}
     </div>
   );
 }
 
-function ComboChartDefs() {
+function ComboChartDefs({ colors, gradientId }) {
   return (
     <defs>
-      <linearGradient id="mdBarGrad" x1="0" y1="0" x2="0" y2="1">
+      <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor={colors.orangeLight} />
         <stop offset="100%" stopColor={colors.orange} />
       </linearGradient>
@@ -883,19 +707,23 @@ function ComboChartDefs() {
   );
 }
 
-function DCLocationChart() {
+function ComboChartCard({ config, colors }) {
   const r = useResponsive();
+  const barLabelRenderer = createBarLabel(colors.orange);
+  const lineLabelRenderer = createLineLabel(colors.orange);
+  const gradientId = `mdBarGrad-${config.xKey}`;
+
   return (
     <div className="md-chart-box">
-      <h3 className="md-chart-title">Migration Status by DC Location</h3>
-      <p className="md-chart-subtitle">Apps count vs completion %</p>
+      <h3 className="md-chart-title">{config.title}</h3>
+      <p className="md-chart-subtitle">{config.subtitle}</p>
       <div className="md-chart-inner">
         <ResponsiveContainer width="100%" height={r.chartHeight}>
-          <ComposedChart data={dcLocationData} margin={r.comboMargin}>
-            <ComboChartDefs />
+          <ComposedChart data={config.data} margin={r.comboMargin}>
+            <ComboChartDefs colors={colors} gradientId={gradientId} />
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2eaf3" />
             <XAxis
-              dataKey="location"
+              dataKey={config.xKey}
               tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
               axisLine={{ stroke: '#c8d9ea' }}
               angle={r.xAxisAngle}
@@ -905,39 +733,39 @@ function DCLocationChart() {
             />
             <YAxis
               yAxisId="left"
-              domain={[0, 700]}
+              domain={config.yAxisLeft.domain}
               tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
               axisLine={{ stroke: '#c8d9ea' }}
               width={r.isMobile ? 32 : 40}
-              label={r.showAxisLabels ? { value: '# Apps', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
+              label={r.showAxisLabels ? { value: config.yAxisLeft.label, angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
-              domain={[0, 120]}
+              domain={config.yAxisRight.domain}
               tickFormatter={(v) => `${v}%`}
               tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
               axisLine={{ stroke: '#c8d9ea' }}
               width={r.isMobile ? 36 : 48}
-              label={r.showAxisLabels ? { value: '% Completion', angle: 90, position: 'insideRight', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
+              label={r.showAxisLabels ? { value: config.yAxisRight.label, angle: 90, position: 'insideRight', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(26,58,107,0.04)' }} />
             <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: r.legendSize, paddingBottom: 6 }} />
-            <Bar yAxisId="left" dataKey="apps" name="# Apps" fill="url(#mdBarGrad)" barSize={r.barSize} radius={[6, 6, 0, 0]} {...chartAnimation}>
-              {!r.isMobile && <LabelList dataKey="apps" content={renderBarLabel} />}
+            <Bar yAxisId="left" dataKey={config.barKey} name={config.barLabel} fill={`url(#${gradientId})`} barSize={r.barSize} radius={[6, 6, 0, 0]} {...chartAnimation}>
+              {!r.isMobile && <LabelList dataKey={config.barKey} content={barLabelRenderer} />}
             </Bar>
             <Line
               yAxisId="right"
               type="monotone"
-              dataKey="completion"
-              name="% Completion"
+              dataKey={config.lineKey}
+              name={config.lineLabel}
               stroke={colors.orange}
               strokeWidth={r.isMobile ? 2 : 2.5}
               dot={{ r: r.isMobile ? 3 : 5, fill: colors.orange, stroke: '#fff', strokeWidth: 2 }}
               activeDot={{ r: r.activeDotSize, fill: colors.orange, stroke: '#fff', strokeWidth: 2 }}
               {...chartAnimation}
             >
-              {!r.isMobile && <LabelList dataKey="completion" content={renderLineLabel} />}
+              {!r.isMobile && <LabelList dataKey={config.lineKey} content={lineLabelRenderer} />}
             </Line>
           </ComposedChart>
         </ResponsiveContainer>
@@ -946,87 +774,24 @@ function DCLocationChart() {
   );
 }
 
-function BUChart() {
+function MonthlyProgressChart({ config, colors }) {
   const r = useResponsive();
-  return (
-    <div className="md-chart-box">
-      <h3 className="md-chart-title">Migration Status by BU</h3>
-      <p className="md-chart-subtitle">Business unit breakdown</p>
-      <div className="md-chart-inner">
-        <ResponsiveContainer width="100%" height={r.chartHeight}>
-          <ComposedChart data={buData} margin={r.comboMargin}>
-            <ComboChartDefs />
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2eaf3" />
-            <XAxis
-              dataKey="bu"
-              tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
-              axisLine={{ stroke: '#c8d9ea' }}
-              angle={r.xAxisAngle}
-              textAnchor={r.xAxisAngle ? 'end' : 'middle'}
-              height={r.xAxisHeight}
-            />
-            <YAxis
-              yAxisId="left"
-              domain={[0, 50]}
-              tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
-              axisLine={{ stroke: '#c8d9ea' }}
-              width={r.isMobile ? 32 : 40}
-              label={r.showAxisLabels ? { value: '# Apps', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              domain={[0, 120]}
-              tickFormatter={(v) => `${v}%`}
-              tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
-              axisLine={{ stroke: '#c8d9ea' }}
-              width={r.isMobile ? 36 : 48}
-              label={r.showAxisLabels ? { value: '% Completion', angle: 90, position: 'insideRight', offset: 10, style: { fontSize: 10, fill: '#5a7291' } } : undefined}
-            />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(26,58,107,0.04)' }} />
-            <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: r.legendSize, paddingBottom: 6 }} />
-            <Bar yAxisId="left" dataKey="apps" name="# Apps" fill="url(#mdBarGrad)" barSize={r.barSize} radius={[6, 6, 0, 0]} {...chartAnimation}>
-              {!r.isMobile && <LabelList dataKey="apps" content={renderBarLabel} />}
-            </Bar>
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="completion"
-              name="% Completion"
-              stroke={colors.orange}
-              strokeWidth={r.isMobile ? 2 : 2.5}
-              dot={{ r: r.isMobile ? 3 : 5, fill: colors.orange, stroke: '#fff', strokeWidth: 2 }}
-              activeDot={{ r: r.activeDotSize, fill: colors.orange, stroke: '#fff', strokeWidth: 2 }}
-              {...chartAnimation}
-            >
-              {!r.isMobile && <LabelList dataKey="completion" content={renderLineLabel} />}
-            </Line>
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
+  const lineConfig = config.lines.map((line) => ({
+    ...line,
+    color: colors[line.colorKey],
+  }));
 
-function MonthlyProgressChart() {
-  const r = useResponsive();
-  const lineConfig = [
-    { key: 'appMigrated', name: '% APP Migrated', color: colors.line1 },
-    { key: 'bfWise', name: 'BF Wise Migration%', color: colors.line2 },
-    { key: 'cloudSpend', name: 'Cloud Spent count to Total Growth', color: colors.line3 },
-    { key: 'costReduction', name: 'Cloud Cost Reduction', color: colors.line4 },
-  ];
   return (
     <div className="md-chart-box">
-      <h3 className="md-chart-title">% Monthly Migrated App Progress</h3>
-      <p className="md-chart-subtitle">Trend over Jan – Apr 2026</p>
+      <h3 className="md-chart-title">{config.title}</h3>
+      <p className="md-chart-subtitle">{config.subtitle}</p>
       <div className="md-chart-inner">
         <ResponsiveContainer width="100%" height={r.chartHeight}>
-          <LineChart data={monthlyProgressData} margin={r.lineMargin}>
+          <LineChart data={config.data} margin={r.lineMargin}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2eaf3" />
             <XAxis dataKey="month" tick={{ fontSize: r.tickSize, fill: '#5a7291' }} axisLine={{ stroke: '#c8d9ea' }} />
             <YAxis
-              domain={[0, 100]}
+              domain={config.yDomain}
               tickFormatter={(v) => (r.isMobile ? `${v}%` : `${v.toFixed(2)}%`)}
               tick={{ fontSize: r.tickSize, fill: '#5a7291' }}
               axisLine={{ stroke: '#c8d9ea' }}
@@ -1058,123 +823,31 @@ function MonthlyProgressChart() {
   );
 }
 
-function StatusBadge({ status }) {
-  const isCompleted = status === 'Completed';
+function DashboardContent({ data }) {
   return (
-    <span className={`md-badge ${isCompleted ? 'md-badge-completed' : 'md-badge-on-track'}`}>
-      <span className="md-badge-dot" />
-      {status}
-    </span>
-  );
-}
-
-function ProgressCell({ value }) {
-  const isComplete = value >= 100;
-  return (
-    <div className="md-progress-cell">
-      <div className="md-progress-bar">
-        <div
-          className={`md-progress-fill ${isComplete ? 'complete' : ''}`}
-          style={{ width: `${value}%` }}
-        />
+    <div className="md-root">
+      <div className="md-content">
+        <DashboardHeader header={data.header} />
+        <MetricCards cards={data.metricCards} />
+        <div className="md-charts-row">
+          <ComboChartCard config={data.charts.dcLocation} colors={data.colors} />
+          <ComboChartCard config={data.charts.bu} colors={data.colors} />
+          <MonthlyProgressChart config={data.charts.monthlyProgress} colors={data.colors} />
+        </div>
       </div>
-      <span className="md-progress-text">{value}%</span>
     </div>
   );
 }
 
-function MobileTableCard({ row, index }) {
-  return (
-    <div className="md-mobile-card" style={{ animationDelay: `${0.65 + index * 0.05}s` }}>
-      <div className="md-mobile-card-header">
-        <div>
-          <strong>{row.productName}</strong>
-          <div className="md-mobile-card-id">ID: {row.productId}</div>
-        </div>
-        <StatusBadge status={row.migrationStatus} />
-      </div>
-      <div className="md-mobile-card-row">
-        <span className="md-mobile-card-label">DC Location</span>
-        <span className="md-mobile-card-value">{row.dcLocation}</span>
-      </div>
-      <div className="md-mobile-card-row">
-        <span className="md-mobile-card-label">Completion</span>
-        <span className="md-mobile-card-value"><ProgressCell value={row.completion} /></span>
-      </div>
-      {row.migrationPhase && (
-        <div className="md-mobile-card-row">
-          <span className="md-mobile-card-label">Phase</span>
-          <span className="md-mobile-card-value">{row.migrationPhase}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MigrationTable() {
-  return (
-    <>
-      <div className="md-table-header">
-        <h2>Migration Details</h2>
-        <span className="md-table-count">{migrationTableData.length} Applications</span>
-      </div>
-      <div className="md-table-section">
-        <div className="md-table-desktop">
-          <div className="md-table-scroll">
-            <table className="md-migration-table">
-              <thead>
-                <tr>
-                  <th>DC Location</th>
-                  <th>Product ID</th>
-                  <th>Product Name</th>
-                  <th>% Completion</th>
-                  <th>Migration Status</th>
-                  <th>Migration Phase</th>
-                </tr>
-              </thead>
-              <tbody>
-                {migrationTableData.map((row, index) => (
-                  <tr key={`${row.productId}-${index}`}>
-                    <td>{row.dcLocation}</td>
-                    <td>{row.productId}</td>
-                    <td><strong>{row.productName}</strong></td>
-                    <td><ProgressCell value={row.completion} /></td>
-                    <td><StatusBadge status={row.migrationStatus} /></td>
-                    <td>{row.migrationPhase || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="md-table-scroll-hint">← Scroll horizontally to see all columns →</p>
-        </div>
-        <div className="md-table-mobile">
-          {migrationTableData.map((row, index) => (
-            <MobileTableCard key={`${row.productId}-m-${index}`} row={row} index={index} />
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ── Main App ──
 function App() {
+  const { data, loading, error, reload } = useDashboardData();
+
   return (
     <>
       <DashboardStyles />
-      <div className="md-root">
-        <div className="md-content">
-          <DashboardHeader />
-          <MetricCards />
-          <div className="md-charts-row">
-            <DCLocationChart />
-            <BUChart />
-            <MonthlyProgressChart />
-          </div>
-          <MigrationTable />
-        </div>
-      </div>
+      {loading && <LoadingScreen />}
+      {!loading && error && <ErrorScreen message={error} onRetry={reload} />}
+      {!loading && data && <DashboardContent data={data} />}
     </>
   );
 }
