@@ -15,6 +15,107 @@ import productResiliencyData from './data/productResiliencyData.json';
 const CHART_KEYS = ['mttd', 'mtte', 'mttr'];
 const CHART_DELAYS = { mttd: 450, mtte: 520, mttr: 590 };
 
+// All 8 cards defined here so XYZ.js works even if JSON is old/incomplete when copied elsewhere.
+const METRIC_CARDS_TEMPLATE = [
+  {
+    type: 'availability',
+    title: 'Client Availability',
+    description: 'Uptime across all client-facing services',
+    value: 99.9964,
+    decimals: 4,
+    suffix: '%',
+    valueColor: '#027a48',
+    accent: '#027a48',
+    icon: 'shield',
+    thresholdLegend: 'Threshold: Red <99.90%, Yellow 99.90% to <99.99%, Green 99.99%+',
+  },
+  {
+    type: 'count',
+    title: 'Critical Incident Volume',
+    description: 'Total critical incidents reported',
+    value: 29,
+    valueLabel: 'Total Count',
+    accent: '#0000ab',
+    icon: 'alert',
+  },
+  {
+    type: 'count',
+    title: 'Critical Incidents Due to Change',
+    description: 'Incidents triggered by system changes',
+    value: 16,
+    valueLabel: 'Count',
+    accent: '#b42318',
+    icon: 'change',
+  },
+  {
+    type: 'kpi',
+    title: 'SLA Compliance',
+    description: 'SLA adherence over the last four weeks',
+    value: 90,
+    suffix: '%',
+    caption: 'Last Weeks',
+    accent: '#059669',
+    icon: 'compliance',
+  },
+  {
+    type: 'time',
+    title: 'Mean Time to Detect',
+    description: 'Average and median detection time',
+    meanValue: '4.38 Hrs.',
+    medianLabel: 'Median time to Detect',
+    medianValue: '0.85 Hrs.',
+    accent: '#1d4ed8',
+    icon: 'detect',
+  },
+  {
+    type: 'time',
+    title: 'Mean Time to Engage',
+    description: 'Average and median engagement time',
+    meanValue: '1.71 Hrs.',
+    medianLabel: 'Median Time to Engage',
+    medianValue: '0.78 Hrs.',
+    accent: '#7c3aed',
+    icon: 'engage',
+  },
+  {
+    type: 'time',
+    title: 'Mean Time to Resolve',
+    description: 'Average and median resolution time',
+    meanValue: '12.15 Hrs.',
+    medianLabel: 'Median Time to Resolve',
+    medianValue: '7.10 Hrs.',
+    accent: '#0d9488',
+    icon: 'resolve',
+  },
+  {
+    type: 'kpi',
+    title: 'Open Incidents',
+    description: 'Currently open incidents across all services',
+    value: 12,
+    accent: '#dc6803',
+    icon: 'incidents',
+    trend: {
+      direction: 'down',
+      value: '14%',
+      label: 'vs Previous Quarter',
+    },
+  },
+];
+
+function mergeMetricCards(fromJson = []) {
+  const byTitle = new Map(fromJson.map((card) => [card.title, card]));
+  return METRIC_CARDS_TEMPLATE.map(
+    (template) => ({ ...template, ...byTitle.get(template.title) })
+  );
+}
+
+function getDashboardData(source = productResiliencyData) {
+  return {
+    ...source,
+    metricCards: mergeMetricCards(source?.metricCards),
+  };
+}
+
 const DASHBOARD_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { min-height: 100vh; width: 100%; }
@@ -1361,7 +1462,7 @@ function DashboardContent({ data }) {
 const XYZ = () => (
   <>
     <style>{DASHBOARD_STYLES}</style>
-    <DashboardContent data={productResiliencyData} />
+    <DashboardContent data={getDashboardData()} />
   </>
 );
 
