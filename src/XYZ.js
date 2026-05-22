@@ -15,37 +15,8 @@ import productResiliencyData from './data/productResiliencyData.json';
 const CHART_KEYS = ['mttd', 'mtte', 'mttr'];
 const CHART_DELAYS = { mttd: 450, mtte: 520, mttr: 590 };
 
-const METRIC_CARDS_TEMPLATE = [
-  {
-    type: 'availability',
-    title: 'Client Availability',
-    description: 'Uptime across all client-facing services',
-    value: 99.9964,
-    decimals: 4,
-    suffix: '%',
-    valueColor: '#027a48',
-    accent: '#027a48',
-    icon: 'shield',
-    thresholdLegend: 'Threshold: Red <99.90%, Yellow 99.90% to <99.99%, Green 99.99%+',
-  },
-  {
-    type: 'count',
-    title: 'Critical Incident Volume',
-    description: 'Total critical incidents reported',
-    value: 29,
-    valueLabel: 'Total Count',
-    accent: '#0000ab',
-    icon: 'alert',
-  },
-  {
-    type: 'count',
-    title: 'Critical Incidents Due to Change',
-    description: 'Incidents triggered by system changes',
-    value: 16,
-    valueLabel: 'Count',
-    accent: '#b42318',
-    icon: 'change',
-  },
+// Fallback only when JSON is old/incomplete (e.g. copied without updated metricCards).
+const FALLBACK_KPI_CARDS = [
   {
     type: 'kpi',
     title: 'SLA Compliance',
@@ -55,36 +26,6 @@ const METRIC_CARDS_TEMPLATE = [
     caption: 'Last Weeks',
     accent: '#059669',
     icon: 'compliance',
-  },
-  {
-    type: 'time',
-    title: 'Mean Time to Detect',
-    description: 'Average and median detection time',
-    meanValue: '4.38 Hrs.',
-    medianLabel: 'Median time to Detect',
-    medianValue: '0.85 Hrs.',
-    accent: '#1d4ed8',
-    icon: 'detect',
-  },
-  {
-    type: 'time',
-    title: 'Mean Time to Engage',
-    description: 'Average and median engagement time',
-    meanValue: '1.71 Hrs.',
-    medianLabel: 'Median Time to Engage',
-    medianValue: '0.78 Hrs.',
-    accent: '#7c3aed',
-    icon: 'engage',
-  },
-  {
-    type: 'time',
-    title: 'Mean Time to Resolve',
-    description: 'Average and median resolution time',
-    meanValue: '12.15 Hrs.',
-    medianLabel: 'Median Time to Resolve',
-    medianValue: '7.10 Hrs.',
-    accent: '#0d9488',
-    icon: 'resolve',
   },
   {
     type: 'kpi',
@@ -101,17 +42,28 @@ const METRIC_CARDS_TEMPLATE = [
   },
 ];
 
-function mergeMetricCards(fromJson = []) {
-  const byTitle = new Map(fromJson.map((card) => [card.title, card]));
-  return METRIC_CARDS_TEMPLATE.map(
-    (template) => ({ ...template, ...byTitle.get(template.title) })
-  );
+function ensureMetricCards(cards = []) {
+  if (cards.length >= 8) return cards.slice(0, 8);
+
+  const result = [...cards];
+  const titles = new Set(result.map((card) => card.title));
+
+  if (!titles.has('SLA Compliance')) {
+    result.splice(3, 0, FALLBACK_KPI_CARDS[0]);
+    titles.add('SLA Compliance');
+  }
+
+  if (!titles.has('Open Incidents')) {
+    result.push(FALLBACK_KPI_CARDS[1]);
+  }
+
+  return result;
 }
 
 function getDashboardData(source = productResiliencyData) {
   return {
     ...source,
-    metricCards: mergeMetricCards(source?.metricCards),
+    metricCards: ensureMetricCards(source?.metricCards),
   };
 }
 
@@ -1084,6 +1036,7 @@ function AvailabilityCard({ card, delay }) {
 
 function CountCard({ card, delay }) {
   const count = useCountUp(card.value, 900);
+  const displayValue = card.valueLabel ? `${card.valueLabel}: ${count}` : `${count}${card.suffix || ''}`;
 
   return (
     <MetricCardShell accent={card.accent} delay={delay} title={card.description || card.title}>
@@ -1095,12 +1048,7 @@ function CountCard({ card, delay }) {
       </div>
       <div className="pr-metric-card-body">
         <div className="pr-metric-card-value-row">
-          <span className="pr-metric-card-value">{count}{card.suffix || ''}</span>
-        </div>
-        <div className="pr-metric-card-footer">
-          {card.valueLabel && (
-            <span className="pr-metric-card-caption">{card.valueLabel}</span>
-          )}
+          <span className="pr-metric-card-value">{displayValue}</span>
         </div>
       </div>
     </MetricCardShell>

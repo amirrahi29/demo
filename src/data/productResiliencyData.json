@@ -117,15 +117,15 @@
         "fy26Current": "5.55 hrs"
       },
       "data": [
-        { "month": "Jul", "fy25": 12.06, "fy26": 5.75 },
-        { "month": "Aug", "fy25": 6.08, "fy26": 4.28 },
-        { "month": "Sep", "fy25": 11.83, "fy26": 5.79 },
-        { "month": "Oct", "fy25": 6.24, "fy26": 5.44 },
-        { "month": "Nov", "fy25": 7.54, "fy26": 4.86 },
-        { "month": "Dec", "fy25": 8.82, "fy26": 4.96 },
-        { "month": "Jan", "fy25": 6.98, "fy26": 4.72 },
-        { "month": "Feb", "fy25": 24.17, "fy26": 5.44 },
-        { "month": "Mar", "fy25": 11.92, "fy26": 3.95 }
+        { "month": "Jul", "fy25": 3.85, "fy26": 2.77 },
+        { "month": "Aug", "fy25": 6.63, "fy26": 6.26 },
+        { "month": "Sep", "fy25": 7.1, "fy26": 4.72 },
+        { "month": "Oct", "fy25": 9.91, "fy26": 8.39 },
+        { "month": "Nov", "fy25": 16.27, "fy26": 8.79 },
+        { "month": "Dec", "fy25": 10.04, "fy26": 4.05 },
+        { "month": "Jan", "fy25": 8.24, "fy26": 1.65 },
+        { "month": "Feb", "fy25": 7.34, "fy26": 6.1 },
+        { "month": "Mar", "fy25": 4.38, "fy26": 3.65 }
       ]
     },
     "mtte": {
@@ -141,21 +141,21 @@
         "fy26Current": "3.97 hrs"
       },
       "data": [
-        { "month": "Jul", "fy25": 3.86, "fy26": 2.47 },
-        { "month": "Aug", "fy25": 3.08, "fy26": 2.47 },
-        { "month": "Sep", "fy25": 0.25, "fy26": 2.97 },
-        { "month": "Oct", "fy25": 4.45, "fy26": 17.82 },
-        { "month": "Nov", "fy25": 3.08, "fy26": 2.97 },
-        { "month": "Dec", "fy25": 3.44, "fy26": 3.44 },
-        { "month": "Jan", "fy25": 3.86, "fy26": 3.86 },
-        { "month": "Feb", "fy25": 4.28, "fy26": 4.28 },
-        { "month": "Mar", "fy25": 3.08, "fy26": 3.44 }
+        { "month": "Jul", "fy25": 3.08, "fy26": 2.17 },
+        { "month": "Aug", "fy25": 4.37, "fy26": 1.59 },
+        { "month": "Sep", "fy25": 6.2, "fy26": 0.68 },
+        { "month": "Oct", "fy25": 1.23, "fy26": 6.2 },
+        { "month": "Nov", "fy25": 6.15, "fy26": 2.62 },
+        { "month": "Dec", "fy25": 3.61, "fy26": 2.04 },
+        { "month": "Jan", "fy25": 0.83, "fy26": 5.43 },
+        { "month": "Feb", "fy25": 14.39, "fy26": 2.4 },
+        { "month": "Mar", "fy25": 1.71, "fy26": 7.5 }
       ]
     },
     "mttr": {
       "title": "Mean Time to Restore (hrs)",
       "goal": 19.43,
-      "yMax": 30,
+      "yMax": 36,
       "fytdPercent": "10.21%",
       "fytdColorKey": "green",
       "headerStats": {
@@ -165,15 +165,15 @@
         "fy26Current": "20.52 hrs"
       },
       "data": [
-        { "month": "Jul", "fy25": 28.5, "fy26": 21.5 },
-        { "month": "Aug", "fy25": 21.5, "fy26": 19.0 },
-        { "month": "Sep", "fy25": 18.0, "fy26": 20.0 },
-        { "month": "Oct", "fy25": 25.0, "fy26": 21.0 },
-        { "month": "Nov", "fy25": 20.0, "fy26": 19.0 },
-        { "month": "Dec", "fy25": 25.0, "fy26": 22.0 },
-        { "month": "Jan", "fy25": 22.0, "fy26": 20.0 },
-        { "month": "Feb", "fy25": 20.0, "fy26": 21.0 },
-        { "month": "Mar", "fy25": 22.0, "fy26": 19.5 }
+        { "month": "Jul", "fy25": 12.26, "fy26": 17.97 },
+        { "month": "Aug", "fy25": 18.38, "fy26": 29.97 },
+        { "month": "Sep", "fy25": 10.34, "fy26": 13.26 },
+        { "month": "Oct", "fy25": 21.6, "fy26": 29.18 },
+        { "month": "Nov", "fy25": 25.33, "fy26": 18.46 },
+        { "month": "Dec", "fy25": 18.19, "fy26": 19.23 },
+        { "month": "Jan", "fy25": 21.1, "fy26": 6.15 },
+        { "month": "Feb", "fy25": 21.34, "fy26": 34.38 },
+        { "month": "Mar", "fy25": 12.79, "fy26": 22.15 }
       ]
     }
   },
