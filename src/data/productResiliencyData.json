@@ -1,12 +1,11 @@
 {
   "header": {
     "title": "Product Resiliency: ADP Wide Metrics FYTD March 2026",
-    "subtitle": "Enterprise Operations Dashboard · Real-time Resiliency Intelligence",
-    "liveBadge": "Live Data · FYTD March 2026"
+    "subtitle": "Enterprise Operations Dashboard · Real-time Resiliency Intelligence"
   },
   "colors": {
-    "headerOrange": "#c9542a",
-    "headerOrangeDark": "#a84422",
+    "headerOrange": "#0000ab",
+    "headerOrangeDark": "#000080",
     "green": "#027a48",
     "red": "#b42318",
     "fy25Line": "#1d2939",
@@ -17,8 +16,7 @@
   },
   "metricsSection": {
     "title": "Monthly Metrics",
-    "subtitle": "Key resiliency indicators for FYTD March 2026",
-    "liveTag": "Updated Live"
+    "subtitle": "Key resiliency indicators for FYTD March 2026"
   },
   "metricCards": [
     {
@@ -45,8 +43,7 @@
       "description": "Total critical incidents reported",
       "value": 29,
       "max": 50,
-      "valueLabel": "Total Count",
-      "accent": "#c9542a",
+      "accent": "#0000ab",
       "icon": "alert",
       "badge": "Incidents",
       "badgeStatus": "warning"
@@ -57,53 +54,66 @@
       "description": "Incidents triggered by system changes",
       "value": 16,
       "max": 50,
-      "valueLabel": "Count",
       "accent": "#b42318",
       "icon": "change",
       "badge": "Change Related",
       "badgeStatus": "danger"
     },
     {
+      "type": "kpi",
+      "title": "SLA Compliance",
+      "description": "SLA adherence over the last four weeks",
+      "value": 90,
+      "suffix": "%",
+      "caption": "Last Weeks",
+      "accent": "#059669",
+      "icon": "compliance"
+    },
+    {
       "type": "time",
       "title": "Mean Time to Detect",
-      "shortLabel": "MTTD",
       "description": "Average & median detection time",
       "meanLabel": "Mean",
       "meanValue": "4.38 Hrs.",
-      "meanNumeric": 4.38,
       "medianLabel": "Median",
       "medianValue": "0.85 Hrs.",
-      "medianNumeric": 0.85,
       "accent": "#1d4ed8",
       "icon": "detect"
     },
     {
       "type": "time",
       "title": "Mean Time to Engage",
-      "shortLabel": "MTTE",
       "description": "Average & median engagement time",
       "meanLabel": "Mean",
       "meanValue": "1.71 Hrs.",
-      "meanNumeric": 1.71,
       "medianLabel": "Median",
       "medianValue": "0.78 Hrs.",
-      "medianNumeric": 0.78,
       "accent": "#7c3aed",
       "icon": "engage"
     },
     {
       "type": "time",
       "title": "Mean Time to Resolve",
-      "shortLabel": "MTTR",
       "description": "Average & median resolution time",
       "meanLabel": "Mean",
       "meanValue": "12.15 Hrs.",
-      "meanNumeric": 12.15,
       "medianLabel": "Median",
       "medianValue": "7.10 Hrs.",
-      "medianNumeric": 7.10,
       "accent": "#0d9488",
       "icon": "resolve"
+    },
+    {
+      "type": "kpi",
+      "title": "Open Incidents",
+      "description": "Currently open incidents across all services",
+      "value": 12,
+      "accent": "#dc6803",
+      "icon": "incidents",
+      "trend": {
+        "direction": "down",
+        "value": "14%",
+        "label": "vs Previous Quarter"
+      }
     }
   ],
   "charts": {
