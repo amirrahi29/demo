@@ -172,10 +172,17 @@ const DASHBOARD_STYLES = `
     line-height: 1.4;
   }
 
-  .pr-metrics-cards {
+  .pr-metrics-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .pr-metrics-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
+    align-items: stretch;
   }
 
   .pr-metric-card {
@@ -188,7 +195,8 @@ const DASHBOARD_STYLES = `
     border: 1px solid #eaecf0;
     background: #fff;
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
-    min-height: 132px;
+    min-height: 148px;
+    height: 100%;
     cursor: default;
     animation: pr-strip-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
     transition:
@@ -239,20 +247,6 @@ const DASHBOARD_STYLES = `
     animation: pr-strip-shine 0.55s ease;
   }
 
-  .pr-metric-card.featured {
-    background: #f6fef9;
-    --accent: #027a48;
-  }
-
-  .pr-metric-card.featured::before {
-    opacity: 0.7;
-  }
-
-  .pr-metric-card.featured:hover {
-    background: #ecfdf3;
-    border-color: rgba(2, 122, 72, 0.22);
-  }
-
   .pr-metric-card-header {
     display: flex;
     align-items: flex-start;
@@ -301,6 +295,15 @@ const DASHBOARD_STYLES = `
     flex-direction: column;
     gap: 8px;
     flex: 1;
+    justify-content: space-between;
+  }
+
+  .pr-metric-card-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 32px;
+    justify-content: flex-end;
   }
 
   .pr-metric-card-value-row {
@@ -321,14 +324,6 @@ const DASHBOARD_STYLES = `
 
   .pr-metric-card:hover .pr-metric-card-value {
     color: var(--accent);
-  }
-
-  .pr-metric-card.featured .pr-metric-card-value {
-    color: #027a48;
-  }
-
-  .pr-metric-card.featured:hover .pr-metric-card-value {
-    color: #027a48;
   }
 
   .pr-metric-card-sub {
@@ -357,36 +352,6 @@ const DASHBOARD_STYLES = `
   .pr-metric-card-badge.warning { background: #fffaeb; color: #b54708; border-color: #fedf89; }
   .pr-metric-card-badge.danger { background: #fef3f2; color: #b42318; border-color: #fecdca; }
 
-  .pr-metric-card-thresholds {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .pr-metric-card-threshold {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 8px;
-    font-weight: 600;
-    color: #98a2b3;
-    text-transform: uppercase;
-    letter-spacing: 0.2px;
-  }
-
-  .pr-metric-card-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: transform 0.22s ease;
-  }
-
-  .pr-metric-card:hover .pr-metric-card-dot {
-    transform: scale(1.2);
-  }
-
   .pr-metric-card-bar {
     height: 4px;
     border-radius: 999px;
@@ -407,63 +372,26 @@ const DASHBOARD_STYLES = `
     background: var(--accent);
   }
 
-  .pr-metric-card-time-row {
-    display: flex;
-    gap: 8px;
-  }
-
-  .pr-metric-card-time-item {
-    flex: 1;
-    min-width: 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #f9fafb;
-    border: 1px solid #f2f4f7;
-    transition: border-color 0.22s ease, background 0.22s ease;
-  }
-
-  .pr-metric-card-time-item.median {
-    background: #f9fafb;
-    border-color: #eaecf0;
-  }
-
-  .pr-metric-card:hover .pr-metric-card-time-item {
-    border-color: #e4e7ec;
-    background: #fff;
-  }
-
-  .pr-metric-card:hover .pr-metric-card-time-item.median {
-    border-color: color-mix(in srgb, var(--accent) 28%, #e4e7ec);
-    background: color-mix(in srgb, var(--accent) 5%, white);
-  }
-
-  .pr-metric-card-time-lbl {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    color: #98a2b3;
-    margin-bottom: 4px;
-  }
-
-  .pr-metric-card-time-item.median .pr-metric-card-time-val { color: var(--accent); }
-
-  .pr-metric-card-time-val {
-    font-size: 13px;
-    font-weight: 700;
-    color: #344054;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: color 0.22s ease;
-  }
-
-  .pr-metric-card:hover .pr-metric-card-threshold { color: #667085; }
-
   .pr-metric-card-caption {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: #667085;
+    line-height: 1.35;
+  }
+
+  .pr-metric-card-threshold-legend {
+    font-size: 9px;
+    font-weight: 500;
+    color: #667085;
+    line-height: 1.4;
+  }
+
+  .pr-metric-card-value.is-green {
+    color: #027a48;
+  }
+
+  .pr-metric-card:hover .pr-metric-card-value.is-green {
+    color: #027a48;
   }
 
   .pr-metric-card-trend {
@@ -559,26 +487,28 @@ const DASHBOARD_STYLES = `
   }
 
   @media (max-width: 1400px) {
-    .pr-metrics-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .pr-metrics-row { gap: 12px; }
+    .pr-metrics-grid { gap: 12px; }
   }
 
-  @media (max-width: 1200px) {
-    .pr-metrics-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 992px) {
+    .pr-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   @media (max-width: 768px) {
     .pr-content-inner { padding: 0 14px; }
     .pr-header-banner { padding: 16px 0; }
     .pr-metrics-section { padding: 12px 0 10px; }
-    .pr-metrics-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .pr-metric-card { min-height: 120px; padding: 12px 14px; }
+    .pr-metrics-row { gap: 10px; }
+    .pr-metrics-grid { gap: 10px; }
+    .pr-metric-card { min-height: 136px; padding: 12px 14px; }
     .pr-footer { flex-direction: column; text-align: center; }
     .pr-footer .pr-content-inner { flex-direction: column; text-align: center; }
     .pr-footer-note { justify-content: center; }
   }
 
   @media (max-width: 576px) {
-    .pr-metrics-cards { grid-template-columns: 1fr; }
+    .pr-metrics-row { grid-template-columns: 1fr; }
     .pr-metric-card-value { font-size: 22px; }
   }
 
@@ -595,7 +525,6 @@ const DASHBOARD_STYLES = `
     }
     .pr-metric-card:hover::before { opacity: inherit; }
     .pr-metric-card:hover::after { animation: none; opacity: 0; }
-    .pr-metric-card.featured:hover { background: #f6fef9; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -712,10 +641,10 @@ function MetricIcon({ type }) {
   }
 }
 
-function MetricCardShell({ children, accent, className = '', delay = 0, featured = false, title = '' }) {
+function MetricCardShell({ children, accent, delay = 0, title = '' }) {
   return (
     <div
-      className={`pr-metric-card ${featured ? 'featured' : ''} ${className}`}
+      className="pr-metric-card"
       style={{ '--accent': accent, animationDelay: `${delay}ms` }}
       title={title || undefined}
     >
@@ -729,13 +658,7 @@ function AvailabilityCard({ card, delay }) {
   const displayValue = `${count}${card.suffix || ''}`;
 
   return (
-    <MetricCardShell
-      accent={card.accent}
-      className="availability"
-      delay={delay}
-      featured
-      title={card.description || card.title}
-    >
+    <MetricCardShell accent={card.accent} delay={delay} title={card.description || card.title}>
       <div className="pr-metric-card-header">
         <div className="pr-metric-card-icon">
           <MetricIcon type={card.icon} />
@@ -744,24 +667,18 @@ function AvailabilityCard({ card, delay }) {
       </div>
       <div className="pr-metric-card-body">
         <div className="pr-metric-card-value-row">
-          <span className="pr-metric-card-value">{displayValue}</span>
-          {card.badge && (
-            <span className={`pr-metric-card-badge ${card.badgeStatus || 'success'}`}>{card.badge}</span>
-          )}
-          {card.target && (
-            <span className="pr-metric-card-sub">Goal {card.target}{card.suffix || ''}</span>
+          <span
+            className={`pr-metric-card-value${card.valueColor ? ' is-green' : ''}`}
+            style={card.valueColor ? { color: card.valueColor } : undefined}
+          >
+            {displayValue}
+          </span>
+        </div>
+        <div className="pr-metric-card-footer">
+          {card.thresholdLegend && (
+            <span className="pr-metric-card-threshold-legend">{card.thresholdLegend}</span>
           )}
         </div>
-        {card.thresholds?.length > 0 && (
-          <div className="pr-metric-card-thresholds">
-            {card.thresholds.map((row) => (
-              <span key={row.label} className="pr-metric-card-threshold">
-                <span className="pr-metric-card-dot" style={{ background: row.color }} />
-                {row.label.split(' ')[0]}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </MetricCardShell>
   );
@@ -769,7 +686,6 @@ function AvailabilityCard({ card, delay }) {
 
 function CountCard({ card, delay }) {
   const count = useCountUp(card.value, 900);
-  const fillPct = card.max ? Math.min((card.value / card.max) * 100, 100) : 0;
 
   return (
     <MetricCardShell accent={card.accent} delay={delay} title={card.description || card.title}>
@@ -782,15 +698,12 @@ function CountCard({ card, delay }) {
       <div className="pr-metric-card-body">
         <div className="pr-metric-card-value-row">
           <span className="pr-metric-card-value">{count}{card.suffix || ''}</span>
-          {card.badge && (
-            <span className={`pr-metric-card-badge ${card.badgeStatus || 'warning'}`}>{card.badge}</span>
+        </div>
+        <div className="pr-metric-card-footer">
+          {card.valueLabel && (
+            <span className="pr-metric-card-caption">{card.valueLabel}</span>
           )}
         </div>
-        {card.max > 0 && (
-          <div className="pr-metric-card-bar">
-            <div className="pr-metric-card-bar-fill" style={{ width: `${fillPct}%` }} />
-          </div>
-        )}
       </div>
     </MetricCardShell>
   );
@@ -806,15 +719,11 @@ function TimeCard({ card, delay }) {
         <span className="pr-metric-card-label">{card.title}</span>
       </div>
       <div className="pr-metric-card-body">
-        <div className="pr-metric-card-time-row">
-          <div className="pr-metric-card-time-item">
-            <div className="pr-metric-card-time-lbl">{card.meanLabel}</div>
-            <div className="pr-metric-card-time-val">{card.meanValue}</div>
-          </div>
-          <div className="pr-metric-card-time-item median">
-            <div className="pr-metric-card-time-lbl">{card.medianLabel}</div>
-            <div className="pr-metric-card-time-val">{card.medianValue}</div>
-          </div>
+        <div className="pr-metric-card-value-row">
+          <span className="pr-metric-card-value">{card.meanValue}</span>
+        </div>
+        <div className="pr-metric-card-footer">
+          <span className="pr-metric-card-caption">{card.medianLabel}: {card.medianValue}</span>
         </div>
       </div>
     </MetricCardShell>
@@ -854,13 +763,15 @@ function KpiCard({ card, delay }) {
         <div className="pr-metric-card-value-row">
           <span className="pr-metric-card-value">{displayValue}</span>
         </div>
-        {card.caption && <span className="pr-metric-card-caption">{card.caption}</span>}
-        {card.trend && (
-          <span className={`pr-metric-card-trend ${card.trend.direction}`}>
-            <TrendArrow direction={card.trend.direction} />
-            {card.trend.value} {card.trend.label}
-          </span>
-        )}
+        <div className="pr-metric-card-footer">
+          {card.caption && <span className="pr-metric-card-caption">{card.caption}</span>}
+          {card.trend && (
+            <span className={`pr-metric-card-trend ${card.trend.direction}`}>
+              <TrendArrow direction={card.trend.direction} />
+              {card.trend.value} {card.trend.label}
+            </span>
+          )}
+        </div>
       </div>
     </MetricCardShell>
   );
@@ -882,11 +793,21 @@ function MetricCard({ card, delay }) {
 }
 
 function MonthlyMetricsCards({ cards }) {
-  return (
-    <div className="pr-metrics-cards">
-      {cards.map((card, index) => (
-        <MetricCard key={card.title} card={card} delay={60 + index * 40} />
+  const row1 = cards.slice(0, 4);
+  const row2 = cards.slice(4, 8);
+
+  const renderRow = (rowCards, rowOffset) => (
+    <div className="pr-metrics-row">
+      {rowCards.map((card, index) => (
+        <MetricCard key={card.title} card={card} delay={60 + (rowOffset + index) * 40} />
       ))}
+    </div>
+  );
+
+  return (
+    <div className="pr-metrics-grid">
+      {renderRow(row1, 0)}
+      {renderRow(row2, 4)}
     </div>
   );
 }
