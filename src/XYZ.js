@@ -15,7 +15,6 @@ import productResiliencyData from './data/productResiliencyData.json';
 const CHART_KEYS = ['mttd', 'mtte', 'mttr'];
 const CHART_DELAYS = { mttd: 450, mtte: 520, mttr: 590 };
 
-// All 8 cards defined here so XYZ.js works even if JSON is old/incomplete when copied elsewhere.
 const METRIC_CARDS_TEMPLATE = [
   {
     type: 'availability',
