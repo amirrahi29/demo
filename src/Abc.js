@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 
 const DATA_SOURCE = 'json';
-const JSON_DATA_URL = `${process.env.PUBLIC_URL}/dashboardData.json`;
+const JSON_DATA_URL = `${import.meta.env.BASE_URL}dashboardData.json`;
 const API_DATA_URL = '/api/dashboard';
 
 async function fetchDashboardData() {

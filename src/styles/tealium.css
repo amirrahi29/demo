@@ -782,7 +782,6 @@
 /* Table rows — responsive-friendly */
 .tealium-table-body {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .tealium-row-text {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import useResponsiveChart from './hooks/useResponsiveChart';
 import {
   Area,
   AreaChart,
@@ -46,50 +47,6 @@ function formatAppDateTime(iso) {
 
 function formatDate(iso) {
   return formatAppDate(iso);
-}
-
-function getChartViewportWidth() {
-  return typeof window !== 'undefined' ? window.innerWidth : 1200;
-}
-
-function useResponsiveChart() {
-  const [width, setWidth] = useState(getChartViewportWidth);
-
-  useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize, { passive: true });
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const isMobile = width <= 480;
-  const isTablet = width <= 768;
-  const isSmall = width <= 1024;
-
-  return {
-    width,
-    isMobile,
-    isTablet,
-    isSmall,
-    tick: isMobile ? 9 : isTablet ? 10 : 11,
-    tickSmall: isMobile ? 8 : isTablet ? 9 : 10,
-    yAxisWidth: isMobile ? 48 : isTablet ? 60 : 76,
-    barYAxisWidth: isMobile ? 56 : isTablet ? 72 : 88,
-    barSize: isMobile ? 7 : isTablet ? 9 : 12,
-    pieRadius: isMobile ? 52 : isTablet ? 72 : 90,
-    chartMargin: isMobile
-      ? { top: 6, right: 8, left: 2, bottom: 0 }
-      : isTablet
-        ? { top: 8, right: 12, left: 4, bottom: 2 }
-        : { top: 10, right: 16, left: 6, bottom: 4 },
-    axisMargin: isMobile
-      ? { top: 6, right: 10, left: 4, bottom: 2 }
-      : { top: 8, right: 16, left: 6, bottom: 4 },
-    xAxisHeight: isMobile ? 46 : isTablet ? 36 : 30,
-    legendProps: isMobile
-      ? { verticalAlign: 'bottom', align: 'center', wrapperStyle: { fontSize: 10, paddingTop: 6, lineHeight: 1.3 } }
-      : { verticalAlign: 'bottom', align: 'left', wrapperStyle: { fontSize: 11, paddingTop: 8, lineHeight: 1.35 } },
-    showDualAxis: !isMobile,
-  };
 }
 
 function toSlug(text) {
@@ -449,8 +406,8 @@ const INITIATIVE_TRACKER_REF = {
 
 const SCORECARD_STATUS_META = {
   'on-track': { label: 'On Track', tone: 'track' },
-  'on-watch': { label: 'On Watch', tone: 'watch' },
-  'at-risk': { label: 'At Risk', tone: 'risk' },
+  'at-risk': { label: 'At Risk', tone: 'watch' },
+  'off-track': { label: 'Off Track', tone: 'risk' },
 };
 
 /** Executive initiative scorecard KPI rows (reference screenshots). */
@@ -462,10 +419,10 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 30 / 50 / 20' },
     ],
     kpis: [
-      { kpi: 'Cost Savings Realized', status: 'on-watch', current: '$8.7M', target2029: '$18M', targetYearOne: '$12M', comments: '—' },
+      { kpi: 'Cost Savings Realized', status: 'at-risk', current: '$8.7M', target2029: '$18M', targetYearOne: '$12M', comments: '—' },
       { kpi: 'Migration Readiness', status: 'on-track', current: '70:30', target2029: '80:20', targetYearOne: '75:25', comments: '—' },
       { kpi: 'Milestone Achievement', status: 'on-track', current: '78%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
-      { kpi: 'Product Rollout Velocity', status: 'on-watch', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: '—' },
+      { kpi: 'Product Rollout Velocity', status: 'at-risk', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: '—' },
       { kpi: 'Risk & Compliance Score', status: 'at-risk', current: 'Medium', target2029: 'Low', targetYearOne: 'Low-Medium', comments: '—' },
     ],
   },
@@ -488,9 +445,9 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 28 / 52 / 20' },
     ],
     kpis: [
-      { kpi: 'Milestone Achievement', status: 'on-watch', current: '72%', target2029: '>85%', targetYearOne: '78%', comments: '—' },
-      { kpi: 'Delivery Progress', status: 'on-watch', current: '58%', target2029: '85%', targetYearOne: '70%', comments: '—' },
-      { kpi: 'Schedule Adherence', status: 'on-watch', current: '72%', target2029: '90%', targetYearOne: '80%', comments: '—' },
+      { kpi: 'Milestone Achievement', status: 'at-risk', current: '72%', target2029: '>85%', targetYearOne: '78%', comments: '—' },
+      { kpi: 'Delivery Progress', status: 'at-risk', current: '58%', target2029: '85%', targetYearOne: '70%', comments: '—' },
+      { kpi: 'Schedule Adherence', status: 'at-risk', current: '72%', target2029: '90%', targetYearOne: '80%', comments: '—' },
     ],
   },
   'pi acceleration': {
@@ -500,9 +457,9 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 15 / 35 / 50' },
     ],
     kpis: [
-      { kpi: 'Milestone Achievement', status: 'at-risk', current: '35%', target2029: '>85%', targetYearOne: '60%', comments: 'Behind plan' },
-      { kpi: 'Sprint Completion', status: 'at-risk', current: '35%', target2029: '90%', targetYearOne: '70%', comments: '—' },
-      { kpi: 'Delivery Risk', status: 'at-risk', current: 'High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
+      { kpi: 'Milestone Achievement', status: 'off-track', current: '35%', target2029: '>85%', targetYearOne: '60%', comments: 'Behind plan' },
+      { kpi: 'Sprint Completion', status: 'off-track', current: '35%', target2029: '90%', targetYearOne: '70%', comments: '—' },
+      { kpi: 'Delivery Risk', status: 'off-track', current: 'High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
     ],
   },
   'ai productivity benefit (cumulative %)': {
@@ -513,10 +470,10 @@ const INITIATIVE_SCORECARD_REF = {
     ],
     kpis: [
       { kpi: 'Agents in Pipeline', status: 'on-track', current: '18', target2029: '25', targetYearOne: '20', comments: '—' },
-      { kpi: 'Agents Rolled Out', status: 'on-watch', current: '6', target2029: '15', targetYearOne: '10', comments: '—' },
+      { kpi: 'Agents Rolled Out', status: 'at-risk', current: '6', target2029: '15', targetYearOne: '10', comments: '—' },
       { kpi: 'Persona Coverage', status: 'on-track', current: '64%', target2029: '90%', targetYearOne: '75%', comments: '—' },
       { kpi: 'User Satisfaction', status: 'on-track', current: '82', target2029: '90', targetYearOne: '85', comments: '—' },
-      { kpi: 'Model Reliability', status: 'on-watch', current: '89%', target2029: '95%', targetYearOne: '92%', comments: '—' },
+      { kpi: 'Model Reliability', status: 'at-risk', current: '89%', target2029: '95%', targetYearOne: '92%', comments: '—' },
     ],
   },
   'investment and revenue gains from ventures': {
@@ -528,16 +485,16 @@ const INITIATIVE_SCORECARD_REF = {
     kpis: [
       { kpi: 'Targets in Pipeline', status: 'on-track', current: '9', target2029: '12', targetYearOne: '10', comments: '—' },
       { kpi: 'Deals Closed', status: 'on-track', current: '3', target2029: '5', targetYearOne: '4', comments: '—' },
-      { kpi: 'Due Diligence Completion', status: 'on-watch', current: '67%', target2029: '90%', targetYearOne: '78%', comments: '—' },
-      { kpi: 'Revenue from New Ventures', status: 'on-watch', current: '$15M', target2029: '$25M', targetYearOne: '$18M', comments: '—' },
-      { kpi: 'Integration Risk', status: 'on-watch', current: 'Moderate-High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
+      { kpi: 'Due Diligence Completion', status: 'at-risk', current: '67%', target2029: '90%', targetYearOne: '78%', comments: '—' },
+      { kpi: 'Revenue from New Ventures', status: 'at-risk', current: '$15M', target2029: '$25M', targetYearOne: '$18M', comments: '—' },
+      { kpi: 'Integration Risk', status: 'at-risk', current: 'Moderate-High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
     ],
   },
 };
 
 function deriveScorecardStatus(initiativeStatus, risk) {
-  if (initiativeStatus === 'delayed' || initiativeStatus === 'blocked' || risk === 'high') return 'at-risk';
-  if (initiativeStatus === 'at-risk' || risk === 'medium') return 'on-watch';
+  if (initiativeStatus === 'delayed' || initiativeStatus === 'blocked' || risk === 'high') return 'off-track';
+  if (initiativeStatus === 'at-risk' || risk === 'medium') return 'at-risk';
   return 'on-track';
 }
 
@@ -565,7 +522,7 @@ function buildFallbackScorecard(initiative) {
       },
       {
         kpi: 'Schedule Adherence',
-        status: progress >= 70 ? 'on-track' : progress >= 50 ? 'on-watch' : 'at-risk',
+        status: progress >= 70 ? 'on-track' : progress >= 50 ? 'at-risk' : 'off-track',
         current: `${progress}%`,
         target2029: '90%',
         targetYearOne: '75%',
@@ -588,10 +545,7 @@ function buildInitiativeScorecard(initiative) {
 }
 
 function deriveScorecardStatusFromProgress(progress) {
-  const band = classifyProgressBand(progress);
-  if (band === 'on-track') return 'on-track';
-  if (band === 'at-risk') return 'on-watch';
-  return 'at-risk';
+  return classifyProgressBand(progress);
 }
 
 function buildInitiativeScorecardSummary(ini) {
@@ -615,7 +569,8 @@ function buildInitiativeScorecardSummary(ini) {
 }
 
 function ScorecardStatusCell({ status }) {
-  const meta = SCORECARD_STATUS_META[status] || SCORECARD_STATUS_META['on-watch'];
+  const normalized = status === 'on-watch' ? 'at-risk' : status;
+  const meta = SCORECARD_STATUS_META[normalized] || SCORECARD_STATUS_META['at-risk'];
   return (
     <span className="def-scorecard-status">
       <i className={`def-scorecard-dot def-scorecard-dot-${meta.tone}`} aria-hidden="true" />
@@ -1799,8 +1754,9 @@ function useViewport() {
     isMobile: false,
     isTablet: false,
     chartH: 210,
-    wsChartH: 192,
-    wsBarH: 156,
+    panelChartH: 168,
+    panelMinH: 320,
+    bottomMinH: 300,
   }));
 
   useEffect(() => {
@@ -1811,8 +1767,9 @@ function useViewport() {
         isMobile: width < 480,
         isTablet: width < 768,
         chartH: width < 480 ? 160 : width < 640 ? 180 : width < 768 ? 195 : width < 1024 ? 205 : 220,
-        wsChartH: width < 480 ? 148 : width < 640 ? 168 : width < 768 ? 176 : width < 1024 ? 184 : 192,
-        wsBarH: width < 480 ? 118 : width < 640 ? 132 : width < 768 ? 140 : width < 1024 ? 148 : 156,
+        panelChartH: width < 480 ? 136 : width < 640 ? 148 : width < 768 ? 156 : width < 1024 ? 164 : 172,
+        panelMinH: width < 768 ? 0 : width < 1024 ? 300 : 320,
+        bottomMinH: width < 768 ? 0 : width < 1024 ? 280 : 300,
       });
     };
     sync();
@@ -2057,9 +2014,9 @@ function CockpitPanelHeader({ title, actionLabel = 'View all' }) {
 
 function CockpitRecoveryTimeTable({ rows }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
       <CockpitPanelHeader title="Average time to recovery (last 6 months)" />
-      <div className="def-cockpit-table-scroll">
+      <div className="def-cockpit-table-scroll def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-recovery-time">
           <thead>
             <tr>
@@ -2087,7 +2044,7 @@ function CockpitRecoveryTimeTable({ rows }) {
 
 function CockpitTopRisksPanel({ risks }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-top-risks def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-top-risks def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
       <CockpitPanelHeader title="Top risks" />
       <ul className="def-cockpit-exec-risk-list">
         {risks.map((risk) => (
@@ -2109,9 +2066,9 @@ function CockpitTopRisksPanel({ risks }) {
 
 function OwnershipOverviewTable({ rows }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
       <CockpitPanelHeader title="Ownership overview" />
-      <div className="def-cockpit-table-scroll wide">
+      <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-ownership">
           <thead>
             <tr>
@@ -2162,9 +2119,9 @@ function OwnershipOverviewTable({ rows }) {
 
 function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '360ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '360ms' }}>
       <CockpitPanelHeader title="Upcoming milestones (next 30 days)" />
-      <div className="def-cockpit-table-scroll wide">
+      <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-milestones">
           <thead>
             <tr>
@@ -2205,7 +2162,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
 function CockpitQuarterHighlights({ lastQuarter, highlights }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '400ms' }}>
-      <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive">
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive">
         <h3 className="def-cockpit-card-title">Last quarter summary ({lastQuarter.label})</h3>
         <div className="def-cockpit-lq-grid">
           <div className="def-cockpit-lq-stat on-track">
@@ -2222,7 +2179,7 @@ function CockpitQuarterHighlights({ lastQuarter, highlights }) {
           </div>
         </div>
       </div>
-      <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive">
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-cockpit-highlight-panel">
         <h3 className="def-cockpit-card-title">Key highlights</h3>
         <ul className="def-cockpit-highlight-list">
           {highlights.map((item) => (
@@ -2249,7 +2206,7 @@ function CockpitStackedArea({ data, theme, height = 240 }) {
   const net = improved - deteriorated;
 
   return (
-    <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
+    <div className="def-cockpit-chart-card def-cockpit-panel def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
       <div className="def-cockpit-chart-head">
         <h3 className="def-cockpit-card-title">Status movement (last 6 months)</h3>
       </div>
@@ -2330,7 +2287,7 @@ function CockpitQuarterBars({ rows, theme, height = 240, compact = false, compar
     };
   });
   return (
-    <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '240ms' }}>
+    <div className="def-cockpit-chart-card def-cockpit-panel def-cockpit-interactive def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-chart-head">
         <h3 className="def-cockpit-card-title">Quarterly comparison</h3>
       </div>
@@ -2394,14 +2351,18 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
     () => [{ id: 'all', label: 'All FAST pillars' }, ...ORG_DATA.fastCategories.map((f) => ({ id: f.id, label: f.shortName }))],
     [],
   );
-  const wsBlockHeight = vp.wsChartH + vp.wsBarH + 148;
   const healthBand = classifyProgressBand(analytics.executiveMetrics.healthScore);
   const healthTrendDown = analytics.executiveMetrics.healthTrend.startsWith('▼');
 
   return (
     <div
       className={`def-layer def-page-enter def-cockpit def-cockpit-theme-${theme}`}
-      style={{ '--cockpit-chart-h': `${vp.chartH}px`, '--cockpit-ws-h': `${wsBlockHeight}px` }}
+      style={{
+        '--cockpit-chart-h': `${vp.chartH}px`,
+        '--cockpit-panel-chart-h': `${vp.panelChartH}px`,
+        '--cockpit-panel-min-h': vp.panelMinH ? `${vp.panelMinH}px` : '0px',
+        '--cockpit-bottom-min-h': vp.bottomMinH ? `${vp.bottomMinH}px` : '0px',
+      }}
     >
       <header className="def-cockpit-top def-cockpit-interactive def-stagger-in" style={{ '--stagger': '0ms' }}>
         <div className="def-cockpit-top-main">
@@ -2513,12 +2474,12 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
       </section>
 
       <div className="def-cockpit-workspace def-cockpit-workspace-analytics">
-        <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.wsChartH} />
+        <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.panelChartH} />
         <CockpitRecoveryTimeTable rows={analytics.recoveryTimeTable} />
         <CockpitQuarterBars
           rows={analytics.quarterlyBars}
           theme={theme}
-          height={vp.wsBarH}
+          height={vp.panelChartH}
           compact={vp.compact}
           comparisonStats={analytics.quarterlyStats}
         />
@@ -3311,8 +3272,6 @@ function TeamView({
 ───────────────────────────────────────────────────────────── */
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   html, body, #root {
@@ -3831,7 +3790,6 @@ const STYLES = `
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
 
@@ -3843,7 +3801,6 @@ const STYLES = `
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     background: var(--def-sidebar-bg);
@@ -4280,7 +4237,6 @@ const STYLES = `
     max-height: min(420px, 46vh);
     overflow-y: auto;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: rgba(148,163,184,0.35) transparent;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
@@ -4334,9 +4290,7 @@ const STYLES = `
     letter-spacing: -0.01em;
     overflow: hidden;
     word-break: break-word;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    line-clamp: 2;
   }
   .def-sidebar-ini-meta {
     grid-column: 1;
@@ -4449,7 +4403,6 @@ const STYLES = `
       overflow-y: auto;
       overflow-x: hidden;
       overscroll-behavior: contain;
-      -webkit-overflow-scrolling: touch;
     }
     .def-sidebar.def-sidebar-open {
       transform: translateX(0);
@@ -4613,7 +4566,6 @@ const STYLES = `
       flex-wrap: wrap;
     }
     .def-table-wrap {
-      -webkit-overflow-scrolling: touch;
     }
     .def-health-chart-card {
       padding: 12px 8px 10px;
@@ -5032,7 +4984,6 @@ const STYLES = `
     box-shadow: var(--def-shadow);
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     max-width: 100%;
   }
@@ -6233,7 +6184,6 @@ const STYLES = `
     overflow-x: auto;
     overflow-y: visible;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     background: var(--def-glass);
     border: 1px solid var(--def-border);
@@ -6540,7 +6490,6 @@ const STYLES = `
     flex: 1;
     min-height: 0;
     overflow: auto;
-    -webkit-overflow-scrolling: touch;
   }
   .def-drawer-pillar-table .def-table-wrap.def-table-pro {
     border-radius: 0;
@@ -6725,7 +6674,6 @@ const STYLES = `
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px 18px 28px;
-    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
   .def-drawer-summary {
@@ -7143,50 +7091,183 @@ const STYLES = `
     0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.35); }
     50% { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
   }
+  @keyframes cockpitShimmerSweep {
+    0% { transform: translateX(-130%) skewX(-14deg); opacity: 0; }
+    30% { opacity: 0.75; }
+    100% { transform: translateX(230%) skewX(-14deg); opacity: 0; }
+  }
+  @keyframes cockpitIconFloat {
+    0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+    50% { transform: translateY(-2px) scale(1.1) rotate(-4deg); }
+  }
 
   /* Command Center Cockpit */
   .def-cockpit {
     --cockpit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --cockpit-ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
     --cockpit-shadow-sm: 0 1px 4px rgba(15,39,68,0.05);
-    --cockpit-shadow-md: 0 10px 28px rgba(15,39,68,0.09);
-    --cockpit-shadow-lg: 0 18px 42px rgba(99,102,241,0.14);
+    --cockpit-shadow-md: 0 12px 32px rgba(15,39,68,0.1), 0 2px 8px rgba(99,102,241,0.06);
+    --cockpit-shadow-lg: 0 20px 48px rgba(99,102,241,0.16), 0 6px 16px rgba(15,39,68,0.08);
+    --cockpit-hover-lift: -6px;
+    --cockpit-hover-scale: 1.012;
     display: flex; flex-direction: column; gap: var(--cockpit-gap); padding-bottom: 0;
   }
   .def-cockpit-interactive {
-    position: relative; overflow: hidden;
-    transition: transform 0.32s var(--cockpit-ease), box-shadow 0.32s var(--cockpit-ease), border-color 0.28s ease;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 0.38s var(--cockpit-ease-spring),
+      box-shadow 0.38s var(--cockpit-ease),
+      border-color 0.32s ease,
+      background 0.32s ease;
   }
   .def-cockpit-interactive::before {
-    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(135deg, rgba(99,102,241,0.07) 0%, transparent 52%);
-    opacity: 0; transition: opacity 0.32s ease;
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(135deg, rgba(99,102,241,0.09) 0%, rgba(168,85,247,0.04) 42%, transparent 68%);
+    opacity: 0;
+    transition: opacity 0.38s ease;
+  }
+  .def-cockpit-chart-card.def-cockpit-interactive::after,
+  .def-cockpit-table-card.def-cockpit-interactive::after,
+  .def-cockpit-metric-card.def-cockpit-interactive:not(.metric-count)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255,255,255,0.52) 50%,
+      transparent 60%
+    );
+    transform: translateX(-130%) skewX(-14deg);
+    opacity: 0;
+  }
+  .def-cockpit-interactive > * {
+    position: relative;
+    z-index: 2;
   }
   .def-cockpit-interactive:focus-visible {
-    outline: 2px solid #6366f1; outline-offset: 2px;
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
   }
   @media (hover: hover) and (pointer: fine) {
     .def-cockpit-interactive:hover {
-      transform: translateY(-3px);
+      transform: translateY(var(--cockpit-hover-lift)) scale(var(--cockpit-hover-scale));
       box-shadow: var(--cockpit-shadow-md);
-      border-color: rgba(99,102,241,0.24);
+      border-color: rgba(99,102,241,0.28);
     }
     .def-cockpit-interactive:hover::before { opacity: 1; }
+    .def-cockpit-chart-card.def-cockpit-interactive:hover::after,
+    .def-cockpit-table-card.def-cockpit-interactive:hover::after,
+    .def-cockpit-metric-card.def-cockpit-interactive:not(.metric-count):hover::after {
+      animation: cockpitShimmerSweep 0.72s var(--cockpit-ease) forwards;
+    }
     .def-cockpit-metric-card:hover .def-cockpit-metric-icon {
-      transform: scale(1.1) rotate(-3deg);
+      animation: cockpitIconFloat 0.55s var(--cockpit-ease-spring) both;
+    }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-spark {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.03);
+    }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-value {
+      transform: scale(1.035);
+    }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-stripe {
+      transform: scaleX(1);
+      height: 4px;
+      opacity: 1;
+    }
+    .def-cockpit-fast-health:hover .def-cockpit-fast-icon {
+      animation: cockpitIconFloat 0.55s var(--cockpit-ease-spring) both;
+    }
+    .def-cockpit-fast-health:hover::after { opacity: 1; height: 3px; }
+    .def-cockpit-fast-health:hover .def-cockpit-fast-chart {
+      transform: scale(1.04);
+    }
+    .def-cockpit-move-stat:hover {
+      transform: translateY(-3px);
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(99,102,241,0.1);
+      border-color: rgba(99,102,241,0.22);
+    }
+    .def-cockpit-exec-risk-item:hover {
+      background: rgba(99,102,241,0.05);
+      transform: translateX(3px);
+      border-radius: 10px;
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+    .def-cockpit-exec-risk-item:hover .def-cockpit-exec-risk-score {
+      transform: scale(1.08);
+      box-shadow: 0 6px 16px rgba(15,23,42,0.12);
+    }
+    .def-cockpit-highlight-item:hover {
+      transform: translateX(4px);
+      background: #fff;
+      border-color: rgba(99,102,241,0.24);
+      box-shadow: 0 6px 18px rgba(99,102,241,0.08);
+    }
+    .def-cockpit-highlight-item:hover .def-cockpit-highlight-icon {
+      transform: scale(1.1) rotate(-4deg);
       background: rgba(99,102,241,0.16);
     }
-    .def-cockpit-metric-card:hover .def-cockpit-metric-spark { opacity: 1; transform: scale(1.04); }
-    .def-cockpit-fast-health:hover .def-cockpit-fast-icon {
-      transform: scale(1.08);
-      background: rgba(99,102,241,0.18);
+    .def-cockpit-lq-stat:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(15,23,42,0.08);
+      border-color: rgba(99,102,241,0.2);
     }
-    .def-cockpit-fast-health:hover::after { opacity: 1; }
-    .def-cockpit-move-stat:hover { transform: translateY(-2px); background: #fff; }
-    .def-cockpit-risk-item:hover { background: rgba(99,102,241,0.04); }
+    .def-cockpit-risk-item:hover { background: rgba(99,102,241,0.05); }
     .def-cockpit-table tbody tr:hover { background: rgba(99,102,241,0.06); }
     .def-cockpit-top:hover { box-shadow: var(--cockpit-shadow-sm); }
     .def-cockpit-user-chip:hover { border-color: rgba(99,102,241,0.3); }
     .def-cockpit-filter select:hover { border-color: rgba(99,102,241,0.35); }
+    .def-chart-legend-item:hover {
+      color: var(--def-heading);
+      transform: translateY(-1px);
+    }
+    .def-cockpit-view-all:hover {
+      color: #4338ca;
+      transform: translateX(2px);
+    }
+  }
+  @media (hover: none) {
+    .def-cockpit-interactive:active {
+      transform: scale(0.985);
+      transition-duration: 0.14s;
+    }
+    .def-cockpit-metric-card:active,
+    .def-cockpit-fast-health:active {
+      opacity: 0.94;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .def-cockpit-interactive,
+    .def-cockpit-metric-card,
+    .def-cockpit-fast-health,
+    .def-cockpit-move-stat,
+    .def-cockpit-highlight-item,
+    .def-cockpit-lq-stat,
+    .def-cockpit-exec-risk-item,
+    .def-cockpit-metric-icon,
+    .def-cockpit-metric-value,
+    .def-cockpit-metric-spark,
+    .def-stagger-in {
+      transition: none !important;
+      animation: none !important;
+    }
+    .def-stagger-in { opacity: 1; }
+    .def-cockpit-interactive::after { display: none; }
   }
   .def-cockpit-top {
     position: relative;
@@ -7355,6 +7436,7 @@ const STYLES = `
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 10px;
+    align-items: stretch;
   }
   .def-cockpit-metric-card {
     position: relative;
@@ -7362,7 +7444,7 @@ const STYLES = `
     flex-direction: column;
     gap: 8px;
     padding: 12px 13px 10px;
-    min-height: 0;
+    min-height: 112px;
     min-width: 0;
     overflow: hidden;
     background: #fff;
@@ -7371,30 +7453,30 @@ const STYLES = `
     box-shadow:
       0 1px 2px rgba(15,23,42,0.04),
       0 8px 24px rgba(15,23,42,0.05);
-    transition:
-      transform 0.28s var(--cockpit-ease),
-      box-shadow 0.28s var(--cockpit-ease),
-      border-color 0.28s ease;
-  }
-  .def-cockpit-metric-card:hover {
-    transform: translateY(-2px);
   }
   .def-cockpit-metric-card.metric-status {
-    min-height: 118px;
+    min-height: 112px;
   }
   .def-cockpit-metric-card.metric-count {
-    min-height: 96px;
+    min-height: 112px;
     padding-top: 14px;
     background: linear-gradient(180deg, #ffffff 0%, rgba(99,102,241,0.045) 100%);
     border-color: rgba(99,102,241,0.16);
+    --cockpit-hover-lift: -7px;
+    --cockpit-hover-scale: 1.016;
   }
   .def-cockpit-metric-card.metric-health {
-    min-height: 108px;
+    min-height: 112px;
   }
-  .def-cockpit-metric-card.metric-count:hover {
-    border-color: rgba(99,102,241,0.38);
-    box-shadow: 0 12px 28px rgba(99,102,241,0.12);
-    transform: translateY(-2px);
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-metric-card.metric-count:hover {
+      border-color: rgba(99,102,241,0.42);
+      box-shadow: var(--cockpit-shadow-lg);
+    }
+    .def-cockpit-metric-card.metric-count:hover::after {
+      opacity: 1;
+      transform: scale(1.35);
+    }
   }
   .def-cockpit-metric-card.metric-count::after {
     content: '';
@@ -7403,8 +7485,11 @@ const STYLES = `
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 72%);
+    background: radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 72%);
     pointer-events: none;
+    z-index: 0;
+    opacity: 0.75;
+    transition: transform 0.45s var(--cockpit-ease-spring), opacity 0.35s ease;
   }
   .def-cockpit-metric-stripe {
     position: absolute;
@@ -7412,9 +7497,15 @@ const STYLES = `
     left: 0;
     right: 0;
     height: 3px;
-    background: var(--metric-band-color, rgba(99,102,241,0.55));
+    background: var(--metric-band-color, linear-gradient(90deg, #6366f1, #a855f7));
     border-radius: 14px 14px 0 0;
-    opacity: 0.9;
+    opacity: 0.88;
+    transform: scaleX(0.82);
+    transform-origin: left center;
+    transition:
+      transform 0.42s var(--cockpit-ease-spring),
+      height 0.32s var(--cockpit-ease),
+      opacity 0.28s ease;
   }
   .def-cockpit-metric-head {
     display: flex;
@@ -7438,14 +7529,14 @@ const STYLES = `
     gap: 8px;
     min-width: 0;
   }
-  .def-cockpit-metric-card.def-accent-emerald { border-color: rgba(5,150,105,0.2); }
-  .def-cockpit-metric-card.def-accent-emerald:hover { border-color: rgba(5,150,105,0.38); box-shadow: 0 10px 28px rgba(5,150,105,0.12); }
+  .def-cockpit-metric-card.def-accent-emerald { border-color: rgba(5,150,105,0.2); --cockpit-hover-lift: -6px; }
+  .def-cockpit-metric-card.def-accent-emerald:hover { border-color: rgba(5,150,105,0.42); box-shadow: 0 16px 36px rgba(5,150,105,0.14); }
   .def-cockpit-metric-card.def-accent-amber { border-color: rgba(217,119,6,0.2); }
-  .def-cockpit-metric-card.def-accent-amber:hover { border-color: rgba(217,119,6,0.38); box-shadow: 0 10px 28px rgba(217,119,6,0.12); }
+  .def-cockpit-metric-card.def-accent-amber:hover { border-color: rgba(217,119,6,0.42); box-shadow: 0 16px 36px rgba(217,119,6,0.14); }
   .def-cockpit-metric-card.def-accent-rose { border-color: rgba(220,38,38,0.2); }
-  .def-cockpit-metric-card.def-accent-rose:hover { border-color: rgba(220,38,38,0.38); box-shadow: 0 10px 28px rgba(220,38,38,0.12); }
+  .def-cockpit-metric-card.def-accent-rose:hover { border-color: rgba(220,38,38,0.42); box-shadow: 0 16px 36px rgba(220,38,38,0.14); }
   .def-cockpit-metric-card.def-accent-indigo { border-color: rgba(99,102,241,0.2); }
-  .def-cockpit-metric-card.def-accent-indigo:hover { border-color: rgba(99,102,241,0.38); box-shadow: var(--cockpit-shadow-lg); }
+  .def-cockpit-metric-card.def-accent-indigo:hover { border-color: rgba(99,102,241,0.42); box-shadow: var(--cockpit-shadow-lg); }
   .def-cockpit-metric-icon {
     flex: 0 0 auto;
     width: 28px;
@@ -7458,7 +7549,7 @@ const STYLES = `
     font-size: 0.82rem;
     line-height: 1;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
-    transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
+    transition: background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease;
   }
   .def-cockpit-metric-card.metric-count .def-cockpit-metric-icon.metric-icon-tr {
     width: 30px;
@@ -7466,15 +7557,18 @@ const STYLES = `
     border-radius: 10px;
     background: linear-gradient(145deg, rgba(99,102,241,0.14) 0%, rgba(129,140,248,0.08) 100%);
     border-color: rgba(99,102,241,0.18);
-    transition: transform 0.32s var(--cockpit-ease), background 0.32s ease, border-color 0.32s ease;
+    transition: background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease;
   }
-  .def-cockpit-metric-card.metric-count:hover .def-cockpit-metric-icon.metric-icon-tr {
-    transform: scale(1.1) rotate(-3deg);
-    background: rgba(99,102,241,0.18);
-    border-color: rgba(99,102,241,0.28);
-  }
-  .def-cockpit-metric-card:hover .def-cockpit-metric-icon {
-    transform: scale(1.04);
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-metric-card.metric-count:hover .def-cockpit-metric-icon.metric-icon-tr {
+      background: rgba(99,102,241,0.2);
+      border-color: rgba(99,102,241,0.32);
+      box-shadow: 0 6px 16px rgba(99,102,241,0.18);
+    }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-icon {
+      background: rgba(99,102,241,0.16);
+      border-color: rgba(99,102,241,0.26);
+    }
   }
   .def-cockpit-metric-pill {
     flex: 0 0 auto;
@@ -7505,7 +7599,12 @@ const STYLES = `
     border-radius: inherit;
     background: linear-gradient(90deg, var(--metric-band-color) 0%, rgba(255,255,255,0.35) 140%);
     box-shadow: 0 0 10px color-mix(in srgb, var(--metric-band-color) 40%, transparent);
-    transition: width 0.8s var(--cockpit-ease);
+    transition: width 0.8s var(--cockpit-ease), box-shadow 0.35s ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-metric-card.metric-health:hover .def-cockpit-metric-health-fill {
+      box-shadow: 0 0 14px color-mix(in srgb, var(--metric-band-color) 55%, transparent);
+    }
   }
   .def-cockpit-metric-card.metric-health {
     background: var(--metric-band-bg);
@@ -7553,17 +7652,19 @@ const STYLES = `
     color: var(--metric-band-color);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
   }
-  .def-cockpit-metric-card.status-on-track:hover {
-    border-color: rgba(5,150,105,0.38);
-    box-shadow: 0 12px 28px rgba(5,150,105,0.12);
-  }
-  .def-cockpit-metric-card.status-at-risk:hover {
-    border-color: rgba(217,119,6,0.38);
-    box-shadow: 0 12px 28px rgba(217,119,6,0.12);
-  }
-  .def-cockpit-metric-card.status-off-track:hover {
-    border-color: rgba(220,38,38,0.38);
-    box-shadow: 0 12px 28px rgba(239,68,68,0.12);
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-metric-card.status-on-track:hover {
+      border-color: rgba(5,150,105,0.42);
+      box-shadow: 0 16px 36px rgba(5,150,105,0.14);
+    }
+    .def-cockpit-metric-card.status-at-risk:hover {
+      border-color: rgba(217,119,6,0.42);
+      box-shadow: 0 16px 36px rgba(217,119,6,0.14);
+    }
+    .def-cockpit-metric-card.status-off-track:hover {
+      border-color: rgba(220,38,38,0.42);
+      box-shadow: 0 16px 36px rgba(239,68,68,0.14);
+    }
   }
   .def-app.def-theme-dark .def-cockpit-metric-card.status-on-track,
   .def-app.def-theme-dark .def-cockpit-metric-card.metric-health.status-on-track {
@@ -7619,6 +7720,8 @@ const STYLES = `
     line-height: var(--leading-tight);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
+    transform-origin: left center;
+    transition: transform 0.35s var(--cockpit-ease-spring), color 0.28s ease;
   }
   .def-cockpit-metric-card.metric-count .def-cockpit-metric-value {
     font-size: clamp(1.15rem, 1.5vw, 1.35rem);
@@ -7640,12 +7743,8 @@ const STYLES = `
     width: 100%;
     height: 32px;
     margin-top: auto;
-    opacity: 0.95;
-    transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
-  }
-  .def-cockpit-metric-card:hover .def-cockpit-metric-spark {
-    opacity: 1;
-    transform: translateY(-1px);
+    opacity: 0.92;
+    transition: opacity 0.32s ease, transform 0.38s var(--cockpit-ease-spring);
   }
   .def-cockpit-section {
     background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
@@ -7775,7 +7874,7 @@ const STYLES = `
     border-color: rgba(99,102,241,0.45);
     box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
   }
-  .def-lol-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .def-lol-table-scroll { overflow-x: auto; }
   .def-lol-table {
     width: 100%;
     border-collapse: separate;
@@ -7930,7 +8029,7 @@ const STYLES = `
     outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
   }
   .def-tracker-count { font-size: 0.64rem; font-weight: 700; color: var(--def-muted); white-space: nowrap; }
-  .def-tracker-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .def-tracker-table-scroll { overflow-x: auto; }
   .def-tracker-table {
     width: 100%; min-width: 880px; border-collapse: collapse; font-size: var(--text-xs);
   }
@@ -7983,30 +8082,56 @@ const STYLES = `
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--cockpit-gap);
+    align-items: stretch;
   }
   .def-cockpit-fast-health {
     position: relative;
-    display: flex; flex-direction: column; gap: var(--cockpit-gap); padding: var(--cockpit-pad) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--cockpit-gap);
+    padding: var(--cockpit-pad) var(--space-3);
+    height: 100%;
+    min-height: 168px;
     background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
-    border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
-    cursor: pointer; text-align: left; min-width: 0;
-    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  }
-  .def-cockpit-fast-health:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--def-shadow-lg);
-    border-color: rgba(99,102,241,0.25);
+    border: 1px solid rgba(226,232,240,0.95);
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    min-width: 0;
+    font: inherit;
+    color: inherit;
   }
   .def-cockpit-fast-health::after {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #6366f1, #22c55e);
-    opacity: 0; transition: opacity 0.28s ease;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #6366f1, #22c55e, #a855f7);
+    opacity: 0;
+    transition: opacity 0.38s ease, height 0.32s var(--cockpit-ease);
+    z-index: 3;
   }
   .def-cockpit-fast-head { display: flex; align-items: flex-start; gap: 8px; }
   .def-cockpit-fast-icon {
-    width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center;
-    border-radius: 8px; background: rgba(99,102,241,0.1); color: #6366f1; font-size: 0.9rem;
-    transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(99,102,241,0.1);
+    color: #6366f1;
+    font-size: 0.9rem;
+    transition: background 0.32s ease, box-shadow 0.32s ease;
+  }
+  .def-cockpit-fast-chart {
+    position: relative;
+    width: clamp(72px, 10vw, 88px);
+    height: clamp(72px, 10vw, 88px);
+    flex-shrink: 0;
+    transition: transform 0.42s var(--cockpit-ease-spring);
   }
   .def-cockpit-fast-titles { min-width: 0; flex: 1; }
   .def-cockpit-fast-kicker {
@@ -8015,10 +8140,10 @@ const STYLES = `
   }
   .def-cockpit-fast-health h3 {
     margin: 0; font-size: clamp(0.68rem, 1.2vw, 0.72rem); font-weight: 700; color: var(--def-heading); line-height: 1.25;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    overflow: hidden; line-clamp: 2;
   }
-  .def-cockpit-fast-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .def-cockpit-fast-chart { position: relative; width: clamp(72px, 10vw, 88px); height: clamp(72px, 10vw, 88px); flex-shrink: 0; }
+  .def-cockpit-fast-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .def-cockpit-fast-foot { margin-top: auto; }
   .def-cockpit-fast-donut-center {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; text-align: center;
@@ -8042,20 +8167,33 @@ const STYLES = `
   .def-cockpit-fast-trend.down { background: rgba(239,68,68,0.12); color: #b91c1c; }
   .def-cockpit-workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(200px, 260px);
     gap: var(--cockpit-gap);
-    align-items: start;
+    align-items: stretch;
     min-width: 0;
   }
   .def-cockpit-workspace-analytics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  .def-cockpit-workspace-analytics > * {
+    min-height: var(--cockpit-panel-min-h, 0px);
+    height: 100%;
+  }
   .def-cockpit-bottom-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(240px, 0.85fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(280px, 0.88fr);
     gap: var(--cockpit-gap);
-    align-items: start;
+    align-items: stretch;
     min-width: 0;
+  }
+  .def-cockpit-bottom-row > * {
+    min-height: var(--cockpit-bottom-min-h, 0px);
+    height: 100%;
+  }
+  .def-cockpit-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: inherit;
   }
   .def-cockpit-bottom-card {
     min-height: 0;
@@ -8080,8 +8218,8 @@ const STYLES = `
     cursor: pointer;
     padding: 0;
     white-space: nowrap;
+    transition: color 0.22s ease, transform 0.28s var(--cockpit-ease);
   }
-  .def-cockpit-view-all:hover { text-decoration: underline; }
   .def-cockpit-quarter-trends {
     display: flex;
     flex-wrap: wrap;
@@ -8114,6 +8252,11 @@ const STYLES = `
     align-items: center;
     padding: 8px 0;
     border-bottom: 1px solid rgba(226,232,240,0.85);
+    transition:
+      transform 0.32s var(--cockpit-ease-spring),
+      background 0.28s ease,
+      padding 0.28s ease,
+      border-radius 0.28s ease;
   }
   .def-cockpit-exec-risk-item:last-child { border-bottom: none; padding-bottom: 0; }
   .def-cockpit-exec-risk-score {
@@ -8126,6 +8269,7 @@ const STYLES = `
     font-weight: var(--font-extrabold);
     line-height: 1;
     border: 2px solid transparent;
+    transition: transform 0.32s var(--cockpit-ease-spring), box-shadow 0.32s ease;
   }
   .def-cockpit-exec-risk-item.tone-high .def-cockpit-exec-risk-score {
     color: #b91c1c;
@@ -8212,10 +8356,21 @@ const STYLES = `
   .def-cockpit-table-milestones { min-width: min(560px, 100%); }
   .def-cockpit-table-recovery-time { min-width: min(420px, 100%); }
   .def-cockpit-bottom-rail {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr;
     gap: var(--cockpit-gap);
     min-width: 0;
+    height: 100%;
+    min-height: inherit;
+  }
+  .def-cockpit-highlight-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .def-cockpit-highlight-panel .def-cockpit-highlight-list {
+    flex: 1;
+    justify-content: space-between;
   }
   .def-cockpit-lq-grid {
     display: grid;
@@ -8229,6 +8384,11 @@ const STYLES = `
     border: 1px solid rgba(226,232,240,0.95);
     background: #f8fafc;
     text-align: center;
+    transition:
+      transform 0.32s var(--cockpit-ease-spring),
+      box-shadow 0.32s ease,
+      border-color 0.28s ease,
+      background 0.28s ease;
   }
   .def-cockpit-lq-stat span {
     display: block;
@@ -8266,6 +8426,11 @@ const STYLES = `
     border-radius: 9px;
     background: #f8fafc;
     border: 1px solid rgba(226,232,240,0.95);
+    transition:
+      transform 0.32s var(--cockpit-ease-spring),
+      background 0.28s ease,
+      border-color 0.28s ease,
+      box-shadow 0.32s ease;
   }
   .def-cockpit-highlight-icon {
     width: 24px;
@@ -8276,6 +8441,7 @@ const STYLES = `
     background: rgba(99,102,241,0.1);
     font-size: 0.72rem;
     line-height: 1;
+    transition: transform 0.32s var(--cockpit-ease-spring), background 0.28s ease;
   }
   .def-cockpit-highlight-item p {
     margin: 0;
@@ -8314,28 +8480,65 @@ const STYLES = `
     min-height: 0;
   }
   .def-cockpit-chart-card, .def-cockpit-table-card, .def-cockpit-rail-card {
-    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
-    padding: var(--cockpit-pad) var(--space-3); min-width: 0; min-height: 0; box-shadow: var(--cockpit-shadow-sm);
+    background: #fff;
+    border: 1px solid rgba(226,232,240,0.95);
+    border-radius: 12px;
+    padding: var(--space-3);
+    min-width: 0;
+    min-height: 0;
+    box-shadow: var(--cockpit-shadow-sm);
+  }
+  .def-cockpit-chart-card.def-cockpit-interactive,
+  .def-cockpit-table-card.def-cockpit-interactive {
+    --cockpit-hover-lift: -5px;
+    --cockpit-hover-scale: 1.008;
   }
   .def-cockpit-card-title, .def-cockpit-chart-head .def-cockpit-card-title {
-    margin: 0; font-size: var(--text-sm); font-weight: var(--font-extrabold); color: var(--def-heading);
-    line-height: var(--leading-snug); letter-spacing: var(--tracking-tight);
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: var(--font-extrabold);
+    color: var(--def-heading);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
   }
   .def-cockpit-chart-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     min-width: 0;
+    flex-shrink: 0;
   }
   .def-cockpit-chart-plot {
     width: 100%;
     min-width: 0;
     overflow: hidden;
+    flex: 0 0 var(--cockpit-panel-chart-h, 168px);
+    height: var(--cockpit-panel-chart-h, 168px);
   }
   .def-cockpit-chart-plot .recharts-responsive-container {
     min-width: 0 !important;
+    height: 100% !important;
+  }
+  .def-cockpit-panel .def-chart-legend-row,
+  .def-cockpit-panel .def-cockpit-quarter-trends,
+  .def-cockpit-panel .def-cockpit-movement-stats {
+    flex-shrink: 0;
+  }
+  .def-cockpit-panel .def-cockpit-movement-stats {
+    margin-top: auto;
+  }
+  .def-cockpit-top-risks .def-cockpit-exec-risk-list {
+    flex: 1;
+    justify-content: center;
+  }
+  .def-cockpit-ws-recovery .def-cockpit-table-scroll,
+  .def-cockpit-bottom-card .def-cockpit-table-scroll.wide {
+    flex: 1 1 auto;
+    min-height: 140px;
+    max-height: min(240px, 34vh);
+    overflow: auto;
   }
   .def-chart-legend-row {
     display: flex;
@@ -8354,6 +8557,7 @@ const STYLES = `
     color: var(--def-muted);
     line-height: var(--leading-snug);
     white-space: nowrap;
+    transition: color 0.22s ease, transform 0.28s var(--cockpit-ease);
   }
   .def-chart-legend-item i {
     width: 10px;
@@ -8362,12 +8566,35 @@ const STYLES = `
     flex-shrink: 0;
     font-style: normal;
   }
-  .def-cockpit-movement-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
-  .def-cockpit-move-stat {
-    padding: 6px 8px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;
-    transition: transform 0.25s var(--cockpit-ease), background 0.25s ease;
+  .def-cockpit-panel .def-cockpit-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
   }
-  .def-cockpit-move-stat span { display: block; font-size: 0.6rem; font-weight: 700; color: var(--def-muted); text-transform: uppercase; }
+  .def-cockpit-movement-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: auto;
+  }
+  .def-cockpit-move-stat {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition:
+      transform 0.32s var(--cockpit-ease-spring),
+      background 0.28s ease,
+      box-shadow 0.32s ease,
+      border-color 0.28s ease;
+  }
+  .def-cockpit-move-stat span {
+    display: block;
+    font-size: 0.56rem;
+    font-weight: 700;
+    color: var(--def-muted);
+    text-transform: uppercase;
+    line-height: 1.25;
+  }
   .def-cockpit-move-stat strong { display: block; margin-top: 1px; font-size: 0.95rem; font-weight: 800; }
   .def-cockpit-move-stat.improved strong { color: #15803d; }
   .def-cockpit-move-stat.deteriorated strong { color: #b91c1c; }
@@ -8376,7 +8603,6 @@ const STYLES = `
   .def-cockpit-table-scroll {
     overflow: auto;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     max-height: 100%;
   }
   .def-cockpit-table-scroll-recovery {
@@ -8431,10 +8657,8 @@ const STYLES = `
     font-weight: 700;
     color: var(--def-heading);
     line-height: 1.25;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     overflow: hidden;
+    line-clamp: 2;
   }
   .def-cockpit-risk-pct {
     flex-shrink: 0;
@@ -8490,22 +8714,16 @@ const STYLES = `
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .def-cockpit-bottom-row {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-  }
-  @media (max-width: 1400px) {
-    .def-cockpit-workspace {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-      grid-template-rows: auto auto;
-    }
-    .def-cockpit-ws-charts { grid-column: 1; grid-row: 1 / span 2; }
-    .def-cockpit-ws-recovery { grid-column: 2; grid-row: 1 / span 2; }
-    .def-cockpit-workspace > .def-cockpit-rail {
+    .def-cockpit-bottom-row > .def-cockpit-bottom-rail {
       grid-column: 1 / -1;
-      flex-direction: row;
-      flex-wrap: wrap;
+      max-width: 520px;
     }
-    .def-cockpit-rail-card { flex: 1 1 min(100%, 220px); }
+    .def-cockpit-workspace-analytics > *,
+    .def-cockpit-bottom-row > * {
+      min-height: 0;
+    }
   }
   @media (max-width: 1280px) {
     .def-cockpit-metrics-row {
@@ -8513,18 +8731,27 @@ const STYLES = `
       flex-wrap: nowrap;
       overflow-x: auto;
       overscroll-behavior-x: contain;
-      scroll-snap-type: x proximity;
-      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: 4px;
       scrollbar-width: thin;
-      padding-bottom: 2px;
+      gap: 10px;
+      padding: 4px 2px 8px;
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
     }
     .def-cockpit-metric-card {
-      flex: 0 0 158px;
+      flex: 0 0 clamp(148px, 42vw, 168px);
       scroll-snap-align: start;
     }
   }
   @media (max-width: 1024px) {
     .def-cockpit-fast-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-cockpit-bottom-row {
+      grid-template-columns: 1fr;
+    }
+    .def-cockpit-bottom-row > .def-cockpit-bottom-rail {
+      max-width: none;
+    }
   }
   @media (max-width: 768px) {
     .def-cockpit-top { padding: 12px 14px 12px 16px; }
@@ -8563,28 +8790,28 @@ const STYLES = `
     .def-cockpit-bottom-row {
       grid-template-columns: 1fr;
     }
-    .def-cockpit-ws-charts,
-    .def-cockpit-ws-recovery,
-    .def-cockpit-workspace > .def-cockpit-rail {
-      grid-column: auto;
-      grid-row: auto;
+    .def-cockpit-workspace-analytics > *,
+    .def-cockpit-bottom-row > * {
+      min-height: 0;
+      height: auto;
     }
-    .def-cockpit-ws-recovery,
-    .def-cockpit-workspace > .def-cockpit-rail {
-      max-height: none;
+    .def-cockpit-bottom-rail {
+      grid-template-rows: auto auto;
     }
-    .def-cockpit-ws-recovery .def-cockpit-table-scroll-recovery {
-      max-height: min(240px, calc(var(--cockpit-chart-h, 195px) + 72px));
+    .def-cockpit-ws-recovery .def-cockpit-table-scroll,
+    .def-cockpit-bottom-card .def-cockpit-table-scroll.wide {
+      max-height: min(220px, 42vh);
     }
-    .def-cockpit-rail { flex-direction: column; }
-    .def-cockpit-rail-card { flex: 1 1 auto; }
+    .def-cockpit-chart-plot {
+      flex-basis: min(var(--cockpit-panel-chart-h, 148px), 42vw);
+      height: min(var(--cockpit-panel-chart-h, 148px), 42vw);
+    }
     .def-cockpit-table-recovery,
     .def-cockpit-table-teams { min-width: min(520px, 100%); }
     .def-tracker-table { min-width: min(720px, 100%); font-size: var(--text-xs); }
     .def-tracker-head { flex-direction: column; }
     .def-tracker-search { max-width: none; }
     .def-tracker-legend { width: 100%; }
-    .def-cockpit-interactive:hover { transform: none; }
   }
   @media (max-width: 640px) {
     .def-cockpit { --cockpit-pad: var(--space-3); }
@@ -8616,7 +8843,7 @@ const STYLES = `
     .def-cockpit-user-chip small { display: none; }
     .def-cockpit-table-recovery,
     .def-cockpit-table-teams { min-width: min(100%, 480px); }
-    .def-cockpit-fast-health h3 { -webkit-line-clamp: 3; }
+    .def-cockpit-fast-health h3 { line-clamp: 3; }
   }
 
   /* Dark theme — layer surfaces */
