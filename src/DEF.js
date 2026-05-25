@@ -9293,11 +9293,7 @@ const DEF = () => {
 };
 
 const mountNode = typeof document !== 'undefined' ? document.getElementById('root') : null;
-const defEntryScript = typeof document !== 'undefined'
-  ? document.querySelector('script[type="module"]')?.getAttribute('src') ?? ''
-  : '';
-const isDefEntry = defEntryScript.includes('DEF.js');
-if (mountNode && isDefEntry) {
+if (mountNode) {
   ReactDOM.createRoot(mountNode).render(
     <React.StrictMode>
       <DEF />
