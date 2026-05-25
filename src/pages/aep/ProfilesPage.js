@@ -7,7 +7,7 @@ import AEPLayout from '../../components/aep/AEPLayout';
 import PageTabs from '../../components/aep/PageTabs';
 import ChartContainer from '../../components/aep/ChartContainer';
 import { SettingsIcon, InfoIcon } from '../../components/aep/icons';
-import useResponsiveChart from '../../hooks/useResponsiveChart';
+import { useResponsiveChart } from '../../DEF';
 import {
   namespaceOverlapData, profileBrowseList, mergePolicies, COLORS,
   unionSchemaData, computedAttributes,

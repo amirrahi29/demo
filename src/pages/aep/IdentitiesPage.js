@@ -8,7 +8,7 @@ import PageTabs from '../../components/aep/PageTabs';
 import ChartContainer from '../../components/aep/ChartContainer';
 import AnalyticsWidget from '../../components/aep/AnalyticsWidget';
 import { SettingsIcon, MoreIcon } from '../../components/aep/icons';
-import useResponsiveChart from '../../hooks/useResponsiveChart';
+import { useResponsiveChart } from '../../DEF';
 import { identityNamespaces, COLORS, identityGraphSamples, identityGraphTrend } from '../../data/platformData';
 import DataTable from '../../components/aep/DataTable';
 import KpiGrid from '../../components/aep/KpiGrid';

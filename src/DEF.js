@@ -9293,7 +9293,11 @@ const DEF = () => {
 };
 
 const mountNode = typeof document !== 'undefined' ? document.getElementById('root') : null;
-if (mountNode) {
+const defEntryScript = typeof document !== 'undefined'
+  ? document.querySelector('script[type="module"]')?.getAttribute('src') ?? ''
+  : '';
+const isDefEntry = defEntryScript.includes('DEF.js');
+if (mountNode && isDefEntry) {
   ReactDOM.createRoot(mountNode).render(
     <React.StrictMode>
       <DEF />
@@ -9301,4 +9305,5 @@ if (mountNode) {
   );
 }
 
+export { useResponsiveChart };
 export default DEF;
