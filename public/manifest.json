@@ -1,7 +1,7 @@
 {
-  "short_name": "Codex Copilot",
-  "name": "Codex Copilot — Data Pipeline Platform",
-  "description": "Ingestion, transformation, and standardization dashboards",
+  "short_name": "ADP Demo",
+  "name": "ADP Demo - Strategic Execution Cockpit",
+  "description": "Executive portfolio dashboard and initiative tracker",
   "icons": [
     {
       "src": "favicon.ico",
@@ -22,5 +22,6 @@
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#1473e6",
-  "background_color": "#f5f5f5"
+  "background_color": "#f5f5f5",
+  "lang": "en-US"
 }

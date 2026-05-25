@@ -3,8 +3,6 @@ import ReactDOM from 'react-dom/client';
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -18,9 +16,10 @@ import {
 } from 'recharts';
 
 const APP_LOCALE = 'en-US';
+const EMPTY_VALUE = 'N/A';
 
 function formatAppDate(iso) {
-  if (!iso) return '—';
+  if (!iso) return EMPTY_VALUE;
   return new Date(iso).toLocaleDateString(APP_LOCALE, {
     day: 'numeric',
     month: 'short',
@@ -29,7 +28,7 @@ function formatAppDate(iso) {
 }
 
 function formatAppDateTime(iso) {
-  if (!iso) return '—';
+  if (!iso) return EMPTY_VALUE;
   try {
     return new Date(iso).toLocaleString(APP_LOCALE, {
       month: 'numeric',
@@ -46,6 +45,11 @@ function formatAppDateTime(iso) {
 
 function formatDate(iso) {
   return formatAppDate(iso);
+}
+
+function formatAppNumber(value, options) {
+  if (value == null || Number.isNaN(Number(value))) return EMPTY_VALUE;
+  return Number(value).toLocaleString(APP_LOCALE, options);
 }
 
 function getChartViewportWidth() {
@@ -96,7 +100,7 @@ function toSlug(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 56);
 }
 
-/** Per-initiative progress (26 rows) — clear mix: >80% on-track, 50–80% at-risk, <50% off-track. */
+/** Per-initiative progress (26 rows) - clear mix: >80% on-track, 50-80% at-risk, <50% off-track. */
 const DEMO_INITIATIVE_PROGRESS = [
   95, 88, 62, 28, 94, 38, 96, 67, 24, 82, 48, 91, 73, 19, 89, 76,
   32, 97, 54, 41, 85, 47, 98, 26, 71, 81,
@@ -192,7 +196,7 @@ const LAY_OF_LAND_ROWS = [
   { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'Portfolio & TAM Expansion', owner: 'Product & AI', team: 'Prasanna & Team' },
   { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'H2A (Human to Agent) Standards', owner: 'Product & AI', team: 'Prasanna & Team' },
   { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Breakthrough Business Revenue - Marketplace', owner: 'Ventures', team: 'Oz & Team' },
-  { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Breakthrough Business Revenue - Data', owner: '—', team: '—' },
+  { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Breakthrough Business Revenue - Data', owner: 'N/A', team: 'N/A' },
   { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Investment and Revenue Gains from Ventures', owner: 'Ventures', team: 'Oz & Team' },
   { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Vendor Management (TESM)', owner: 'GPT Strat', team: 'Varun & Team' },
   { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'GPT Global Delivery Model', owner: 'GPT SOT', team: 'Varun & Team' },
@@ -321,7 +325,7 @@ function SidebarInitiativeStatus({ initiative }) {
         borderColor: theme?.border,
         background: theme?.iconBg,
       }}
-      title={`${progressBandLabel(band)} · ${progress}%`}
+      title={`${progressBandLabel(band)} | ${progress}%`}
     >
       {progress}%
     </span>
@@ -335,7 +339,7 @@ const IMPERATIVE_LABELS = {
   TRANSFORM: 'Transform',
 };
 
-/** Initiative tracker KPI overrides — progress/trend/risk derived from live project data. */
+/** Initiative tracker KPI overrides - progress/trend/risk derived from live project data. */
 const INITIATIVE_TRACKER_REF = {
   'deliver against medium term guidance': {
     initiative: 'Deliver on BU & Functional Priorities & KTLO',
@@ -462,11 +466,11 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 30 / 50 / 20' },
     ],
     kpis: [
-      { kpi: 'Cost Savings Realized', status: 'at-risk', current: '$8.7M', target2029: '$18M', targetYearOne: '$12M', comments: '—' },
-      { kpi: 'Migration Readiness', status: 'on-track', current: '70:30', target2029: '80:20', targetYearOne: '75:25', comments: '—' },
-      { kpi: 'Milestone Achievement', status: 'on-track', current: '78%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
-      { kpi: 'Product Rollout Velocity', status: 'at-risk', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: '—' },
-      { kpi: 'Risk & Compliance Score', status: 'at-risk', current: 'Medium', target2029: 'Low', targetYearOne: 'Low-Medium', comments: '—' },
+      { kpi: 'Cost Savings Realized', status: 'at-risk', current: '$8.7M', target2029: '$18M', targetYearOne: '$12M', comments: 'N/A' },
+      { kpi: 'Migration Readiness', status: 'on-track', current: '70:30', target2029: '80:20', targetYearOne: '75:25', comments: 'N/A' },
+      { kpi: 'Milestone Achievement', status: 'on-track', current: '78%', target2029: '>85%', targetYearOne: '80%', comments: 'N/A' },
+      { kpi: 'Product Rollout Velocity', status: 'at-risk', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: 'N/A' },
+      { kpi: 'Risk & Compliance Score', status: 'at-risk', current: 'Medium', target2029: 'Low', targetYearOne: 'Low-Medium', comments: 'N/A' },
     ],
   },
   'client 0 lyric': {
@@ -476,9 +480,9 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 35 / 45 / 20' },
     ],
     kpis: [
-      { kpi: 'Milestone Achievement', status: 'on-track', current: '88%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
-      { kpi: 'Client Adoption', status: 'on-track', current: '71%', target2029: '85%', targetYearOne: '75%', comments: '—' },
-      { kpi: 'Schedule Adherence', status: 'on-track', current: '88%', target2029: '90%', targetYearOne: '82%', comments: '—' },
+      { kpi: 'Milestone Achievement', status: 'on-track', current: '88%', target2029: '>85%', targetYearOne: '80%', comments: 'N/A' },
+      { kpi: 'Client Adoption', status: 'on-track', current: '71%', target2029: '85%', targetYearOne: '75%', comments: 'N/A' },
+      { kpi: 'Schedule Adherence', status: 'on-track', current: '88%', target2029: '90%', targetYearOne: '82%', comments: 'N/A' },
     ],
   },
   'nextgen development per plan': {
@@ -488,9 +492,9 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 28 / 52 / 20' },
     ],
     kpis: [
-      { kpi: 'Milestone Achievement', status: 'at-risk', current: '72%', target2029: '>85%', targetYearOne: '78%', comments: '—' },
-      { kpi: 'Delivery Progress', status: 'at-risk', current: '58%', target2029: '85%', targetYearOne: '70%', comments: '—' },
-      { kpi: 'Schedule Adherence', status: 'at-risk', current: '72%', target2029: '90%', targetYearOne: '80%', comments: '—' },
+      { kpi: 'Milestone Achievement', status: 'at-risk', current: '72%', target2029: '>85%', targetYearOne: '78%', comments: 'N/A' },
+      { kpi: 'Delivery Progress', status: 'at-risk', current: '58%', target2029: '85%', targetYearOne: '70%', comments: 'N/A' },
+      { kpi: 'Schedule Adherence', status: 'at-risk', current: '72%', target2029: '90%', targetYearOne: '80%', comments: 'N/A' },
     ],
   },
   'pi acceleration': {
@@ -501,8 +505,8 @@ const INITIATIVE_SCORECARD_REF = {
     ],
     kpis: [
       { kpi: 'Milestone Achievement', status: 'off-track', current: '35%', target2029: '>85%', targetYearOne: '60%', comments: 'Behind plan' },
-      { kpi: 'Sprint Completion', status: 'off-track', current: '35%', target2029: '90%', targetYearOne: '70%', comments: '—' },
-      { kpi: 'Delivery Risk', status: 'off-track', current: 'High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
+      { kpi: 'Sprint Completion', status: 'off-track', current: '35%', target2029: '90%', targetYearOne: '70%', comments: 'N/A' },
+      { kpi: 'Delivery Risk', status: 'off-track', current: 'High', target2029: 'Low', targetYearOne: 'Medium', comments: 'N/A' },
     ],
   },
   'ai productivity benefit (cumulative %)': {
@@ -512,11 +516,11 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 25 / 50 / 25' },
     ],
     kpis: [
-      { kpi: 'Agents in Pipeline', status: 'on-track', current: '18', target2029: '25', targetYearOne: '20', comments: '—' },
-      { kpi: 'Agents Rolled Out', status: 'at-risk', current: '6', target2029: '15', targetYearOne: '10', comments: '—' },
-      { kpi: 'Persona Coverage', status: 'on-track', current: '64%', target2029: '90%', targetYearOne: '75%', comments: '—' },
-      { kpi: 'User Satisfaction', status: 'on-track', current: '82', target2029: '90', targetYearOne: '85', comments: '—' },
-      { kpi: 'Model Reliability', status: 'at-risk', current: '89%', target2029: '95%', targetYearOne: '92%', comments: '—' },
+      { kpi: 'Agents in Pipeline', status: 'on-track', current: '18', target2029: '25', targetYearOne: '20', comments: 'N/A' },
+      { kpi: 'Agents Rolled Out', status: 'at-risk', current: '6', target2029: '15', targetYearOne: '10', comments: 'N/A' },
+      { kpi: 'Persona Coverage', status: 'on-track', current: '64%', target2029: '90%', targetYearOne: '75%', comments: 'N/A' },
+      { kpi: 'User Satisfaction', status: 'on-track', current: '82', target2029: '90', targetYearOne: '85', comments: 'N/A' },
+      { kpi: 'Model Reliability', status: 'at-risk', current: '89%', target2029: '95%', targetYearOne: '92%', comments: 'N/A' },
     ],
   },
   'investment and revenue gains from ventures': {
@@ -526,11 +530,11 @@ const INITIATIVE_SCORECARD_REF = {
       { label: 'Risk Mix', value: 'Low / Med / High : 22 / 48 / 30' },
     ],
     kpis: [
-      { kpi: 'Targets in Pipeline', status: 'on-track', current: '9', target2029: '12', targetYearOne: '10', comments: '—' },
-      { kpi: 'Deals Closed', status: 'on-track', current: '3', target2029: '5', targetYearOne: '4', comments: '—' },
-      { kpi: 'Due Diligence Completion', status: 'at-risk', current: '67%', target2029: '90%', targetYearOne: '78%', comments: '—' },
-      { kpi: 'Revenue from New Ventures', status: 'at-risk', current: '$15M', target2029: '$25M', targetYearOne: '$18M', comments: '—' },
-      { kpi: 'Integration Risk', status: 'at-risk', current: 'Moderate-High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
+      { kpi: 'Targets in Pipeline', status: 'on-track', current: '9', target2029: '12', targetYearOne: '10', comments: 'N/A' },
+      { kpi: 'Deals Closed', status: 'on-track', current: '3', target2029: '5', targetYearOne: '4', comments: 'N/A' },
+      { kpi: 'Due Diligence Completion', status: 'at-risk', current: '67%', target2029: '90%', targetYearOne: '78%', comments: 'N/A' },
+      { kpi: 'Revenue from New Ventures', status: 'at-risk', current: '$15M', target2029: '$25M', targetYearOne: '$18M', comments: 'N/A' },
+      { kpi: 'Integration Risk', status: 'at-risk', current: 'Moderate-High', target2029: 'Low', targetYearOne: 'Medium', comments: 'N/A' },
     ],
   },
 };
@@ -561,7 +565,7 @@ function buildFallbackScorecard(initiative) {
         current: `${progress}%`,
         target2029: '>85%',
         targetYearOne: '70%',
-        comments: '—',
+        comments: 'N/A',
       },
       {
         kpi: 'Schedule Adherence',
@@ -569,7 +573,7 @@ function buildFallbackScorecard(initiative) {
         current: `${progress}%`,
         target2029: '90%',
         targetYearOne: '75%',
-        comments: '—',
+        comments: 'N/A',
       },
       {
         kpi: 'Delivery Risk',
@@ -577,7 +581,7 @@ function buildFallbackScorecard(initiative) {
         current: risk === 'high' ? 'High' : risk === 'medium' ? 'Medium' : 'Low',
         target2029: 'Low',
         targetYearOne: 'Low-Medium',
-        comments: '—',
+        comments: 'N/A',
       },
     ],
   };
@@ -607,7 +611,7 @@ function buildInitiativeScorecardSummary(ini) {
       : `${progress}%`,
     target2029: firstKpi?.target2029 ?? ref?.target ?? `${Math.min(100, progress + 15)}%`,
     targetYearOne: firstKpi?.targetYearOne ?? `${Math.min(100, progress + 8)}%`,
-    comments: firstKpi?.comments ?? '—',
+    comments: firstKpi?.comments ?? 'N/A',
   };
 }
 
@@ -637,7 +641,7 @@ const OWNER_TONE_MAP = {
 };
 
 function resolveOwnerTone(owner) {
-  if (!owner || owner === '—') return 'neutral';
+  if (!owner || owner === 'N/A') return 'neutral';
   if (OWNER_TONE_MAP[owner]) return OWNER_TONE_MAP[owner];
   if (owner.includes('Lyric')) return 'teal';
   if (owner.includes('Product')) return 'violet';
@@ -645,7 +649,7 @@ function resolveOwnerTone(owner) {
 }
 
 function OwnerBadge({ owner }) {
-  if (!owner || owner === '—') return <span className="def-owner-empty">—</span>;
+  if (!owner || owner === EMPTY_VALUE) return <span className="def-owner-empty">{EMPTY_VALUE}</span>;
   const tone = resolveOwnerTone(owner);
   return (
     <span className={`def-owner-badge tone-${tone}`} title={`Owner: ${owner}`}>
@@ -656,7 +660,7 @@ function OwnerBadge({ owner }) {
 }
 
 function TeamBadge({ team }) {
-  if (!team || team === '—') return <span className="def-owner-empty">—</span>;
+  if (!team || team === EMPTY_VALUE) return <span className="def-owner-empty">{EMPTY_VALUE}</span>;
   return (
     <span className="def-team-badge" title={`Team: ${team}`}>
       <span className="def-team-badge-icon" aria-hidden="true">👥</span>
@@ -735,7 +739,7 @@ function CockpitCollapsibleSection({
           {description ? <p className="def-cockpit-collapse-desc">{description}</p> : null}
         </div>
         {badge ? <span className="def-cockpit-collapse-badge">{badge}</span> : null}
-        <span className="def-cockpit-collapse-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <span className="def-cockpit-collapse-chevron" aria-hidden="true">{open ? 'v' : '>'}</span>
       </button>
       {open ? (
         <div id={bodyId} className="def-cockpit-collapse-body">
@@ -750,7 +754,7 @@ function StrategicTargetCards({ targets }) {
   if (!targets?.length) return null;
   return (
     <div className="def-scorecard-targets">
-      <p className="def-scorecard-targets-label">Strategic targets — 2029</p>
+      <p className="def-scorecard-targets-label">Strategic targets - 2029</p>
       <div className="def-scorecard-targets-row">
         {targets.map((target) => (
           <div key={target.label} className="def-scorecard-target-card">
@@ -768,10 +772,14 @@ function InitiativeKpiTable({
   onRowClick,
   emptyMessage = 'No KPI rows to display.',
   showOwnership = false,
+  embedded = false,
 }) {
   const colSpan = showOwnership ? 8 : 6;
+  const wrapClass = embedded
+    ? 'def-table-wrap def-table-embedded def-table-scroll-wrap'
+    : 'def-table-wrap def-table-pro def-table-scroll-wrap';
   return (
-    <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
+    <div className={wrapClass}>
       <table className="def-table def-initiative-kpi-table">
         <thead>
           <tr>
@@ -839,8 +847,8 @@ function buildInitiativeTrackerRows(fastCategories) {
         imperative,
         initiative: ref?.initiative ?? defaultInitiative,
         subInitiative: ini.name,
-        owner: ini.owner ?? '—',
-        team: ini.team?.name ?? '—',
+        owner: ini.owner ?? 'N/A',
+        team: ini.team?.name ?? 'N/A',
         scorecardStatus: scorecardSummary.scorecardStatus,
         current: scorecardSummary.current,
         target2029: scorecardSummary.target2029,
@@ -854,9 +862,9 @@ function buildInitiativeTrackerRows(fastCategories) {
   rows.sort(
     (a, b) =>
       (imperativeOrder[a.imperative] ?? 9) - (imperativeOrder[b.imperative] ?? 9)
-      || a.imperative.localeCompare(b.imperative)
-      || a.initiative.localeCompare(b.initiative)
-      || a.subInitiative.localeCompare(b.subInitiative),
+      || a.imperative.localeCompare(b.imperative, APP_LOCALE)
+      || a.initiative.localeCompare(b.initiative, APP_LOCALE)
+      || a.subInitiative.localeCompare(b.subInitiative, APP_LOCALE),
   );
 
   return applyTrackerRowSpans(rows);
@@ -881,8 +889,8 @@ function getInitiativeTrackerDetail(initiative, fastCategory) {
   return {
     parentInitiative: ref?.initiative ?? defaultParent,
     imperative: IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName,
-    owner: initiative.owner ?? '—',
-    team: initiative.team?.name ?? '—',
+    owner: initiative.owner ?? 'N/A',
+    team: initiative.team?.name ?? 'N/A',
     budgetPct,
     budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
     budgetTone: budgetPct >= 80 ? 'warn' : 'ok',
@@ -919,12 +927,12 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
   return (
     <CockpitCollapsibleSection
       id="initiative-tracker"
-      title="Lay of land — initiative tracker"
-      description={`Portfolio scorecard across FAST pillars, owners, teams, and KPI targets · Last updated: ${updatedLabel}`}
+      title="Lay of land - Initiative tracker"
+      description={`Portfolio scorecard across FAST pillars, owners, teams, and KPI targets | Last updated: ${updatedLabel}`}
       badge={`${filtered.length} initiatives`}
       defaultOpen={false}
       className="def-cockpit-tracker def-cockpit-interactive def-stagger-in"
-      stagger="360ms"
+      stagger="280ms"
     >
       <div className="def-tracker-legend">
         <span className="def-tracker-legend-item adp"><i aria-hidden="true" /> Source: ADP / Provided by ADP</span>
@@ -937,7 +945,7 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search initiative…"
+            placeholder="Search initiative..."
           />
         </label>
         <span className="def-tracker-count">{filtered.length} initiatives</span>
@@ -1006,7 +1014,7 @@ function buildLayOfLandCategories() {
     const projects = [createDemoProject(`prj-${index + 1}`, row.initiative, index)];
     const teamSummary = summarizeProjects(projects);
     fastMap.get(fastId).initiatives.push({
-      id: initiativeId, name: row.initiative, owner: row.owner ?? '—', status: teamSummary.status,
+      id: initiativeId, name: row.initiative, owner: row.owner ?? 'N/A', status: teamSummary.status,
       team: { id: toSlug(`${row.team}-${initiativeId}`), name: row.team, status: teamSummary.status, summary: teamSummary },
       projects,
     });
@@ -1080,8 +1088,8 @@ function computeExecutiveMetrics(fastCategories, weekly = []) {
     offTrackCount: summary.offTrackProjects,
     healthScore: summary.overallHealth,
     healthTrend: healthDelta >= 0
-      ? `▲ ${Math.abs(healthDelta)} pts vs Last Quarter`
-      : `▼ ${Math.abs(healthDelta)} pts vs Last Quarter`,
+      ? `Up ${Math.abs(healthDelta)} pts vs last quarter`
+      : `Down ${Math.abs(healthDelta)} pts vs last quarter`,
   };
 }
 
@@ -1097,7 +1105,7 @@ function buildOwnershipOverview(pillarFasts) {
   const byOwner = new Map();
   pillarFasts.forEach((fast) => {
     fast.initiatives.forEach((ini) => {
-      const owner = ini.owner && ini.owner !== '—' ? ini.owner : 'Unassigned';
+      const owner = ini.owner && ini.owner !== 'N/A' ? ini.owner : 'Unassigned';
       if (!byOwner.has(owner)) byOwner.set(owner, { owner, initiatives: [] });
       byOwner.get(owner).initiatives.push(ini);
     });
@@ -1153,34 +1161,6 @@ function buildUpcomingMilestones(pillarFasts) {
     .slice(0, 8);
 }
 
-function buildRecoveryTimeTable() {
-  return [
-    { id: 'off-at', path: 'Off Track → At Risk', current: 18, previous: 25, changePct: -28 },
-    { id: 'at-on', path: 'At Risk → On Track', current: 22, previous: 31, changePct: -29 },
-    { id: 'off-on', path: 'Off Track → On Track', current: 41, previous: 58, changePct: -29 },
-    { id: 'completion', path: 'Initiative completion time', current: 76, previous: 94, changePct: -19 },
-  ];
-}
-
-function buildExecutiveTopRisks(pillarFasts) {
-  return pillarFasts
-    .map((fast) => {
-      const projects = fast.initiatives.flatMap((ini) => ini.projects);
-      const bands = countProjectsByProgressBand(projects);
-      const atRiskCount = bands.atRisk + bands.offTrack;
-      const score = Math.min(99, Math.max(12, Math.round(100 - fast.healthScore + atRiskCount * 2.5)));
-      return {
-        id: fast.id,
-        score,
-        title: IMPERATIVE_LABELS[fast.shortName] || fast.shortName,
-        subtitle: `${atRiskCount} initiative${atRiskCount === 1 ? '' : 's'} at risk`,
-        tone: score >= 22 ? 'high' : score >= 18 ? 'medium' : 'low',
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4);
-}
-
 function buildQuarterlyComparisonStats(rows) {
   if (rows.length < 2) return { onTrackDelta: 0, atRiskDelta: 0, offTrackDelta: 0 };
   const pct = (row) => {
@@ -1231,9 +1211,9 @@ function buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary) {
       text: `${Math.max(ceoSummary.completedProjects, 3)} initiatives completed this quarter across the portfolio.`,
     },
     {
-      id: 'recovery',
-      icon: '⏱',
-      text: 'Average time from At Risk to On Track improved 29% over the last 6 months.',
+      id: 'health',
+      icon: '◆',
+      text: `Portfolio health score is ${executiveMetrics.healthScore}/100 with ${executiveMetrics.atRiskCount} initiatives at risk.`,
     },
   ];
 }
@@ -1393,7 +1373,7 @@ function HierarchyTrail({ items }) {
     <nav className="def-breadcrumb" aria-label="Organization hierarchy">
       {items.map((item, index) => (
         <span key={item.key} className="def-bc-item">
-          {index > 0 && <span className="def-bc-sep" aria-hidden="true">›</span>}
+          {index > 0 && <span className="def-bc-sep" aria-hidden="true">/</span>}
           {item.onClick ? (
             <button type="button" className="def-bc-link" onClick={item.onClick}>
               {item.tier && <span className="def-bc-tier">{item.tier}</span>}
@@ -1495,7 +1475,7 @@ function AppSidebar({
                   <div className="def-sidebar-pillar-copy">
                     <strong title={fast.shortName}>{fast.shortName}</strong>
                     <span>
-                      {fast.initiatives.length} initiatives · {fast.summary.activeProjects} projects
+                      {fast.initiatives.length} initiatives | {fast.summary.activeProjects} projects
                     </span>
                   </div>
                   <div className="def-sidebar-pillar-actions">
@@ -1516,7 +1496,7 @@ function AppSidebar({
                       aria-expanded={isExpanded}
                       aria-label={`${isExpanded ? 'Collapse' : 'Expand'} initiatives under ${fast.shortName}`}
                     >
-                      {isExpanded ? '▾' : '▸'}
+                      {isExpanded ? 'v' : '>'}
                     </button>
                   </div>
                 </div>
@@ -1530,8 +1510,8 @@ function AppSidebar({
                   </p>
                   {fast.initiatives.map((ini) => {
                     const isIniActive = initiative?.id === ini.id && fastCategory?.id === fast.id;
-                    const ownerLabel = ini.owner && ini.owner !== '—' ? ini.owner : 'Unassigned';
-                    const teamLabel = ini.team?.name && ini.team.name !== '—' ? ini.team.name : 'No team';
+                    const ownerLabel = ini.owner && ini.owner !== 'N/A' ? ini.owner : 'Unassigned';
+                    const teamLabel = ini.team?.name && ini.team.name !== 'N/A' ? ini.team.name : 'No team';
                     return (
                       <button
                         key={ini.id}
@@ -1543,9 +1523,9 @@ function AppSidebar({
                         <span className="def-sidebar-ini-name" title={ini.name}>{ini.name}</span>
                         <span
                           className="def-sidebar-ini-meta"
-                          title={`Owner: ${ownerLabel} · Team: ${teamLabel}`}
+                          title={`Owner: ${ownerLabel} | Team: ${teamLabel}`}
                         >
-                          {ownerLabel} · {teamLabel}
+                          {ownerLabel} | {teamLabel}
                         </span>
                         <SidebarInitiativeStatus initiative={ini} />
                       </button>
@@ -1604,22 +1584,10 @@ function progressBandLabel(band) {
 function buildCockpitAnalytics(orgData, filterFastId) {
   const { fastCategories, ceoTrends, ceoSummary: globalSummary } = orgData;
   const pillarFasts = filterFastId ? fastCategories.filter((f) => f.id === filterFastId) : fastCategories;
-  const initiatives = pillarFasts.flatMap((f) => f.initiatives.map((i) => ({
-    ...i,
-    pillar: f.shortName,
-    fastId: f.id,
-  })));
   const ceoSummary = filterFastId ? computePortfolioSummary(pillarFasts) : globalSummary;
 
   const weekly = ceoTrends.weekly;
   const monthly = ceoTrends.monthly.slice(-4);
-
-  const statusMovement = weekly.map((w) => ({
-    label: w.label,
-    OnTrack: w.onTrack ?? 0,
-    AtRisk: w.atRisk ?? 0,
-    Delayed: w.delayed ?? 0,
-  }));
 
   const quarterlyBars = monthly.map((m, i) => ({
     quarter: `${m.label}`,
@@ -1630,22 +1598,6 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   }));
 
   const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
-
-  const topRisks = [...initiatives.flatMap((i) => i.projects)]
-    .filter((p) => p.risk === 'high' || CRITICAL_STATUS.has(p.status) || (p.progress ?? 0) < 80)
-    .sort((a, b) => (a.progress ?? 0) - (b.progress ?? 0))
-    .slice(0, 7)
-    .map((p) => {
-      const progress = p.progress ?? 0;
-      const band = classifyProgressBand(progress);
-      return {
-        id: p.id,
-        title: p.name,
-        progress,
-        band,
-        levelLabel: progressBandLabel(band),
-      };
-    });
 
   const lastQuarterBullets = [
     `Average team utilization was ${weekly[weekly.length - 1]?.utilization ?? 85}%. Portfolio health ended near ${weekly[weekly.length - 1]?.close ?? ceoSummary.overallHealth}%.`,
@@ -1669,17 +1621,13 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   return {
     ceoSummary,
     executiveMetrics,
-    statusMovement,
     quarterlyBars,
     quarterlyStats,
-    recoveryTimeTable: buildRecoveryTimeTable(),
     initiativeTracker,
     ownershipOverview: buildOwnershipOverview(pillarFasts),
     upcomingMilestones: buildUpcomingMilestones(pillarFasts),
-    executiveTopRisks: buildExecutiveTopRisks(pillarFasts),
     lastQuarterSummary: buildLastQuarterSummary(quarterlyBars),
     keyHighlights: buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary),
-    topRisks,
     lastQuarterBullets,
     sparks,
   };
@@ -1934,7 +1882,7 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
         </ul>
       </div>
       <div className="def-cockpit-fast-foot">
-        <span className="def-cockpit-fast-team">Team · {leadTeam}</span>
+        <span className="def-cockpit-fast-team">Team | {leadTeam}</span>
       </div>
     </button>
   );
@@ -1949,61 +1897,9 @@ function CockpitPanelHeader({ title, actionLabel = 'View all' }) {
   );
 }
 
-function CockpitRecoveryTimeTable({ rows }) {
-  return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
-      <CockpitPanelHeader title="Average time to recovery (last 6 months)" />
-      <div className="def-cockpit-table-scroll def-cockpit-panel-body">
-        <table className="def-cockpit-table def-cockpit-table-recovery-time">
-          <thead>
-            <tr>
-              <th>Recovery path</th>
-              <th>Current (days)</th>
-              <th>Previous 6M</th>
-              <th>Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td><strong>{row.path}</strong></td>
-                <td>{row.current}</td>
-                <td>{row.previous}</td>
-                <td className="def-cockpit-trend-good">↓ {Math.abs(row.changePct)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function CockpitTopRisksPanel({ risks }) {
-  return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-top-risks def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
-      <CockpitPanelHeader title="Top risks" />
-      <ul className="def-cockpit-exec-risk-list">
-        {risks.map((risk) => (
-          <li key={risk.id} className={`def-cockpit-exec-risk-item tone-${risk.tone}`}>
-            <span className="def-cockpit-exec-risk-score" aria-hidden="true">{risk.score}</span>
-            <div className="def-cockpit-exec-risk-copy">
-              <strong>{risk.title}</strong>
-              <small>{risk.subtitle}</small>
-            </div>
-          </li>
-        ))}
-        {risks.length === 0 && (
-          <li className="def-cockpit-risk-empty">No executive risks flagged.</li>
-        )}
-      </ul>
-    </div>
-  );
-}
-
 function OwnershipOverviewTable({ rows }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
       <CockpitPanelHeader title="Ownership overview" />
       <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-ownership">
@@ -2056,7 +1952,7 @@ function OwnershipOverviewTable({ rows }) {
 
 function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '360ms' }}>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
       <CockpitPanelHeader title="Upcoming milestones (next 30 days)" />
       <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-milestones">
@@ -2098,7 +1994,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
 
 function CockpitQuarterHighlights({ lastQuarter, highlights }) {
   return (
-    <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '400ms' }}>
+    <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive">
         <h3 className="def-cockpit-card-title">Last quarter summary ({lastQuarter.label})</h3>
         <div className="def-cockpit-lq-grid">
@@ -2131,147 +2027,6 @@ function CockpitQuarterHighlights({ lastQuarter, highlights }) {
   );
 }
 
-function CockpitStackedArea({ data, theme, height = 240 }) {
-  const chart = useResponsiveChart();
-  const isDark = theme === 'dark';
-  const tick = isDark ? '#a1a1aa' : '#475569';
-  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.12)';
-  const first = data[0];
-  const last = data[data.length - 1];
-  const improved = Math.max(0, (last?.OnTrack ?? 0) - (first?.OnTrack ?? 0));
-  const deteriorated = Math.max(0, (last?.Delayed ?? 0) - (first?.Delayed ?? 0));
-  const net = improved - deteriorated;
-
-  return (
-    <div className="def-cockpit-chart-card def-cockpit-panel def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
-      <div className="def-cockpit-chart-head">
-        <h3 className="def-cockpit-card-title">Status movement (last 6 months)</h3>
-      </div>
-      <div className="def-cockpit-chart-plot">
-        <ResponsiveContainer width="100%" height={height}>
-          <AreaChart data={data} margin={chart.chartMargin}>
-            <defs>
-              <linearGradient id="cockpitOn" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
-                <stop offset="95%" stopColor="#34d399" stopOpacity={0.06} />
-              </linearGradient>
-              <linearGradient id="cockpitRisk" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.42} />
-                <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.06} />
-              </linearGradient>
-              <linearGradient id="cockpitLate" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f87171" stopOpacity={0.45} />
-                <stop offset="95%" stopColor="#f87171" stopOpacity={0.06} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 8" stroke={grid} vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: tick, fontSize: chart.tickSmall }}
-              axisLine={{ stroke: grid }}
-              tickMargin={4}
-              interval={chart.isMobile ? 'preserveStartEnd' : 0}
-              angle={chart.isMobile ? -28 : 0}
-              textAnchor={chart.isMobile ? 'end' : 'middle'}
-              height={chart.xAxisHeight}
-            />
-            <YAxis width={chart.yAxisWidth} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={2} />
-            <Tooltip />
-            <Area name="On track" type="monotone" dataKey="OnTrack" stackId="mix" stroke="#059669" fill="url(#cockpitOn)" isAnimationActive animationDuration={900} />
-            <Area name="At risk" type="monotone" dataKey="AtRisk" stackId="mix" stroke="#d97706" fill="url(#cockpitRisk)" isAnimationActive animationDuration={900} />
-            <Area name="Delayed / blocked" type="monotone" dataKey="Delayed" stackId="mix" stroke="#dc2626" fill="url(#cockpitLate)" isAnimationActive animationDuration={900} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <ChartLegendRow
-        items={[
-          { label: 'On track', color: '#059669' },
-          { label: 'At risk', color: '#d97706' },
-          { label: 'Delayed / blocked', color: '#dc2626' },
-        ]}
-      />
-      <div className="def-cockpit-movement-stats">
-        <div className="def-cockpit-move-stat improved">
-          <span>Improved (Off → At Risk/On Track)</span>
-          <strong>+{improved}</strong>
-        </div>
-        <div className="def-cockpit-move-stat deteriorated">
-          <span>Deteriorated (On Track → At Risk/Off)</span>
-          <strong>−{deteriorated}</strong>
-        </div>
-        <div className={`def-cockpit-move-stat net${net >= 0 ? ' positive' : ' negative'}`}>
-          <span>Net improvement</span>
-          <strong>{net >= 0 ? '+' : ''}{net}</strong>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CockpitQuarterBars({ rows, theme, height = 240, compact = false, comparisonStats }) {
-  const chart = useResponsiveChart();
-  const isDark = theme === 'dark';
-  const tick = isDark ? '#a1a1aa' : '#475569';
-  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(226,232,240,1)';
-  const pctRows = rows.map((row) => {
-    const total = row.onTrack + row.atRisk + row.delayed;
-    if (!total) return { ...row, onPct: 0, riskPct: 0, offPct: 0 };
-    return {
-      ...row,
-      onPct: Math.round((row.onTrack / total) * 100),
-      riskPct: Math.round((row.atRisk / total) * 100),
-      offPct: Math.round((row.delayed / total) * 100),
-    };
-  });
-  return (
-    <div className="def-cockpit-chart-card def-cockpit-panel def-cockpit-interactive def-stagger-in" style={{ '--stagger': '240ms' }}>
-      <div className="def-cockpit-chart-head">
-        <h3 className="def-cockpit-card-title">Quarterly comparison</h3>
-      </div>
-      <div className="def-cockpit-chart-plot">
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart layout="vertical" data={pctRows} margin={chart.axisMargin}>
-            <CartesianGrid strokeDasharray="3 8" stroke={grid} horizontal={false} />
-            <XAxis type="number" domain={[0, 100]} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickFormatter={(v) => `${v}%`} />
-            <YAxis
-              type="category"
-              dataKey="quarter"
-              width={compact ? chart.barYAxisWidth - 12 : chart.barYAxisWidth}
-              tick={{ fill: tick, fontSize: chart.tickSmall }}
-              axisLine={{ stroke: grid }}
-              tickMargin={4}
-            />
-            <Tooltip formatter={(value) => `${value}%`} />
-            <Bar dataKey="onPct" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
-            <Bar dataKey="riskPct" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
-            <Bar dataKey="offPct" name="Off track" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <ChartLegendRow
-        items={[
-          { label: 'On track', color: '#34d399' },
-          { label: 'At risk', color: '#fbbf24' },
-          { label: 'Off track', color: '#f87171' },
-        ]}
-      />
-      {comparisonStats ? (
-        <div className="def-cockpit-quarter-trends">
-          <span className={comparisonStats.onTrackDelta >= 0 ? 'up' : 'down'}>
-            On track {comparisonStats.onTrackDelta >= 0 ? '↑' : '↓'} {Math.abs(comparisonStats.onTrackDelta)}%
-          </span>
-          <span className={comparisonStats.atRiskDelta <= 0 ? 'up' : 'down'}>
-            At risk {comparisonStats.atRiskDelta <= 0 ? '↓' : '↑'} {Math.abs(comparisonStats.atRiskDelta)}%
-          </span>
-          <span className={comparisonStats.offTrackDelta <= 0 ? 'up' : 'down'}>
-            Off track {comparisonStats.offTrackDelta <= 0 ? '↓' : '↑'} {Math.abs(comparisonStats.offTrackDelta)}%
-          </span>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────
    LAYER VIEWS
 ───────────────────────────────────────────────────────────── */
@@ -2289,15 +2044,12 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
     [],
   );
   const healthBand = classifyProgressBand(analytics.executiveMetrics.healthScore);
-  const healthTrendDown = analytics.executiveMetrics.healthTrend.startsWith('▼');
+  const healthTrendDown = analytics.executiveMetrics.healthTrend.startsWith('Down');
 
   return (
     <div
       className={`def-layer def-page-enter def-cockpit def-cockpit-theme-${theme}`}
       style={{
-        '--cockpit-chart-h': `${vp.chartH}px`,
-        '--cockpit-panel-chart-h': `${vp.panelChartH}px`,
-        '--cockpit-panel-min-h': vp.panelMinH ? `${vp.panelMinH}px` : '0px',
         '--cockpit-bottom-min-h': vp.bottomMinH ? `${vp.bottomMinH}px` : '0px',
       }}
     >
@@ -2410,30 +2162,22 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
         </div>
       </section>
 
-      <div className="def-cockpit-workspace def-cockpit-workspace-analytics">
-        <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.panelChartH} />
-        <CockpitRecoveryTimeTable rows={analytics.recoveryTimeTable} />
-        <CockpitQuarterBars
-          rows={analytics.quarterlyBars}
-          theme={theme}
-          height={vp.panelChartH}
-          compact={vp.compact}
-          comparisonStats={analytics.quarterlyStats}
-        />
-        <CockpitTopRisksPanel risks={analytics.executiveTopRisks} />
-      </div>
-
-      <div className="def-cockpit-bottom-row">
-        <OwnershipOverviewTable rows={analytics.ownershipOverview} />
-        <UpcomingMilestonesTable
-          rows={analytics.upcomingMilestones}
-          onOpenInitiative={onOpenInitiative}
-        />
-        <CockpitQuarterHighlights
-          lastQuarter={analytics.lastQuarterSummary}
-          highlights={analytics.keyHighlights}
-        />
-      </div>
+      <section className="def-cockpit-block def-cockpit-interactive def-stagger-in" style={{ '--stagger': '120ms' }}>
+        <div className="def-cockpit-block-head">
+          <h2 className="def-cockpit-section-title">Portfolio insights</h2>
+        </div>
+        <div className="def-cockpit-bottom-row">
+          <OwnershipOverviewTable rows={analytics.ownershipOverview} />
+          <UpcomingMilestonesTable
+            rows={analytics.upcomingMilestones}
+            onOpenInitiative={onOpenInitiative}
+          />
+          <CockpitQuarterHighlights
+            lastQuarter={analytics.lastQuarterSummary}
+            highlights={analytics.keyHighlights}
+          />
+        </div>
+      </section>
 
       <InitiativeTracker
         rows={analytics.initiativeTracker}
@@ -2451,8 +2195,8 @@ function buildFastScorecardRows(fastCategory) {
       id: ini.id,
       initiativeId: ini.id,
       kpi: ini.name,
-      owner: ini.owner ?? '—',
-      team: ini.team?.name ?? '—',
+      owner: ini.owner ?? 'N/A',
+      team: ini.team?.name ?? 'N/A',
       scorecardStatus: summary.scorecardStatus,
       current: summary.current,
       target2029: summary.target2029,
@@ -2506,9 +2250,9 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
             </span>
             <span className="def-drawer-pillar-meta">
               {fastCategory.summary.initiatives} initiatives
-              {' · '}
+              {' | '}
               {fastCategory.summary.activeProjects} projects
-              {' · '}
+              {' | '}
               {fastCategory.summary.teams} teams
             </span>
           </div>
@@ -2532,15 +2276,16 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
   );
 }
 
-function FastCategoryView({ fastCategory, onSelectInitiative, onSelectProject, onGoCeo, onBack }) {
+function FastCategoryView({ fastCategory, onSelectInitiative, onGoCeo, onBack }) {
   const scorecardRows = useMemo(
     () => buildFastScorecardRows(fastCategory),
     [fastCategory],
   );
   const imperative = IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName;
+  const healthTone = healthColor(fastCategory.healthScore);
 
   return (
-    <div className="def-layer def-page-enter def-initiative-page">
+    <div className="def-layer def-page-enter def-initiative-page def-pillar-page">
       <HierarchyTrail
         items={[
           { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
@@ -2548,37 +2293,48 @@ function FastCategoryView({ fastCategory, onSelectInitiative, onSelectProject, o
         ]}
       />
 
-      <header className="def-initiative-header">
-        <div className="def-initiative-header-main">
-          <div className="def-initiative-meta">
-            <span className="def-initiative-pillar">{imperative}</span>
-            <span className="def-initiative-parent">{fastCategory.name}</span>
+      <article className="def-pillar-shell">
+        <header className="def-pillar-hero">
+          <div className="def-pillar-hero-main">
+            <div className="def-pillar-hero-meta">
+              <span className="def-initiative-pillar">{imperative}</span>
+              <StatusPill status={fastCategory.status} />
+            </div>
+            <h1 className="def-pillar-title">{fastCategory.shortName} pillar</h1>
+            <p className="def-pillar-subtitle">{fastCategory.name}</p>
+            <ul className="def-pillar-stats" aria-label="Pillar summary">
+              <li><strong>{fastCategory.summary.initiatives}</strong> initiatives</li>
+              <li><strong>{fastCategory.summary.activeProjects}</strong> projects</li>
+              <li><strong>{fastCategory.summary.teams}</strong> teams</li>
+              <li className="def-pillar-health" style={{ color: healthTone }}>
+                <strong>{fastCategory.healthScore}%</strong> health
+              </li>
+            </ul>
           </div>
-          <h1 className="def-initiative-title">{fastCategory.shortName} pillar</h1>
-          <p className="def-initiative-sub">
-            {fastCategory.summary.initiatives} initiatives
-            {' · '}
-            {fastCategory.summary.activeProjects} projects
-            {' · '}
-            {fastCategory.summary.teams} teams
-          </p>
-        </div>
-        <div className="def-initiative-header-aside">
-          <StatusPill status={fastCategory.status} />
-        </div>
-      </header>
+        </header>
 
-      <SectionCard
-        title="Initiative KPIs"
-        desc={`Executive initiative scorecard — ${fastCategory.initiatives.length} initiatives under ${imperative}`}
-      >
-        <InitiativeKpiTable
-          rows={scorecardRows}
-          onRowClick={(row) => onSelectInitiative(row.initiativeId)}
-        />
-      </SectionCard>
+        <section className="def-pillar-body" aria-labelledby="def-pillar-kpi-title">
+          <div className="def-pillar-section-head">
+            <div>
+              <h2 id="def-pillar-kpi-title" className="def-pillar-section-title">Initiative KPIs</h2>
+              <p className="def-pillar-section-desc">
+                Executive scorecard for {scorecardRows.length} initiatives under {imperative}
+              </p>
+            </div>
+          </div>
+          <InitiativeKpiTable
+            rows={scorecardRows}
+            embedded
+            onRowClick={(row) => onSelectInitiative(row.initiativeId)}
+          />
+        </section>
 
-      <button type="button" className="def-back-btn" onClick={onBack}>← Back to Command Center Cockpit</button>
+        <footer className="def-pillar-footer">
+          <button type="button" className="def-back-link" onClick={onBack}>
+            Back to Command Center Cockpit
+          </button>
+        </footer>
+      </article>
     </div>
   );
 }
@@ -2619,9 +2375,9 @@ function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam,
           <h1 className="def-initiative-title">{initiative.name}</h1>
           <p className="def-initiative-sub">
             Executive initiative scorecard
-            {' · '}
-            Owner: <strong>{initiative.owner ?? '—'}</strong>
-            {' · '}
+            {' | '}
+            Owner: <strong>{initiative.owner ?? 'N/A'}</strong>
+            {' | '}
             Team: <strong>{team?.name ?? 'Unassigned'}</strong>
           </p>
         </div>
@@ -2858,7 +2614,7 @@ function ProjectDetailCharts({ project, theme }) {
           {moduleData.map((item) => (
             <span key={item.status}>
               <i style={{ background: item.fill }} />
-              {item.name} · {item.value}
+              {item.name} | {item.value}
             </span>
           ))}
         </div>
@@ -2975,7 +2731,7 @@ function ProjectDetailContent({ project, theme }) {
                 </div>
                 <div className="def-drawer-module-meta">
                   <span>{mod.assignee}</span>
-                  <span>{mod.estimatedDays}d est.{mod.actualDays ? ` · ${mod.actualDays}d actual` : ''}</span>
+                  <span>{mod.estimatedDays}d est.{mod.actualDays ? ` | ${mod.actualDays}d actual` : ''}</span>
                 </div>
               </article>
             );
@@ -2994,7 +2750,7 @@ function ProjectDetailContent({ project, theme }) {
               <Avatar name={dev.name} tone="slate" />
               <div className="def-drawer-team-info">
                 <strong>{dev.name}</strong>
-                <span>{dev.role} · {dev.currentModule}</span>
+                <span>{dev.role} | {dev.currentModule}</span>
               </div>
               <span
                 className="def-drawer-team-util"
@@ -3038,7 +2794,7 @@ function ProjectDetailDrawer({ project, team, open, onClose, theme = 'light' }) 
           <h2 id="def-drawer-title">{project.name}</h2>
           <p className="def-drawer-subtitle">
             Client: <strong>{project.client}</strong>
-            {' · '}
+            {' | '}
             Team: <strong>{team?.name ?? 'Unassigned'}</strong>
           </p>
           <div className="def-drawer-head-badges">
@@ -3097,9 +2853,9 @@ function TeamView({
           <h1 className="def-initiative-title">{team.name}</h1>
           <p className="def-initiative-sub">
             {projects.length} project{projects.length !== 1 ? 's' : ''}
-            {' · '}
+            {' | '}
             {teamSize} team members
-            {' · '}
+            {' | '}
             {fastCategory.shortName} pillar
           </p>
         </div>
@@ -3592,7 +3348,7 @@ const STYLES = `
   }
   .def-layout {
     position: relative;
-    /* No z-index — mobile drawer must stack above backdrop (z-index 150). */
+    /* No z-index - mobile drawer must stack above backdrop (z-index 150). */
   }
 
   .def-topbar {
@@ -4853,7 +4609,7 @@ const STYLES = `
     position: relative;
   }
   .def-table-scroll-wrap::after {
-    content: 'Scroll →';
+    content: 'Scroll right';
     position: sticky;
     right: 0;
     bottom: 0;
@@ -5032,6 +4788,164 @@ const STYLES = `
   .def-initiative-header-aside {
     display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;
   }
+
+  /* FAST pillar page — single workspace surface */
+  .def-pillar-page {
+    gap: var(--space-2);
+  }
+  .def-pillar-page .def-breadcrumb {
+    margin-bottom: 0;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .def-pillar-shell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid var(--def-border);
+    border-radius: 16px;
+    box-shadow: var(--def-shadow-sm);
+    overflow: hidden;
+  }
+  .def-pillar-hero {
+    position: relative;
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    background: linear-gradient(135deg, #fff 0%, #f8faff 55%, #f5f3ff 100%);
+    border-bottom: 1px solid var(--def-border);
+  }
+  .def-pillar-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, #6366f1, #8b5cf6);
+  }
+  .def-pillar-hero-main { min-width: 0; padding-left: 6px; }
+  .def-pillar-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .def-pillar-title {
+    margin: 0 0 4px;
+    font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+    font-weight: var(--font-extrabold);
+    letter-spacing: var(--tracking-tight);
+    color: var(--def-heading);
+    line-height: var(--leading-tight);
+  }
+  .def-pillar-subtitle {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--def-muted);
+    line-height: var(--leading-relaxed);
+    max-width: 52ch;
+  }
+  .def-pillar-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 0;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.75rem;
+    color: var(--def-muted);
+    font-weight: 600;
+  }
+  .def-pillar-stats li {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .def-pillar-stats li:not(:last-child)::after {
+    content: '';
+    width: 1px;
+    height: 12px;
+    margin: 0 12px;
+    background: var(--def-border);
+  }
+  .def-pillar-stats strong {
+    color: var(--def-heading);
+    font-weight: 800;
+  }
+  .def-pillar-health strong { font-weight: 800; }
+  .def-pillar-body {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    min-width: 0;
+  }
+  .def-pillar-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .def-pillar-section-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--def-heading);
+    letter-spacing: -0.01em;
+  }
+  .def-pillar-section-desc {
+    margin: 4px 0 0;
+    font-size: 0.72rem;
+    color: var(--def-muted);
+    line-height: 1.45;
+  }
+  .def-table-embedded {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(226,232,240,0.95);
+    box-shadow: none;
+  }
+  .def-table-embedded .def-table thead th {
+    background: #f8fafc;
+    font-size: 0.62rem;
+  }
+  .def-table-embedded .def-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .def-pillar-footer {
+    display: flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--def-border);
+    background: #fafbfd;
+  }
+  .def-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--def-blue);
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  .def-back-link::before {
+    content: '←';
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: transform 0.2s ease;
+  }
+  .def-back-link:hover {
+    color: var(--def-violet);
+  }
+  .def-back-link:hover::before {
+    transform: translateX(-3px);
+  }
+
   .def-initiative-source {
     font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;
   }
@@ -7696,6 +7610,22 @@ const STYLES = `
     margin: 0 0 5px; font-size: var(--text-md); font-weight: var(--font-extrabold); color: var(--def-heading);
     letter-spacing: var(--tracking-tight); line-height: var(--leading-snug);
   }
+  .def-cockpit-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .def-cockpit-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .def-cockpit-block-head .def-cockpit-section-title {
+    margin: 0;
+  }
   .def-cockpit-collapsible.is-collapsed {
     padding-bottom: var(--space-2);
   }
@@ -8028,6 +7958,7 @@ const STYLES = `
     gap: var(--cockpit-gap);
     align-items: stretch;
     min-width: 0;
+    width: 100%;
   }
   .def-cockpit-bottom-row > * {
     min-height: var(--cockpit-bottom-min-h, 0px);
@@ -8690,7 +8621,7 @@ const STYLES = `
     .def-cockpit-fast-health h3 { line-clamp: 3; }
   }
 
-  /* Dark theme — layer surfaces */
+  /* Dark theme - layer surfaces */
   .def-app.def-theme-dark .def-alert-line,
   .def-app.def-theme-dark .def-delay-reason {
     background: rgba(234,88,12,0.12);
@@ -8785,6 +8716,24 @@ const STYLES = `
   .def-app.def-theme-dark .def-initiative-progress-card {
     background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
   }
+  .def-app.def-theme-dark .def-pillar-shell {
+    background: rgba(30,41,59,0.92);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-pillar-hero {
+    background: linear-gradient(135deg, rgba(30,41,59,0.98), rgba(15,23,42,0.92));
+    border-bottom-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-pillar-footer {
+    background: rgba(15,23,42,0.55);
+    border-top-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-table-embedded {
+    border-color: rgba(255,255,255,0.1);
+  }
+  .def-app.def-theme-dark .def-table-embedded .def-table thead th {
+    background: rgba(15,23,42,0.65);
+  }
 
   .def-cockpit-theme-dark .def-tracker-search input {
     background: rgba(15,23,42,0.6); border-color: rgba(255,255,255,0.1); color: var(--def-text);
@@ -8794,11 +8743,15 @@ const STYLES = `
   .def-cockpit-theme-dark .def-tracker-imperative { background: rgba(15,23,42,0.65) !important; }
   .def-cockpit-theme-dark .def-tracker-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
 
-  /* Responsive polish — tracker, detail tables, drawer, touch targets */
+  /* Responsive polish - tracker, detail tables, drawer, touch targets */
   @media (max-width: 768px) {
     .def-panel:hover { transform: none; box-shadow: var(--def-shadow); }
     .def-initiative-header { padding: var(--space-3); }
     .def-initiative-header::after { display: none; }
+    .def-pillar-hero { padding: var(--space-3); }
+    .def-pillar-body { padding: var(--space-2) var(--space-3) var(--space-3); }
+    .def-pillar-footer { padding: var(--space-2) var(--space-3); }
+    .def-pillar-stats li:not(:last-child)::after { margin: 0 8px; }
     .def-initiative-stat:hover { transform: none; }
     .def-scorecard-target-card:hover { transform: none; }
     .def-tracker-table-scroll {
@@ -8850,7 +8803,7 @@ const STYLES = `
 `;
 
 /* ─────────────────────────────────────────────────────────────
-   ROOT APP — layer navigation
+   ROOT APP - layer navigation
 ───────────────────────────────────────────────────────────── */
 
 const DEF = () => {
@@ -8868,6 +8821,10 @@ const DEF = () => {
       return 'light';
     }
   });
+
+  useEffect(() => {
+    document.documentElement.lang = APP_LOCALE;
+  }, []);
 
   useEffect(() => {
     try {
@@ -9032,7 +8989,6 @@ const DEF = () => {
               fastCategory={fastCategory}
               onGoCeo={() => navigateTo('ceo')}
               onSelectInitiative={(initId) => goInitiative(fastCategory.id, initId)}
-              onSelectProject={(initId, prjId) => openProjectDrawer(fastCategory.id, initId, prjId)}
               onBack={() => navigateTo('ceo')}
             />
           )}
