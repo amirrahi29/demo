@@ -1070,11 +1070,9 @@ function computePortfolioSummary(fastCategories) {
   };
 }
 
-function computeExecutiveMetrics(fastCategories, weekly = []) {
+function computeExecutiveMetrics(fastCategories) {
   const rows = buildInitiativeTrackerRows(fastCategories);
   const summary = computePortfolioSummary(fastCategories);
-  const prevWeek = weekly.length >= 2 ? weekly[weekly.length - 2] : null;
-  const healthDelta = prevWeek ? summary.overallHealth - prevWeek.close : 8;
 
   return {
     strategicImperatives: new Set(rows.map((row) => row.initiative)).size,
@@ -1087,9 +1085,6 @@ function computeExecutiveMetrics(fastCategories, weekly = []) {
     offTrackPct: summary.offTrackPct,
     offTrackCount: summary.offTrackProjects,
     healthScore: summary.overallHealth,
-    healthTrend: healthDelta >= 0
-      ? `Up ${Math.abs(healthDelta)} pts vs last quarter`
-      : `Down ${Math.abs(healthDelta)} pts vs last quarter`,
   };
 }
 
@@ -1615,7 +1610,7 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     offTrack: sparkSeries(weekly, (w) => w.delayed * 10 + 8),
   };
 
-  const executiveMetrics = computeExecutiveMetrics(pillarFasts, weekly);
+  const executiveMetrics = computeExecutiveMetrics(pillarFasts);
   const quarterlyStats = buildQuarterlyComparisonStats(quarterlyBars);
 
   return {
@@ -2044,7 +2039,6 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
     [],
   );
   const healthBand = classifyProgressBand(analytics.executiveMetrics.healthScore);
-  const healthTrendDown = analytics.executiveMetrics.healthTrend.startsWith('Down');
 
   return (
     <div
@@ -2144,12 +2138,10 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           title="Portfolio Health Score"
           value={analytics.executiveMetrics.healthScore}
           valueSuffix="/100"
-          subtitle={analytics.executiveMetrics.healthTrend}
+          subtitle="last quarter"
           spark={analytics.sparks.health}
           delay="240ms"
           statusBand={healthBand}
-          trendSub
-          trendDown={healthTrendDown}
         />
       </div>
 
