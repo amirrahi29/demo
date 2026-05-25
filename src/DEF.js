@@ -427,7 +427,7 @@ function InitiativeKpiTable({
   const colSpan = showImperativeColumn ? 7 : 6;
   return (
     <div className="def-scorecard-table-scroll def-table-scroll-wrap">
-      <table className="def-scorecard-table">
+      <table className={`def-scorecard-table${showImperativeColumn ? ' def-scorecard-table-grouped' : ''}`}>
         <thead>
           <tr>
             {showImperativeColumn ? <th>Strategic imperative</th> : null}
@@ -837,53 +837,6 @@ function ProgressBar({ value, color, animate = true }) {
         className={`def-progress-fill${animate ? ' def-progress-animate' : ''}`}
         style={{ '--def-progress': `${Math.min(value, 100)}%`, background: fillColor }}
       />
-    </div>
-  );
-}
-
-function KpiStrip({ items }) {
-  const icons = {
-    'Overall Health': '◆',
-    'Active Projects': '▣',
-    'On Track': '✓',
-    'At Risk': '!',
-    'Delayed / Blocked': '⏱',
-    'Delayed': '⏱',
-    Completed: '★',
-    'Health Score': '◆',
-    'Team Leads': '👥',
-    Developers: '⌘',
-    'Avg Utilization': '⚡',
-    Utilization: '⚡',
-    'Team Size': '⌘',
-    'Pending Modules': '▤',
-    Progress: '↗',
-    Planned: '📅',
-    Elapsed: '⏳',
-    Delay: '⚠',
-  };
-
-  return (
-    <div className={`def-kpi-strip${items.length === 4 ? ' def-kpi-strip-quad' : ''}`}>
-      {items.map((item, index) => (
-        <div
-          key={item.label}
-          className="def-kpi-item def-stagger-in"
-          style={{
-            '--stagger': `${index * 70}ms`,
-            '--kpi-color': item.color || '#8b5cf6',
-          }}
-        >
-          <div className="def-kpi-icon-wrap">
-            <span className="def-kpi-icon">{icons[item.label] || '●'}</span>
-          </div>
-          <div className="def-kpi-body">
-            <span className="def-kpi-num">{item.value}</span>
-            <span className="def-kpi-lbl">{item.label}</span>
-          </div>
-          <div className="def-kpi-glow" />
-        </div>
-      ))}
     </div>
   );
 }
@@ -2336,6 +2289,8 @@ const STYLES = `
     --cockpit-pad: var(--space-2);
     --text-min: 0.6875rem;
     --text-xs: 0.75rem;
+    --def-shadow-sm: 0 2px 8px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+    --def-touch-min: 44px;
   }
 
   .def-app.def-theme-light {
@@ -3714,7 +3669,7 @@ const STYLES = `
 
   .def-breadcrumb {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
     margin-bottom: 18px;
@@ -3725,8 +3680,14 @@ const STYLES = `
     border-radius: 12px;
     backdrop-filter: blur(8px);
     box-shadow: var(--def-shadow);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
   }
-  .def-bc-item { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .def-breadcrumb::-webkit-scrollbar { display: none; }
+  .def-bc-item { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 4px; flex-shrink: 0; white-space: nowrap; }
   .def-bc-sep { color: var(--def-subtle); margin: 0 4px; font-weight: 300; }
   .def-bc-tier {
     display: inline-block;
@@ -3785,12 +3746,32 @@ const STYLES = `
   }
 
   /* Initiative detail page */
-  .def-initiative-page { gap: var(--space-3); }
+  .def-initiative-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    width: 100%;
+    min-width: 0;
+  }
   .def-initiative-header {
+    position: relative;
+    overflow: hidden;
     display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
-    flex-wrap: wrap; padding: var(--space-3) var(--space-4);
-    background: #fff; border: 1px solid var(--def-border); border-radius: 12px;
+    flex-wrap: wrap; padding: var(--space-4);
+    background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+    border: 1px solid var(--def-border);
+    border-left: 4px solid #6366f1;
+    border-radius: 14px;
     box-shadow: var(--def-shadow-sm);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .def-initiative-header::after {
+    content: '';
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, rgba(99,102,241,0.1), transparent 70%);
+    pointer-events: none;
   }
   .def-initiative-header-main { min-width: 0; flex: 1 1 280px; }
   .def-initiative-meta {
@@ -3852,8 +3833,14 @@ const STYLES = `
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2);
   }
   .def-initiative-stat {
-    padding: var(--space-2) var(--space-3); background: #f8fafc;
+    padding: var(--space-2) var(--space-3); background: linear-gradient(180deg, #fff, #f8fafc);
     border: 1px solid var(--def-border); border-radius: 10px; text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .def-initiative-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--def-shadow-sm);
+    border-color: rgba(99,102,241,0.28);
   }
   .def-initiative-stat-num {
     display: block; font-size: 1.15rem; font-weight: 800; color: var(--def-heading); line-height: 1.2;
@@ -3879,8 +3866,15 @@ const STYLES = `
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2);
   }
   .def-scorecard-target-card {
-    padding: var(--space-3); border: 1px solid rgba(37,99,235,0.22); border-radius: 10px;
-    background: #fff; box-shadow: var(--def-shadow-sm); min-width: 0;
+    padding: var(--space-3); border: 1px solid rgba(37,99,235,0.22); border-radius: 12px;
+    background: linear-gradient(180deg, #fff, #f8fbff);
+    box-shadow: var(--def-shadow-sm); min-width: 0;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+  .def-scorecard-target-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--def-shadow-lg);
+    border-color: rgba(37,99,235,0.42);
   }
   .def-scorecard-target-card span {
     display: block; font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
@@ -3903,8 +3897,10 @@ const STYLES = `
     vertical-align: middle; line-height: 1.35; background: #fff;
   }
   .def-scorecard-table tbody tr:nth-child(even) td { background: #f8fafc; }
-  .def-scorecard-row-click { cursor: pointer; transition: background 0.18s ease; }
-  .def-scorecard-row-click:hover td { background: rgba(99,102,241,0.06) !important; }
+  .def-scorecard-table tbody tr { transition: background 0.18s ease; }
+  .def-scorecard-table tbody tr:hover td { background: rgba(99,102,241,0.06) !important; }
+  .def-scorecard-row-click { cursor: pointer; }
+  .def-scorecard-row-click:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
   .def-scorecard-imperative {
     font-weight: 800; color: var(--def-heading); vertical-align: top;
     background: #f1f5f9 !important; text-transform: capitalize; min-width: 88px;
@@ -5794,8 +5790,13 @@ const STYLES = `
     opacity: 0.88; transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
   }
   .def-cockpit-section {
-    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
-    padding: var(--cockpit-pad) var(--space-3); box-shadow: var(--cockpit-shadow-sm);
+    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
+    padding: var(--cockpit-pad) var(--space-3); box-shadow: var(--def-shadow-sm);
+    transition: box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+  .def-cockpit-section:hover {
+    box-shadow: var(--def-shadow);
+    border-color: rgba(99,102,241,0.18);
   }
   .def-cockpit-section-title {
     margin: 0 0 5px; font-size: 0.78rem; font-weight: 800; color: var(--def-heading);
@@ -5896,10 +5897,17 @@ const STYLES = `
     gap: var(--cockpit-gap);
   }
   .def-cockpit-fast-health {
+    position: relative;
     display: flex; flex-direction: column; gap: var(--cockpit-gap); padding: var(--cockpit-pad) var(--space-3);
     background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
-    border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
+    border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
     cursor: pointer; text-align: left; min-width: 0;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+  .def-cockpit-fast-health:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--def-shadow-lg);
+    border-color: rgba(99,102,241,0.25);
   }
   .def-cockpit-fast-health::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
@@ -6192,6 +6200,16 @@ const STYLES = `
   .def-cockpit-theme-dark .def-cockpit-interactive::before {
     background: linear-gradient(135deg, rgba(129,140,248,0.12) 0%, transparent 52%);
   }
+  .def-app.def-theme-dark .def-initiative-header {
+    background: linear-gradient(135deg, rgba(30,41,59,0.95), rgba(15,23,42,0.9));
+    border-left-color: #818cf8;
+  }
+  .def-app.def-theme-dark .def-initiative-stat {
+    background: linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.65));
+  }
+  .def-app.def-theme-dark .def-scorecard-target-card {
+    background: linear-gradient(180deg, rgba(30,41,59,0.92), rgba(15,23,42,0.78));
+  }
   .def-app.def-theme-dark .def-initiative-header,
   .def-app.def-theme-dark .def-initiative-progress-card {
     background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
@@ -6216,6 +6234,56 @@ const STYLES = `
   .def-cockpit-theme-dark .def-tracker-table tbody tr:nth-child(even) td { background: rgba(15,23,42,0.45); }
   .def-cockpit-theme-dark .def-tracker-imperative { background: rgba(15,23,42,0.65) !important; }
   .def-cockpit-theme-dark .def-tracker-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
+
+  /* Responsive polish — scorecard, drawer, touch targets */
+  @media (max-width: 768px) {
+    .def-panel:hover { transform: none; box-shadow: var(--def-shadow); }
+    .def-initiative-header { padding: var(--space-3); }
+    .def-initiative-header::after { display: none; }
+    .def-initiative-stat:hover { transform: none; }
+    .def-scorecard-target-card:hover { transform: none; }
+    .def-scorecard-table-scroll {
+      margin-inline: calc(-1 * var(--content-pad-x));
+      padding-inline: var(--content-pad-x);
+      scroll-padding-left: var(--content-pad-x);
+    }
+    .def-scorecard-table-scroll .def-scorecard-table th:first-child,
+    .def-scorecard-table-scroll .def-scorecard-table td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #fff;
+      box-shadow: 2px 0 8px rgba(15,23,42,0.06);
+    }
+    .def-scorecard-table-scroll .def-scorecard-table thead th:first-child {
+      z-index: 3;
+      background: #1e3a8a;
+    }
+    .def-scorecard-table-grouped .def-scorecard-table th:nth-child(2),
+    .def-scorecard-table-grouped .def-scorecard-table td:nth-child(2) {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #fff;
+      box-shadow: 2px 0 8px rgba(15,23,42,0.06);
+    }
+    .def-scorecard-table-grouped .def-scorecard-table thead th:nth-child(2) {
+      z-index: 3;
+      background: #1e3a8a;
+    }
+    .def-scorecard-table th:nth-last-child(-n+2),
+    .def-scorecard-table td:nth-last-child(-n+2) { display: none; }
+    .def-drawer { width: 100%; max-width: 100%; }
+    .def-btn-sm { min-height: var(--def-touch-min); padding: 8px 14px; }
+    .def-back-btn { min-height: var(--def-touch-min); width: 100%; justify-content: center; }
+  }
+  @media (max-width: 480px) {
+    .def-initiative-quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-initiative-title { font-size: 1.05rem; }
+    .def-scorecard-targets-row { gap: var(--space-2); }
+    .def-cockpit-metrics-row { grid-template-columns: 1fr; }
+    .def-bc-current { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
