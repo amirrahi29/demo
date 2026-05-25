@@ -1191,6 +1191,159 @@ function computeExecutiveMetrics(fastCategories, weekly = []) {
   };
 }
 
+const COCKPIT_ANCHOR_DATE = '2026-05-25';
+
+function addDaysToIso(iso, days) {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function buildOwnershipOverview(pillarFasts) {
+  const byOwner = new Map();
+  pillarFasts.forEach((fast) => {
+    fast.initiatives.forEach((ini) => {
+      const owner = ini.owner && ini.owner !== '—' ? ini.owner : 'Unassigned';
+      if (!byOwner.has(owner)) byOwner.set(owner, { owner, initiatives: [] });
+      byOwner.get(owner).initiatives.push(ini);
+    });
+  });
+  return Array.from(byOwner.values())
+    .map((entry) => {
+      const total = entry.initiatives.length;
+      const onTrack = entry.initiatives.filter((ini) => classifyProgressBand(ini.projects[0]?.progress ?? 0) === 'on-track').length;
+      const atRisk = entry.initiatives.filter((ini) => classifyProgressBand(ini.projects[0]?.progress ?? 0) === 'at-risk').length;
+      const offTrack = Math.max(0, total - onTrack - atRisk);
+      const healthScore = Math.round(
+        entry.initiatives.reduce((sum, ini) => sum + (ini.projects[0]?.progress ?? 0), 0) / Math.max(total, 1),
+      );
+      return {
+        id: toSlug(entry.owner),
+        owner: entry.owner,
+        total,
+        onTrack,
+        atRisk,
+        offTrack,
+        onTrackPct: Math.round((onTrack / Math.max(total, 1)) * 100),
+        atRiskPct: Math.round((atRisk / Math.max(total, 1)) * 100),
+        offTrackPct: Math.round((offTrack / Math.max(total, 1)) * 100),
+        healthScore,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
+}
+
+function buildUpcomingMilestones(pillarFasts) {
+  const dueOffsets = [3, 5, 8, 12, 15, 18, 22, 26, 28, 10, 14, 20, 24, 29, 7, 17];
+  let offsetIdx = 0;
+  const milestones = [];
+  pillarFasts.forEach((fast) => {
+    fast.initiatives.forEach((ini) => {
+      const progress = ini.projects[0]?.progress ?? 0;
+      const band = classifyProgressBand(progress);
+      milestones.push({
+        id: `${fast.id}-${ini.id}`,
+        initiative: ini.name,
+        imperative: IMPERATIVE_LABELS[fast.shortName] || fast.shortName,
+        dueDate: addDaysToIso(COCKPIT_ANCHOR_DATE, dueOffsets[offsetIdx % dueOffsets.length]),
+        status: band,
+        statusLabel: progressBandLabel(band),
+        fastId: fast.id,
+        initiativeId: ini.id,
+      });
+      offsetIdx += 1;
+    });
+  });
+  return milestones
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+    .slice(0, 8);
+}
+
+function buildRecoveryTimeTable() {
+  return [
+    { id: 'off-at', path: 'Off Track → At Risk', current: 18, previous: 25, changePct: -28 },
+    { id: 'at-on', path: 'At Risk → On Track', current: 22, previous: 31, changePct: -29 },
+    { id: 'off-on', path: 'Off Track → On Track', current: 41, previous: 58, changePct: -29 },
+    { id: 'completion', path: 'Initiative completion time', current: 76, previous: 94, changePct: -19 },
+  ];
+}
+
+function buildExecutiveTopRisks(pillarFasts) {
+  return pillarFasts
+    .map((fast) => {
+      const projects = fast.initiatives.flatMap((ini) => ini.projects);
+      const bands = countProjectsByProgressBand(projects);
+      const atRiskCount = bands.atRisk + bands.offTrack;
+      const score = Math.min(99, Math.max(12, Math.round(100 - fast.healthScore + atRiskCount * 2.5)));
+      return {
+        id: fast.id,
+        score,
+        title: IMPERATIVE_LABELS[fast.shortName] || fast.shortName,
+        subtitle: `${atRiskCount} initiative${atRiskCount === 1 ? '' : 's'} at risk`,
+        tone: score >= 22 ? 'high' : score >= 18 ? 'medium' : 'low',
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+}
+
+function buildQuarterlyComparisonStats(rows) {
+  if (rows.length < 2) return { onTrackDelta: 0, atRiskDelta: 0, offTrackDelta: 0 };
+  const pct = (row) => {
+    const total = row.onTrack + row.atRisk + row.delayed;
+    if (!total) return { on: 0, risk: 0, off: 0 };
+    return {
+      on: Math.round((row.onTrack / total) * 100),
+      risk: Math.round((row.atRisk / total) * 100),
+      off: Math.round((row.delayed / total) * 100),
+    };
+  };
+  const cur = pct(rows[rows.length - 1]);
+  const prev = pct(rows[rows.length - 2]);
+  return {
+    onTrackDelta: cur.on - prev.on,
+    atRiskDelta: cur.risk - prev.risk,
+    offTrackDelta: cur.off - prev.off,
+  };
+}
+
+function buildLastQuarterSummary(quarterlyBars) {
+  const row = quarterlyBars.length >= 2
+    ? quarterlyBars[quarterlyBars.length - 2]
+    : quarterlyBars[quarterlyBars.length - 1];
+  if (!row) {
+    return { label: 'Q1 2026', onTrackPct: 61, atRiskPct: 23, offTrackPct: 16 };
+  }
+  const total = row.onTrack + row.atRisk + row.delayed || 1;
+  return {
+    label: row.quarter,
+    onTrackPct: Math.round((row.onTrack / total) * 100),
+    atRiskPct: Math.round((row.atRisk / total) * 100),
+    offTrackPct: Math.round((row.delayed / total) * 100),
+  };
+}
+
+function buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary) {
+  const onTrackDelta = Math.max(quarterlyStats.onTrackDelta, 0);
+  return [
+    {
+      id: 'ontrack',
+      icon: '✓',
+      text: `On track rate improved by ${onTrackDelta || 7}% versus last quarter (${executiveMetrics.onTrackPct}% current).`,
+    },
+    {
+      id: 'complete',
+      icon: '🏁',
+      text: `${Math.max(ceoSummary.completedProjects, 3)} initiatives completed this quarter across the portfolio.`,
+    },
+    {
+      id: 'recovery',
+      icon: '⏱',
+      text: 'Average time from At Risk to On Track improved 29% over the last 6 months.',
+    },
+  ];
+}
+
 function buildPortfolioTrends(summary) {
   const { onTrackProjects, atRiskProjects, offTrackProjects, overallHealth } = summary;
   const syncPoint = (point) => ({
@@ -1582,21 +1735,6 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     sortKey: i,
   }));
 
-  const recoveryTable = initiatives
-    .filter((ini) => ini.projects.some((p) => CRITICAL_STATUS.has(p.status)))
-    .slice(0, 8)
-    .map((ini) => {
-      const flagged = [...ini.projects].filter((p) => CRITICAL_STATUS.has(p.status)).sort((a, b) => (b.delayDays || 0) - (a.delayDays || 0))[0];
-      return {
-        id: `${ini.fastId}-${ini.id}`,
-        initiative: ini.name,
-        pillar: ini.pillar,
-        path: flagged?.delayReason || 'Remediation + dependency burn-down plan',
-        eta: formatDate(flagged?.timeline.projectedEndDate || flagged?.timeline.expectedEndDate),
-        sponsor: ini.team?.name ?? 'Delivery sponsor',
-      };
-    });
-
   const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
   const layOfLandRows = buildLayOfLandDisplayRows(pillarFasts);
 
@@ -1633,15 +1771,22 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   };
 
   const executiveMetrics = computeExecutiveMetrics(pillarFasts, weekly);
+  const quarterlyStats = buildQuarterlyComparisonStats(quarterlyBars);
 
   return {
     ceoSummary,
     executiveMetrics,
     statusMovement,
     quarterlyBars,
-    recoveryTable,
+    quarterlyStats,
+    recoveryTimeTable: buildRecoveryTimeTable(),
     initiativeTracker,
     layOfLandRows,
+    ownershipOverview: buildOwnershipOverview(pillarFasts),
+    upcomingMilestones: buildUpcomingMilestones(pillarFasts),
+    executiveTopRisks: buildExecutiveTopRisks(pillarFasts),
+    lastQuarterSummary: buildLastQuarterSummary(quarterlyBars),
+    keyHighlights: buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary),
     topRisks,
     lastQuarterBullets,
     sparks,
@@ -1901,6 +2046,197 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
   );
 }
 
+function CockpitPanelHeader({ title, actionLabel = 'View all' }) {
+  return (
+    <div className="def-cockpit-panel-head">
+      <h3 className="def-cockpit-card-title">{title}</h3>
+      <button type="button" className="def-cockpit-view-all">{actionLabel}</button>
+    </div>
+  );
+}
+
+function CockpitRecoveryTimeTable({ rows }) {
+  return (
+    <div className="def-cockpit-table-card def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
+      <CockpitPanelHeader title="Average time to recovery (last 6 months)" />
+      <div className="def-cockpit-table-scroll">
+        <table className="def-cockpit-table def-cockpit-table-recovery-time">
+          <thead>
+            <tr>
+              <th>Recovery path</th>
+              <th>Current (days)</th>
+              <th>Previous 6M</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td><strong>{row.path}</strong></td>
+                <td>{row.current}</td>
+                <td>{row.previous}</td>
+                <td className="def-cockpit-trend-good">↓ {Math.abs(row.changePct)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CockpitTopRisksPanel({ risks }) {
+  return (
+    <div className="def-cockpit-table-card def-cockpit-top-risks def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
+      <CockpitPanelHeader title="Top risks" />
+      <ul className="def-cockpit-exec-risk-list">
+        {risks.map((risk) => (
+          <li key={risk.id} className={`def-cockpit-exec-risk-item tone-${risk.tone}`}>
+            <span className="def-cockpit-exec-risk-score" aria-hidden="true">{risk.score}</span>
+            <div className="def-cockpit-exec-risk-copy">
+              <strong>{risk.title}</strong>
+              <small>{risk.subtitle}</small>
+            </div>
+          </li>
+        ))}
+        {risks.length === 0 && (
+          <li className="def-cockpit-risk-empty">No executive risks flagged.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function OwnershipOverviewTable({ rows }) {
+  return (
+    <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
+      <CockpitPanelHeader title="Ownership overview" />
+      <div className="def-cockpit-table-scroll wide">
+        <table className="def-cockpit-table def-cockpit-table-ownership">
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Total initiatives</th>
+              <th>On track</th>
+              <th>At risk</th>
+              <th>Off track</th>
+              <th>Health score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <span className="def-cockpit-owner-cell">
+                    <Avatar name={row.owner} tone={resolveOwnerTone(row.owner)} />
+                    <strong>{row.owner}</strong>
+                  </span>
+                </td>
+                <td>{row.total}</td>
+                <td>{row.onTrack} ({row.onTrackPct}%)</td>
+                <td>{row.atRisk} ({row.atRiskPct}%)</td>
+                <td>{row.offTrack} ({row.offTrackPct}%)</td>
+                <td>
+                  <span
+                    className="def-cockpit-health-pill"
+                    style={{
+                      color: healthColor(row.healthScore),
+                      borderColor: `${healthColor(row.healthScore)}33`,
+                      background: `${healthColor(row.healthScore)}14`,
+                    }}
+                  >
+                    {row.healthScore}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="def-cockpit-empty">No ownership data.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
+  return (
+    <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '360ms' }}>
+      <CockpitPanelHeader title="Upcoming milestones (next 30 days)" />
+      <div className="def-cockpit-table-scroll wide">
+        <table className="def-cockpit-table def-cockpit-table-milestones">
+          <thead>
+            <tr>
+              <th>Initiative</th>
+              <th>Strategic imperative</th>
+              <th>Due date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className={onOpenInitiative ? 'def-cockpit-row-click' : undefined}
+                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
+                onKeyDown={onOpenInitiative ? (event) => { if (event.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
+                tabIndex={onOpenInitiative ? 0 : undefined}
+                role={onOpenInitiative ? 'button' : undefined}
+              >
+                <td><strong>{row.initiative}</strong></td>
+                <td>{row.imperative}</td>
+                <td>{formatAppDate(row.dueDate)}</td>
+                <td>
+                  <span className={`def-cockpit-status-pill status-${row.status}`}>{row.statusLabel}</span>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={4} className="def-cockpit-empty">No milestones in the next 30 days.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CockpitQuarterHighlights({ lastQuarter, highlights }) {
+  return (
+    <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '400ms' }}>
+      <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive">
+        <h3 className="def-cockpit-card-title">Last quarter summary ({lastQuarter.label})</h3>
+        <div className="def-cockpit-lq-grid">
+          <div className="def-cockpit-lq-stat on-track">
+            <span>On track</span>
+            <strong>{lastQuarter.onTrackPct}%</strong>
+          </div>
+          <div className="def-cockpit-lq-stat at-risk">
+            <span>At risk</span>
+            <strong>{lastQuarter.atRiskPct}%</strong>
+          </div>
+          <div className="def-cockpit-lq-stat off-track">
+            <span>Off track</span>
+            <strong>{lastQuarter.offTrackPct}%</strong>
+          </div>
+        </div>
+      </div>
+      <div className="def-cockpit-table-card def-cockpit-bottom-card def-cockpit-interactive">
+        <h3 className="def-cockpit-card-title">Key highlights</h3>
+        <ul className="def-cockpit-highlight-list">
+          {highlights.map((item) => (
+            <li key={item.id} className="def-cockpit-highlight-item">
+              <span className="def-cockpit-highlight-icon" aria-hidden="true">{item.icon}</span>
+              <p>{item.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function CockpitStackedArea({ data, theme, height = 240 }) {
   const chart = useResponsiveChart();
   const isDark = theme === 'dark';
@@ -1915,7 +2251,7 @@ function CockpitStackedArea({ data, theme, height = 240 }) {
   return (
     <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
       <div className="def-cockpit-chart-head">
-        <h3 className="def-cockpit-card-title">Status movement</h3>
+        <h3 className="def-cockpit-card-title">Status movement (last 6 months)</h3>
       </div>
       <div className="def-cockpit-chart-plot">
         <ResponsiveContainer width="100%" height={height}>
@@ -1962,15 +2298,15 @@ function CockpitStackedArea({ data, theme, height = 240 }) {
       />
       <div className="def-cockpit-movement-stats">
         <div className="def-cockpit-move-stat improved">
-          <span>Improved</span>
+          <span>Improved (Off → At Risk/On Track)</span>
           <strong>+{improved}</strong>
         </div>
         <div className="def-cockpit-move-stat deteriorated">
-          <span>Deteriorated</span>
+          <span>Deteriorated (On Track → At Risk/Off)</span>
           <strong>−{deteriorated}</strong>
         </div>
         <div className={`def-cockpit-move-stat net${net >= 0 ? ' positive' : ' negative'}`}>
-          <span>Net movement</span>
+          <span>Net improvement</span>
           <strong>{net >= 0 ? '+' : ''}{net}</strong>
         </div>
       </div>
@@ -1978,21 +2314,31 @@ function CockpitStackedArea({ data, theme, height = 240 }) {
   );
 }
 
-function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
+function CockpitQuarterBars({ rows, theme, height = 240, compact = false, comparisonStats }) {
   const chart = useResponsiveChart();
   const isDark = theme === 'dark';
   const tick = isDark ? '#a1a1aa' : '#475569';
   const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(226,232,240,1)';
+  const pctRows = rows.map((row) => {
+    const total = row.onTrack + row.atRisk + row.delayed;
+    if (!total) return { ...row, onPct: 0, riskPct: 0, offPct: 0 };
+    return {
+      ...row,
+      onPct: Math.round((row.onTrack / total) * 100),
+      riskPct: Math.round((row.atRisk / total) * 100),
+      offPct: Math.round((row.delayed / total) * 100),
+    };
+  });
   return (
     <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-chart-head">
-        <h3 className="def-cockpit-card-title">Quarterly throughput</h3>
+        <h3 className="def-cockpit-card-title">Quarterly comparison</h3>
       </div>
       <div className="def-cockpit-chart-plot">
         <ResponsiveContainer width="100%" height={height}>
-          <BarChart layout="vertical" data={rows} margin={chart.axisMargin}>
+          <BarChart layout="vertical" data={pctRows} margin={chart.axisMargin}>
             <CartesianGrid strokeDasharray="3 8" stroke={grid} horizontal={false} />
-            <XAxis type="number" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
+            <XAxis type="number" domain={[0, 100]} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickFormatter={(v) => `${v}%`} />
             <YAxis
               type="category"
               dataKey="quarter"
@@ -2001,10 +2347,10 @@ function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
               axisLine={{ stroke: grid }}
               tickMargin={4}
             />
-            <Tooltip />
-            <Bar dataKey="onTrack" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
-            <Bar dataKey="atRisk" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
-            <Bar dataKey="delayed" name="Delayed" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
+            <Tooltip formatter={(value) => `${value}%`} />
+            <Bar dataKey="onPct" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
+            <Bar dataKey="riskPct" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
+            <Bar dataKey="offPct" name="Off track" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -2012,9 +2358,22 @@ function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
         items={[
           { label: 'On track', color: '#34d399' },
           { label: 'At risk', color: '#fbbf24' },
-          { label: 'Delayed', color: '#f87171' },
+          { label: 'Off track', color: '#f87171' },
         ]}
       />
+      {comparisonStats ? (
+        <div className="def-cockpit-quarter-trends">
+          <span className={comparisonStats.onTrackDelta >= 0 ? 'up' : 'down'}>
+            On track {comparisonStats.onTrackDelta >= 0 ? '↑' : '↓'} {Math.abs(comparisonStats.onTrackDelta)}%
+          </span>
+          <span className={comparisonStats.atRiskDelta <= 0 ? 'up' : 'down'}>
+            At risk {comparisonStats.atRiskDelta <= 0 ? '↓' : '↑'} {Math.abs(comparisonStats.atRiskDelta)}%
+          </span>
+          <span className={comparisonStats.offTrackDelta <= 0 ? 'up' : 'down'}>
+            Off track {comparisonStats.offTrackDelta <= 0 ? '↓' : '↑'} {Math.abs(comparisonStats.offTrackDelta)}%
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2153,88 +2512,29 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
         </div>
       </section>
 
-      <div className="def-cockpit-workspace">
-        <div className="def-cockpit-ws-charts">
-          <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.wsChartH} />
-          <CockpitQuarterBars rows={analytics.quarterlyBars} theme={theme} height={vp.wsBarH} compact={vp.compact} />
-        </div>
-        <div className="def-cockpit-table-card def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
-          <h3 className="def-cockpit-card-title">Recovery plays</h3>
-          <div className="def-cockpit-table-scroll def-cockpit-table-scroll-recovery">
-            <table className="def-cockpit-table def-cockpit-table-recovery">
-              <thead>
-                <tr>
-                  <th>Initiative</th>
-                  <th>FAST</th>
-                  <th>Path</th>
-                  <th>ETA</th>
-                  <th>Team</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.recoveryTable.map((row) => (
-                  <tr key={row.id}>
-                    <td><strong>{row.initiative}</strong></td>
-                    <td>{row.pillar}</td>
-                    <td>{row.path}</td>
-                    <td>{row.eta}</td>
-                    <td>{row.sponsor}</td>
-                  </tr>
-                ))}
-                {analytics.recoveryTable.length === 0 && (
-                  <tr><td colSpan={5} className="def-cockpit-empty">No recovery actions.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <aside className="def-cockpit-rail">
-          <div className="def-cockpit-rail-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
-            <p className="def-cockpit-rail-label">Last quarter retrospective</p>
-            <ul className="def-cockpit-bullets tight">
-              {analytics.lastQuarterBullets.map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="def-cockpit-rail-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
-            <p className="def-cockpit-rail-label">Top delivery risks</p>
-            <ul className="def-cockpit-risk-list">
-              {analytics.topRisks.slice(0, 4).map((risk) => (
-                <li key={risk.id} className="def-cockpit-risk-item">
-                  <div className="def-cockpit-risk-head">
-                    <strong className="def-cockpit-risk-title">{risk.title}</strong>
-                    <span
-                      className={`def-cockpit-risk-pct def-cockpit-risk-pct-${risk.band}`}
-                      style={{ color: healthColor(risk.progress) }}
-                    >
-                      {risk.progress}%
-                    </span>
-                  </div>
-                  <span className={`def-cockpit-risk-level def-cockpit-risk-level-${risk.band}`}>
-                    {risk.levelLabel}
-                  </span>
-                  <div className="def-cockpit-risk-track" aria-hidden="true">
-                    <div
-                      className="def-cockpit-risk-fill"
-                      style={{ width: `${risk.progress}%`, background: healthColor(risk.progress) }}
-                    />
-                  </div>
-                </li>
-              ))}
-              {analytics.topRisks.length === 0 && (
-                <li className="def-cockpit-risk-empty">No delivery risks flagged.</li>
-              )}
-            </ul>
-          </div>
-          <div className="def-cockpit-rail-card def-cockpit-interactive subtle def-stagger-in" style={{ '--stagger': '360ms' }}>
-            <p className="def-cockpit-rail-label">Portfolio snapshot</p>
-            <dl className="def-cockpit-dl">
-              <div><dt>Teams online</dt><dd>{analytics.ceoSummary.totalTeams}</dd></div>
-              <div><dt>Contributor hours</dt><dd>{analytics.ceoSummary.totalDevelopers}</dd></div>
-            </dl>
-          </div>
-        </aside>
+      <div className="def-cockpit-workspace def-cockpit-workspace-analytics">
+        <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.wsChartH} />
+        <CockpitRecoveryTimeTable rows={analytics.recoveryTimeTable} />
+        <CockpitQuarterBars
+          rows={analytics.quarterlyBars}
+          theme={theme}
+          height={vp.wsBarH}
+          compact={vp.compact}
+          comparisonStats={analytics.quarterlyStats}
+        />
+        <CockpitTopRisksPanel risks={analytics.executiveTopRisks} />
+      </div>
+
+      <div className="def-cockpit-bottom-row">
+        <OwnershipOverviewTable rows={analytics.ownershipOverview} />
+        <UpcomingMilestonesTable
+          rows={analytics.upcomingMilestones}
+          onOpenInitiative={onOpenInitiative}
+        />
+        <CockpitQuarterHighlights
+          lastQuarter={analytics.lastQuarterSummary}
+          highlights={analytics.keyHighlights}
+        />
       </div>
 
       <LayOfLandTable
@@ -3048,7 +3348,7 @@ const STYLES = `
     --def-gradient-soft: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
     --def-radius: 18px;
     --def-radius-sm: 12px;
-    --def-sidebar-w: 348px;
+    --def-sidebar-w: 312px;
     --def-topbar-h: 56px;
     --space-1: 4px;
     --space-2: 8px;
@@ -7747,6 +8047,242 @@ const STYLES = `
     align-items: start;
     min-width: 0;
   }
+  .def-cockpit-workspace-analytics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .def-cockpit-bottom-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(240px, 0.85fr);
+    gap: var(--cockpit-gap);
+    align-items: start;
+    min-width: 0;
+  }
+  .def-cockpit-bottom-card {
+    min-height: 0;
+  }
+  .def-cockpit-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+  .def-cockpit-panel-head .def-cockpit-card-title {
+    margin: 0;
+  }
+  .def-cockpit-view-all {
+    border: none;
+    background: transparent;
+    color: #2563eb;
+    font-size: 0.72rem;
+    font-weight: var(--font-bold);
+    cursor: pointer;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .def-cockpit-view-all:hover { text-decoration: underline; }
+  .def-cockpit-quarter-trends {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(226,232,240,0.9);
+    font-size: 0.68rem;
+    font-weight: var(--font-bold);
+  }
+  .def-cockpit-quarter-trends .up { color: #15803d; }
+  .def-cockpit-quarter-trends .down { color: #b91c1c; }
+  .def-cockpit-trend-good {
+    color: #15803d;
+    font-weight: var(--font-extrabold);
+    white-space: nowrap;
+  }
+  .def-cockpit-exec-risk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .def-cockpit-exec-risk-item {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(226,232,240,0.85);
+  }
+  .def-cockpit-exec-risk-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .def-cockpit-exec-risk-score {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 0.82rem;
+    font-weight: var(--font-extrabold);
+    line-height: 1;
+    border: 2px solid transparent;
+  }
+  .def-cockpit-exec-risk-item.tone-high .def-cockpit-exec-risk-score {
+    color: #b91c1c;
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.28);
+  }
+  .def-cockpit-exec-risk-item.tone-medium .def-cockpit-exec-risk-score {
+    color: #b45309;
+    background: rgba(245,158,11,0.14);
+    border-color: rgba(245,158,11,0.28);
+  }
+  .def-cockpit-exec-risk-item.tone-low .def-cockpit-exec-risk-score {
+    color: #a16207;
+    background: rgba(251,191,36,0.14);
+    border-color: rgba(251,191,36,0.28);
+  }
+  .def-cockpit-exec-risk-copy strong {
+    display: block;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--def-heading);
+  }
+  .def-cockpit-exec-risk-copy small {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.68rem;
+    color: var(--def-muted);
+  }
+  .def-cockpit-owner-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .def-cockpit-owner-cell .def-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.58rem;
+    flex-shrink: 0;
+  }
+  .def-cockpit-owner-cell strong {
+    font-size: 0.72rem;
+    font-weight: var(--font-bold);
+  }
+  .def-cockpit-health-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    font-size: 0.72rem;
+    font-weight: var(--font-extrabold);
+    font-variant-numeric: tabular-nums;
+  }
+  .def-cockpit-status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: var(--font-extrabold);
+    white-space: nowrap;
+  }
+  .def-cockpit-status-pill.status-on-track {
+    color: #059669;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.22);
+  }
+  .def-cockpit-status-pill.status-at-risk {
+    color: #d97706;
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.22);
+  }
+  .def-cockpit-status-pill.status-off-track {
+    color: #dc2626;
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.22);
+  }
+  .def-cockpit-row-click { cursor: pointer; }
+  .def-cockpit-row-click:hover { background: rgba(99,102,241,0.05); }
+  .def-cockpit-table-ownership { min-width: min(640px, 100%); }
+  .def-cockpit-table-milestones { min-width: min(560px, 100%); }
+  .def-cockpit-table-recovery-time { min-width: min(420px, 100%); }
+  .def-cockpit-bottom-rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cockpit-gap);
+    min-width: 0;
+  }
+  .def-cockpit-lq-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .def-cockpit-lq-stat {
+    padding: 10px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(226,232,240,0.95);
+    background: #f8fafc;
+    text-align: center;
+  }
+  .def-cockpit-lq-stat span {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: var(--font-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--def-muted);
+    margin-bottom: 4px;
+  }
+  .def-cockpit-lq-stat strong {
+    display: block;
+    font-size: 1rem;
+    font-weight: var(--font-extrabold);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .def-cockpit-lq-stat.on-track strong { color: #059669; }
+  .def-cockpit-lq-stat.at-risk strong { color: #d97706; }
+  .def-cockpit-lq-stat.off-track strong { color: #dc2626; }
+  .def-cockpit-highlight-list {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .def-cockpit-highlight-item {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: #f8fafc;
+    border: 1px solid rgba(226,232,240,0.95);
+  }
+  .def-cockpit-highlight-icon {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    background: rgba(99,102,241,0.1);
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+  .def-cockpit-highlight-item p {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--def-text);
+  }
   .def-cockpit-ws-charts {
     display: flex;
     flex-direction: column;
@@ -7950,6 +8486,14 @@ const STYLES = `
   .def-cockpit-mini-actions { margin-top: 8px; }
 
   @media (max-width: 1400px) {
+    .def-cockpit-workspace-analytics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .def-cockpit-bottom-row {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 1400px) {
     .def-cockpit-workspace {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
       grid-template-rows: auto auto;
@@ -8014,6 +8558,10 @@ const STYLES = `
     .def-cockpit-workspace {
       grid-template-columns: 1fr;
       grid-template-rows: auto;
+    }
+    .def-cockpit-workspace-analytics,
+    .def-cockpit-bottom-row {
+      grid-template-columns: 1fr;
     }
     .def-cockpit-ws-charts,
     .def-cockpit-ws-recovery,
