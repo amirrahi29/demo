@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import useResponsiveChart from './hooks/useResponsiveChart';
-import { formatAppDate as formatDate, formatAppDateTime } from './utils/locale';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactDOM from 'react-dom/client';
 import {
   Area,
   AreaChart,
@@ -20,6 +19,78 @@ import {
   YAxis,
 } from 'recharts';
 
+const APP_LOCALE = 'en-US';
+
+function formatAppDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString(APP_LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatAppDateTime(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString(APP_LOCALE, {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return String(iso);
+  }
+}
+
+function formatDate(iso) {
+  return formatAppDate(iso);
+}
+
+function getChartViewportWidth() {
+  return typeof window !== 'undefined' ? window.innerWidth : 1200;
+}
+
+function useResponsiveChart() {
+  const [width, setWidth] = useState(getChartViewportWidth);
+
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const isMobile = width <= 480;
+  const isTablet = width <= 768;
+  const isSmall = width <= 1024;
+
+  return {
+    width,
+    isMobile,
+    isTablet,
+    isSmall,
+    tick: isMobile ? 9 : isTablet ? 10 : 11,
+    tickSmall: isMobile ? 8 : isTablet ? 9 : 10,
+    yAxisWidth: isMobile ? 44 : isTablet ? 56 : 72,
+    barSize: isMobile ? 7 : isTablet ? 9 : 12,
+    pieRadius: isMobile ? 52 : isTablet ? 72 : 90,
+    chartMargin: isMobile
+      ? { top: 8, right: 6, left: -12, bottom: 0 }
+      : isTablet
+        ? { top: 10, right: 12, left: -4, bottom: 4 }
+        : { top: 12, right: 16, left: 4, bottom: 5 },
+    axisMargin: isMobile
+      ? { top: 8, right: 8, left: 0, bottom: 0 }
+      : { top: 10, right: 16, left: 0, bottom: 5 },
+    legendProps: isMobile
+      ? { verticalAlign: 'bottom', align: 'center', wrapperStyle: { fontSize: 10, paddingTop: 8 } }
+      : { wrapperStyle: { fontSize: 11 } },
+    showDualAxis: !isMobile,
+  };
+}
 
 function toSlug(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 56);
@@ -2220,6 +2291,26 @@ function TeamView({
 ───────────────────────────────────────────────────────────── */
 
 const STYLES = `
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  html, body, #root {
+    margin: 0; padding: 0; min-height: 100vh; max-width: 100%; overflow-x: hidden;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    font-size: 14px; line-height: 1.5; color: #111827; background: #f7f8fa;
+  }
+  ::selection { background: rgba(20, 115, 230, 0.2); color: #2c2c2c; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15); border-radius: 4px; transition: background 0.2s;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+
   :root {
     --def-blue: #6366f1;
     --def-blue-dark: #4f46e5;
@@ -6348,5 +6439,12 @@ const DEF = () => {
     </>
   );
 };
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <DEF />
+  </React.StrictMode>,
+);
 
 export default DEF;

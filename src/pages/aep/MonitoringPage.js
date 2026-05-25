@@ -8,7 +8,6 @@ import PageTabs from '../../components/aep/PageTabs';
 import ChartContainer from '../../components/aep/ChartContainer';
 import { IngestIcon, FingerprintIcon, UserIcon, TargetIcon, ExportIcon, InfoIcon } from '../../components/aep/icons';
 import useResponsiveChart from '../../hooks/useResponsiveChart';
-import { formatAppNumber } from '../../utils/locale';
 import {
   monitoringBatchJobs, monitoringStreaming, monitoringEdge, COLORS,
   monitoringAudienceJobs,
@@ -107,7 +106,7 @@ const ChartTooltip = ({ active, payload, label }) => {
       {payload.map((entry) => (
         <div key={entry.name} className="aep-chart-tooltip-row">
           <span style={{ color: entry.color }}>{entry.name}</span>
-          <strong>{typeof entry.value === 'number' ? formatAppNumber(entry.value) : entry.value}</strong>
+          <strong>{typeof entry.value === 'number' ? entry.value.toLocaleString('en-US') : entry.value}</strong>
         </div>
       ))}
     </div>
@@ -325,7 +324,7 @@ const MonitoringPage = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f8" />
                   <XAxis dataKey="day" tick={{ fontSize: tick }} stroke="#959595" />
                   <YAxis tick={{ fontSize: tick }} width={48} stroke="#959595" />
-                  <Tooltip content={<ChartTooltip />} formatter={(v) => [formatAppNumber(v), 'Records']} />
+                  <Tooltip content={<ChartTooltip />} formatter={(v) => [Number(v).toLocaleString('en-US'), 'Records']} />
                   <Area type="monotone" dataKey="count" name="Records" stroke={COLORS.purple || '#6e49cb'} fill="url(#idGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
