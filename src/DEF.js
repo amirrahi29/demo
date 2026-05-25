@@ -9,7 +9,6 @@ import {
   Cell,
   ComposedChart,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -97,13 +96,47 @@ function toSlug(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 56);
 }
 
-function createDemoProject(id, name, index = 0) {
-  const statuses = ['on-track', 'on-track', 'at-risk', 'delayed', 'on-track', 'blocked', 'on-track'];
-  const risks = ['low', 'medium', 'medium', 'high', 'low', 'high', 'medium'];
-  const status = statuses[index % statuses.length];
-  const risk = risks[index % risks.length];
-  const progress = [82, 71, 58, 35, 88, 52, 67, 44, 90, 64][index % 10];
-  const delayDays = status === 'delayed' || status === 'blocked' ? [28, 23, 76, 5][index % 4] : (index % 5 === 0 ? 4 : 0);
+/** Per-initiative progress (26 rows) — clear mix: >80% on-track, 50–80% at-risk, <50% off-track. */
+const DEMO_INITIATIVE_PROGRESS = [
+  95, 88, 62, 28, 94, 38, 96, 67, 24, 82, 48, 91, 73, 19, 89, 76,
+  32, 97, 54, 41, 85, 47, 98, 26, 71, 81,
+];
+
+function demoTrendFromProgress(progress) {
+  return [
+    Math.max(5, progress - 14),
+    Math.max(5, progress - 9),
+    Math.max(5, progress - 4),
+    progress,
+  ];
+}
+
+function resolveDemoProgress(index, override) {
+  if (override != null) return override;
+  return DEMO_INITIATIVE_PROGRESS[index % DEMO_INITIATIVE_PROGRESS.length];
+}
+
+function statusFromProgressBand(progress, index) {
+  const band = classifyProgressBand(progress);
+  if (band === 'on-track') return 'on-track';
+  if (band === 'at-risk') return index % 5 === 0 ? 'delayed' : 'at-risk';
+  return index % 4 === 0 ? 'blocked' : 'delayed';
+}
+
+function riskFromProgressBand(progress) {
+  const band = classifyProgressBand(progress);
+  if (band === 'on-track') return 'low';
+  if (band === 'at-risk') return 'medium';
+  return 'high';
+}
+
+function createDemoProject(id, name, index = 0, progressOverride) {
+  const progress = resolveDemoProgress(index, progressOverride);
+  const status = statusFromProgressBand(progress, index);
+  const risk = riskFromProgressBand(progress);
+  const delayDays = status === 'delayed' || status === 'blocked'
+    ? (progress < 40 ? [45, 38, 76, 52][index % 4] : [18, 12, 28, 8][index % 4])
+    : 0;
   const delayReason = delayDays > 20
     ? 'Cross-team dependency awaiting sign-off'
     : delayDays > 0
@@ -184,32 +217,93 @@ function summarizeProjects(projects) {
   return { activeProjects: projects.length, delayedProjects: delayed, pendingModules, developers: teamSize, avgUtilization, status };
 }
 
+function classifyProgressBand(progress) {
+  if (progress > 80) return 'on-track';
+  if (progress >= 50) return 'at-risk';
+  return 'off-track';
+}
+
+const PROGRESS_BAND_THEME = {
+  'on-track': {
+    tone: 'emerald',
+    accent: 'def-accent-emerald',
+    color: '#059669',
+    label: '#15803d',
+    sub: '#166534',
+    spark: '#22c55e',
+    iconBg: 'rgba(34,197,94,0.12)',
+    iconBorder: 'rgba(34,197,94,0.22)',
+    cardBg: 'linear-gradient(165deg, #ffffff 0%, #ecfdf5 48%, #f0fdf4 100%)',
+    border: 'rgba(5,150,105,0.24)',
+  },
+  'at-risk': {
+    tone: 'amber',
+    accent: 'def-accent-amber',
+    color: '#d97706',
+    label: '#b45309',
+    sub: '#92400e',
+    spark: '#f59e0b',
+    iconBg: 'rgba(245,158,11,0.14)',
+    iconBorder: 'rgba(245,158,11,0.28)',
+    cardBg: 'linear-gradient(165deg, #ffffff 0%, #fffbeb 48%, #fef3c7 100%)',
+    border: 'rgba(217,119,6,0.24)',
+  },
+  'off-track': {
+    tone: 'rose',
+    accent: 'def-accent-rose',
+    color: '#dc2626',
+    label: '#b91c1c',
+    sub: '#991b1b',
+    spark: '#ef4444',
+    iconBg: 'rgba(239,68,68,0.12)',
+    iconBorder: 'rgba(239,68,68,0.22)',
+    cardBg: 'linear-gradient(165deg, #ffffff 0%, #fef2f2 48%, #fee2e2 100%)',
+    border: 'rgba(220,38,38,0.24)',
+  },
+};
+
+function getProgressBandTheme(band) {
+  return PROGRESS_BAND_THEME[band] || null;
+}
+
+function countProjectsByProgressBand(projects) {
+  const counts = { onTrack: 0, atRisk: 0, offTrack: 0 };
+  projects.forEach((project) => {
+    const band = classifyProgressBand(project.progress ?? 0);
+    if (band === 'on-track') counts.onTrack += 1;
+    else if (band === 'at-risk') counts.atRisk += 1;
+    else counts.offTrack += 1;
+  });
+  return counts;
+}
+
 function summarizeFastStatusCounts(fast) {
   const projects = fast.initiatives.flatMap((ini) => ini.projects);
-  return {
-    onTrack: projects.filter((p) => p.status === 'on-track').length,
-    atRisk: projects.filter((p) => p.status === 'at-risk').length,
-    offTrack: projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length,
-  };
+  return countProjectsByProgressBand(projects);
 }
 
 function SidebarFastStatusRow({ fast }) {
   const counts = summarizeFastStatusCounts(fast);
+  const metrics = [
+    { id: 'ok', label: 'On Track', count: counts.onTrack, tone: 'ok' },
+    { id: 'risk', label: 'At Risk', count: counts.atRisk, tone: 'risk' },
+    { id: 'late', label: 'Off Track', count: counts.offTrack, tone: 'late' },
+  ];
+
   return (
-    <span className="def-sidebar-status-row" aria-label="Project status mix">
-      <span className="def-sidebar-status-line ok">
-        <i style={{ background: '#22c55e' }} aria-hidden="true" />
-        On {counts.onTrack}
-      </span>
-      <span className="def-sidebar-status-line risk">
-        <i style={{ background: '#f59e0b' }} aria-hidden="true" />
-        Risk {counts.atRisk}
-      </span>
-      <span className="def-sidebar-status-line late">
-        <i style={{ background: '#ef4444' }} aria-hidden="true" />
-        Off {counts.offTrack}
-      </span>
-    </span>
+    <div className="def-sidebar-metric-strip" aria-label="Initiative status mix">
+      {metrics.map((metric) => (
+        <div
+          key={metric.id}
+          className={`def-sidebar-metric def-sidebar-metric-${metric.tone}`}
+          title={`${metric.label}: ${metric.count}`}
+        >
+          <span className="def-sidebar-metric-dot" aria-hidden="true" />
+          <strong className="def-sidebar-metric-value">{metric.count}</strong>
+          <span className="def-sidebar-metric-label">{metric.label}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -222,54 +316,113 @@ const IMPERATIVE_LABELS = {
 
 /** Reference rows aligned to Command Center Initiative Tracker (EXL / ADP). */
 const INITIATIVE_TRACKER_REF = {
+  'deliver against medium term guidance': {
+    initiative: 'Deliver on BU & Functional Priorities & KTLO',
+    budgetPct: 72, budgetTotalM: 24, budgetSpentM: 17, schedulePct: 92,
+    target: '$18M', ctt: '$8.7M of $18M (48%)', trend: [78, 84, 88, 92], trendUp: true, risk: 'low', source: 'adp',
+  },
+  'client 0 lyric': {
+    initiative: 'Deliver on BU & Functional Priorities & KTLO',
+    budgetPct: 68, budgetTotalM: 12, budgetSpentM: 8, schedulePct: 88,
+    target: '>85%', ctt: '71% complete', trend: [62, 66, 69, 71], trendUp: true, risk: 'low', source: 'adp',
+  },
+  'nextgen development per plan': {
+    initiative: 'Deliver on BU & Functional Priorities & KTLO',
+    budgetPct: 58, budgetTotalM: 18, budgetSpentM: 10, schedulePct: 72,
+    target: '>85%', ctt: '58% complete', trend: [48, 52, 55, 58], trendUp: true, risk: 'medium', source: 'adp',
+  },
   'pi acceleration': {
     initiative: 'Deliver on BU & Functional Priorities & KTLO',
-    budgetPct: 10, budgetTotalM: 24, budgetSpentM: 2, schedulePct: 60,
-    target: '100%', ctt: '20% of 100%', trend: [24, 22, 20, 20], trendUp: false, risk: 'high', source: 'adp',
+    budgetPct: 35, budgetTotalM: 24, budgetSpentM: 8, schedulePct: 35,
+    target: '>85%', ctt: '35% complete', trend: [42, 39, 37, 35], trendUp: false, risk: 'high', source: 'adp',
   },
   'ai tool adoption (% of assoc.)': {
-    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 5, budgetSpentM: 2, schedulePct: 60,
-    target: '$8M Revenue', ctt: '$1M of $8M (12.5%)', trend: [14, 13, 12, 12.5], trendUp: false, risk: 'medium', source: 'adp',
+    initiative: 'AI Foundation', budgetPct: 62, budgetTotalM: 5, budgetSpentM: 3, schedulePct: 86,
+    target: '$8M Revenue', ctt: '$4.2M of $8M (52%)', trend: [72, 78, 82, 86], trendUp: true, risk: 'low', source: 'adp',
   },
   'ai productivity benefit (cumulative %)': {
-    initiative: 'AI Foundation', budgetPct: 45, budgetTotalM: 12, budgetSpentM: 5, schedulePct: 75,
-    target: '$12M Revenue', ctt: '$4M of $12M (33.3%)', trend: [28, 30, 31, 33], trendUp: true, risk: 'medium', source: 'sample',
+    initiative: 'AI Foundation', budgetPct: 38, budgetTotalM: 12, budgetSpentM: 5, schedulePct: 42,
+    target: '$12M Revenue', ctt: '$2.1M of $12M (18%)', trend: [52, 48, 45, 42], trendUp: false, risk: 'high', source: 'sample',
   },
   'deliver on persona based agent plan': {
-    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 1, budgetSpentM: 0.4, schedulePct: 50,
-    target: '50%', ctt: '20% of 50%', trend: [22, 21, 20, 20], trendUp: false, risk: 'medium', source: 'sample',
+    initiative: 'AI Foundation', budgetPct: 32, budgetTotalM: 1, budgetSpentM: 0.3, schedulePct: 38,
+    target: '50%', ctt: '19% of 50%', trend: [48, 44, 40, 38], trendUp: false, risk: 'high', source: 'sample',
   },
   'ai infrastructure progress (ai studio)': {
-    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 1, budgetSpentM: 0.4, schedulePct: 60,
-    target: '25%', ctt: '10% of 25%', trend: [12, 11, 10, 10], trendUp: false, risk: 'medium', source: 'sample',
+    initiative: 'AI Foundation', budgetPct: 78, budgetTotalM: 1, budgetSpentM: 0.8, schedulePct: 91,
+    target: '25%', ctt: '23% of 25%', trend: [82, 86, 89, 91], trendUp: true, risk: 'low', source: 'sample',
+  },
+  'ai infrastructure progress (personalization engine & data central)': {
+    initiative: 'AI Foundation', budgetPct: 55, budgetTotalM: 2, budgetSpentM: 1.1, schedulePct: 68,
+    target: '30%', ctt: '18% of 30%', trend: [58, 62, 65, 68], trendUp: true, risk: 'medium', source: 'sample',
   },
   'portfolio & tam expansion': {
-    initiative: 'Data and Intelligence Layer', budgetPct: 50, budgetTotalM: 18, budgetSpentM: 9, schedulePct: 60,
-    target: '$108M', ctt: '$12M of $108M (11%)', trend: [14, 13, 12, 11], trendUp: false, risk: 'high', source: 'adp',
+    initiative: 'Data and Intelligence Layer', budgetPct: 74, budgetTotalM: 18, budgetSpentM: 13, schedulePct: 89,
+    target: '$108M', ctt: '$48M of $108M (44%)', trend: [76, 82, 86, 89], trendUp: true, risk: 'low', source: 'adp',
   },
   'ai centric (bu) roadmaps': {
-    initiative: 'Data and Intelligence Layer', budgetPct: 50, budgetTotalM: 24, budgetSpentM: 12, schedulePct: 50,
-    target: '$108M', ctt: '$25M of $108M (23%)', trend: [26, 25, 24, 23], trendUp: false, risk: 'medium', source: 'adp',
+    initiative: 'Data and Intelligence Layer', budgetPct: 61, budgetTotalM: 24, budgetSpentM: 15, schedulePct: 77,
+    target: '$108M', ctt: '$42M of $108M (39%)', trend: [68, 72, 75, 77], trendUp: true, risk: 'medium', source: 'adp',
   },
   'accelerate ng dev. & migration factory via ai': {
-    initiative: 'AI Accelerated EVC Revenue', budgetPct: 50, budgetTotalM: 8, budgetSpentM: 4, schedulePct: 40,
-    target: '$108M', ctt: '$5M of $108M (4.6%)', trend: [6, 5.5, 5, 4.6], trendUp: false, risk: 'high', source: 'sample',
+    initiative: 'AI Accelerated EVC Revenue', budgetPct: 48, budgetTotalM: 8, budgetSpentM: 4, schedulePct: 55,
+    target: '$108M', ctt: '$12M of $108M (11%)', trend: [62, 58, 56, 55], trendUp: false, risk: 'medium', source: 'sample',
   },
   'h2a (human to agent) standards': {
-    initiative: 'AI Accelerated EVC Revenue', budgetPct: 50, budgetTotalM: 5, budgetSpentM: 2.5, schedulePct: 50,
-    target: '100%', ctt: '30% of 100%', trend: [34, 32, 31, 30], trendUp: false, risk: 'medium', source: 'sample',
+    initiative: 'AI Accelerated EVC Revenue', budgetPct: 52, budgetTotalM: 5, budgetSpentM: 2.6, schedulePct: 63,
+    target: '100%', ctt: '38% of 100%', trend: [58, 60, 62, 63], trendUp: true, risk: 'medium', source: 'sample',
   },
   'breakthrough business revenue - marketplace': {
-    initiative: 'AI Accelerated AVM Revenue', budgetPct: 50, budgetTotalM: 3, budgetSpentM: 1.6, schedulePct: 50,
-    target: '100%', ctt: '30% of 100%', trend: [33, 32, 31, 30], trendUp: false, risk: 'medium', source: 'sample',
+    initiative: 'AI Accelerated AVM Revenue', budgetPct: 22, budgetTotalM: 3, budgetSpentM: 0.7, schedulePct: 28,
+    target: '100%', ctt: '12% of 100%', trend: [38, 34, 30, 28], trendUp: false, risk: 'high', source: 'sample',
   },
   'breakthrough business revenue - data': {
-    initiative: 'AI Accelerated CXP Revenue', budgetPct: 100, budgetTotalM: 4, budgetSpentM: 4, schedulePct: 75,
-    target: '100%', ctt: '50% of 100%', trend: [42, 45, 48, 50], trendUp: true, risk: 'low', source: 'sample',
+    initiative: 'AI Accelerated CXP Revenue', budgetPct: 70, budgetTotalM: 4, budgetSpentM: 2.8, schedulePct: 84,
+    target: '100%', ctt: '52% of 100%', trend: [72, 78, 81, 84], trendUp: true, risk: 'low', source: 'sample',
   },
   'investment and revenue gains from ventures': {
-    initiative: 'AI Accelerated CXP Revenue', budgetPct: 100, budgetTotalM: 2, budgetSpentM: 2, schedulePct: 75,
-    target: '100%', ctt: '50% of 100%', trend: [44, 46, 48, 50], trendUp: true, risk: 'low', source: 'sample',
+    initiative: 'AI Accelerated CXP Revenue', budgetPct: 58, budgetTotalM: 2, budgetSpentM: 1.2, schedulePct: 74,
+    target: '100%', ctt: '44% of 100%', trend: [62, 68, 71, 74], trendUp: true, risk: 'medium', source: 'sample',
+  },
+  'vendor management (tesm)': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 28, budgetTotalM: 6, budgetSpentM: 1.7, schedulePct: 33,
+    target: '90%', ctt: '22% of 90%', trend: [42, 38, 35, 33], trendUp: false, risk: 'high', source: 'sample',
+  },
+  'gpt global delivery model': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 82, budgetTotalM: 8, budgetSpentM: 6.5, schedulePct: 90,
+    target: '95%', ctt: '68% of 95%', trend: [78, 84, 87, 90], trendUp: true, risk: 'low', source: 'sample',
+  },
+  'sdlc/adlc': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 46, budgetTotalM: 5, budgetSpentM: 2.3, schedulePct: 58,
+    target: '85%', ctt: '38% of 85%', trend: [52, 54, 56, 58], trendUp: true, risk: 'medium', source: 'sample',
+  },
+  'people excellence (workforce & talent strategy)': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 36, budgetTotalM: 4, budgetSpentM: 1.4, schedulePct: 45,
+    target: '80%', ctt: '28% of 80%', trend: [52, 50, 48, 45], trendUp: false, risk: 'high', source: 'sample',
+  },
+  'stakeholder excellence': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 76, budgetTotalM: 3, budgetSpentM: 2.3, schedulePct: 87,
+    target: '90%', ctt: '62% of 90%', trend: [78, 82, 85, 87], trendUp: true, risk: 'low', source: 'sample',
+  },
+  'collaboration / associate experience': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 44, budgetTotalM: 2, budgetSpentM: 0.9, schedulePct: 52,
+    target: '75%', ctt: '28% of 75%', trend: [58, 56, 54, 52], trendUp: false, risk: 'medium', source: 'sample',
+  },
+  'cloud migration': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 88, budgetTotalM: 10, budgetSpentM: 8.8, schedulePct: 93,
+    target: '100%', ctt: '78% of 100%', trend: [82, 87, 90, 93], trendUp: true, risk: 'low', source: 'sample',
+  },
+  'iam': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 30, budgetTotalM: 2, budgetSpentM: 0.6, schedulePct: 36,
+    target: '90%', ctt: '18% of 90%', trend: [44, 40, 38, 36], trendUp: false, risk: 'high', source: 'sample',
+  },
+  'risk and resiliency': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 54, budgetTotalM: 4, budgetSpentM: 2.2, schedulePct: 66,
+    target: '85%', ctt: '42% of 85%', trend: [58, 62, 64, 66], trendUp: true, risk: 'medium', source: 'sample',
+  },
+  'gpt performance management (control tower)': {
+    initiative: 'GPT Operations & Engagement', budgetPct: 64, budgetTotalM: 5, budgetSpentM: 3.2, schedulePct: 79,
+    target: '90%', ctt: '52% of 90%', trend: [68, 72, 76, 79], trendUp: true, risk: 'medium', source: 'sample',
   },
 };
 
@@ -293,6 +446,42 @@ const INITIATIVE_SCORECARD_REF = {
       { kpi: 'Milestone Achievement', status: 'on-track', current: '78%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
       { kpi: 'Product Rollout Velocity', status: 'on-watch', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: '—' },
       { kpi: 'Risk & Compliance Score', status: 'at-risk', current: 'Medium', target2029: 'Low', targetYearOne: 'Low-Medium', comments: '—' },
+    ],
+  },
+  'client 0 lyric': {
+    strategicTargets: [
+      { label: 'Migration Readiness', value: 'Customer Base : 72%' },
+      { label: 'Product Rollout', value: 'Lyric : 6 / 10' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 35 / 45 / 20' },
+    ],
+    kpis: [
+      { kpi: 'Milestone Achievement', status: 'on-track', current: '88%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
+      { kpi: 'Client Adoption', status: 'on-track', current: '71%', target2029: '85%', targetYearOne: '75%', comments: '—' },
+      { kpi: 'Schedule Adherence', status: 'on-track', current: '88%', target2029: '90%', targetYearOne: '82%', comments: '—' },
+    ],
+  },
+  'nextgen development per plan': {
+    strategicTargets: [
+      { label: 'Platform Readiness', value: 'Core modules : 58%' },
+      { label: 'Migration Factory', value: 'Throughput : 72%' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 28 / 52 / 20' },
+    ],
+    kpis: [
+      { kpi: 'Milestone Achievement', status: 'on-watch', current: '72%', target2029: '>85%', targetYearOne: '78%', comments: '—' },
+      { kpi: 'Delivery Progress', status: 'on-watch', current: '58%', target2029: '85%', targetYearOne: '70%', comments: '—' },
+      { kpi: 'Schedule Adherence', status: 'on-watch', current: '72%', target2029: '90%', targetYearOne: '80%', comments: '—' },
+    ],
+  },
+  'pi acceleration': {
+    strategicTargets: [
+      { label: 'PI Throughput', value: 'Sprint velocity : 35%' },
+      { label: 'Backlog Burn', value: 'Q2 target : 45%' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 15 / 35 / 50' },
+    ],
+    kpis: [
+      { kpi: 'Milestone Achievement', status: 'at-risk', current: '35%', target2029: '>85%', targetYearOne: '60%', comments: 'Behind plan' },
+      { kpi: 'Sprint Completion', status: 'at-risk', current: '35%', target2029: '90%', targetYearOne: '70%', comments: '—' },
+      { kpi: 'Delivery Risk', status: 'at-risk', current: 'High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
     ],
   },
   'ai productivity benefit (cumulative %)': {
@@ -377,15 +566,27 @@ function buildInitiativeScorecard(initiative) {
   return INITIATIVE_SCORECARD_REF[initiative.name.toLowerCase()] ?? buildFallbackScorecard(initiative);
 }
 
+function deriveScorecardStatusFromProgress(progress) {
+  const band = classifyProgressBand(progress);
+  if (band === 'on-track') return 'on-track';
+  if (band === 'at-risk') return 'on-watch';
+  return 'at-risk';
+}
+
 function buildInitiativeScorecardSummary(ini) {
   const ref = INITIATIVE_TRACKER_REF[ini.name.toLowerCase()];
   const scorecard = buildInitiativeScorecard(ini);
   const firstKpi = scorecard.kpis[0];
-  const progress = ini.projects[0]?.progress ?? 55;
+  const progress = ini.projects[0]?.progress ?? 68;
   const risk = ref?.risk ?? (ini.status === 'on-track' ? 'low' : ini.status === 'at-risk' ? 'medium' : 'high');
+  const isFinancial = Boolean(ref?.target?.startsWith('$') || firstKpi?.current?.includes?.('$'));
   return {
-    scorecardStatus: firstKpi?.status ?? deriveScorecardStatus(ini.status, risk),
-    current: firstKpi?.current ?? ref?.ctt ?? `${progress}%`,
+    scorecardStatus: isFinancial
+      ? (firstKpi?.status ?? deriveScorecardStatus(ini.status, risk))
+      : deriveScorecardStatusFromProgress(progress),
+    current: isFinancial
+      ? (firstKpi?.current ?? ref?.ctt ?? `${progress}%`)
+      : `${progress}%`,
     target2029: firstKpi?.target2029 ?? ref?.target ?? `${Math.min(100, progress + 15)}%`,
     targetYearOne: firstKpi?.targetYearOne ?? `${Math.min(100, progress + 8)}%`,
     comments: firstKpi?.comments ?? '—',
@@ -515,18 +716,13 @@ function buildInitiativeTrackerRows(fastCategories) {
 
     fast.initiatives.forEach((ini, index) => {
       const ref = INITIATIVE_TRACKER_REF[ini.name.toLowerCase()];
-      const progress = ini.projects[0]?.progress ?? 55;
+      const progress = ini.projects[0]?.progress ?? 68;
       const budgetPct = ref?.budgetPct ?? Math.min(95, 15 + (index % 6) * 12);
       const budgetTotalM = ref?.budgetTotalM ?? 2 + (index % 5);
       const budgetSpentM = ref?.budgetSpentM ?? Math.round(budgetTotalM * (budgetPct / 100) * 10) / 10;
-      const schedulePct = ref?.schedulePct ?? progress;
-      const risk = ref?.risk ?? (ini.status === 'on-track' ? 'low' : ini.status === 'at-risk' ? 'medium' : 'high');
-      const trend = ref?.trend ?? [
-        Math.max(5, progress - 12),
-        Math.max(5, progress - 8),
-        Math.max(5, progress - 4),
-        progress,
-      ];
+      const schedulePct = progress;
+      const risk = riskFromProgressBand(progress);
+      const trend = ref?.trend ?? demoTrendFromProgress(progress);
       const trendUp = ref?.trendUp ?? trend[trend.length - 1] >= trend[0];
 
       const scorecardStatus = deriveScorecardStatus(ini.status, risk);
@@ -593,17 +789,12 @@ function getInitiativeTrackerDetail(initiative, fastCategory) {
     budgetPct,
     budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
     budgetTone: budgetPct >= 80 ? 'warn' : 'ok',
-    schedulePct: ref?.schedulePct ?? progress,
+    schedulePct: progress,
     target: ref?.target ?? `${Math.min(100, progress + 15)}%`,
-    ctt: ref?.ctt ?? `${progress}% of ${Math.min(100, progress + 15)}%`,
-    trend: ref?.trend ?? [
-      Math.max(0, progress - 10),
-      Math.max(0, progress - 6),
-      Math.max(0, progress - 3),
-      progress,
-    ],
+    ctt: ref?.target?.startsWith('$') ? (ref?.ctt ?? `${progress}%`) : `${progress}%`,
+    trend: ref?.trend ?? demoTrendFromProgress(progress),
     trendUp: ref?.trendUp ?? progress >= (ref?.trend?.[0] ?? progress - 5),
-    risk: ref?.risk ?? (initiative.status === 'on-track' ? 'low' : initiative.status === 'at-risk' ? 'medium' : 'high'),
+    risk: riskFromProgressBand(progress),
     source: ref?.source ?? 'sample',
     delayed,
   };
@@ -718,7 +909,7 @@ function buildLayOfLandCategories() {
   return Array.from(fastMap.values()).map((fast) => {
     const allProjects = fast.initiatives.flatMap((i) => i.projects);
     const delayed = allProjects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
-    const healthScore = Math.max(52, Math.min(92, Math.round(allProjects.reduce((s, p) => s + p.progress, 0) / Math.max(allProjects.length, 1))));
+    const healthScore = Math.round(allProjects.reduce((s, p) => s + p.progress, 0) / Math.max(allProjects.length, 1));
     return {
       ...fast,
       status: delayed >= 3 ? 'at-risk' : delayed >= 1 ? 'delayed' : 'on-track',
@@ -740,10 +931,11 @@ function computePortfolioSummary(fastCategories) {
   const teams = new Set(initiatives.map((i) => i.team.name));
   const activeProjects = projects.filter((p) => p.status !== 'completed').length;
   const delayedProjects = projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
-  const atRiskProjects = projects.filter((p) => p.status === 'at-risk' || p.risk === 'high').length;
-  const onTrackProjects = projects.filter((p) => p.status === 'on-track').length;
+  const bandCounts = countProjectsByProgressBand(projects);
+  const onTrackProjects = bandCounts.onTrack;
+  const atRiskProjects = bandCounts.atRisk;
+  const offTrackProjects = bandCounts.offTrack;
   const completedProjects = projects.filter((p) => p.status === 'completed').length;
-  const offTrackProjects = projects.filter((p) => ['at-risk', 'delayed', 'blocked'].includes(p.status)).length;
   const overallHealth = projects.length ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length) : 0;
   const denom = Math.max(projects.length, 1);
   return {
@@ -765,6 +957,29 @@ function computePortfolioSummary(fastCategories) {
   };
 }
 
+function computeExecutiveMetrics(fastCategories, weekly = []) {
+  const rows = buildInitiativeTrackerRows(fastCategories);
+  const summary = computePortfolioSummary(fastCategories);
+  const prevWeek = weekly.length >= 2 ? weekly[weekly.length - 2] : null;
+  const healthDelta = prevWeek ? summary.overallHealth - prevWeek.close : 8;
+
+  return {
+    strategicImperatives: new Set(rows.map((row) => row.initiative)).size,
+    initiatives: summary.totalInitiatives,
+    subInitiatives: rows.length,
+    onTrackPct: summary.onTrackPct,
+    onTrackCount: summary.onTrackProjects,
+    atRiskPct: summary.atRiskPct,
+    atRiskCount: summary.atRiskProjects,
+    offTrackPct: summary.offTrackPct,
+    offTrackCount: summary.offTrackProjects,
+    healthScore: summary.overallHealth,
+    healthTrend: healthDelta >= 0
+      ? `▲ ${Math.abs(healthDelta)} pts vs Last Quarter`
+      : `▼ ${Math.abs(healthDelta)} pts vs Last Quarter`,
+  };
+}
+
 const FAST_CATEGORIES = buildLayOfLandCategories();
 
 const ORG_DATA = {
@@ -782,22 +997,22 @@ const ORG_DATA = {
     symbol: 'PORTFOLIO',
     ranges: ['8W', '6M'],
     weekly: [
-      { label: '31 Mar', open: 67, high: 70, low: 66, close: 68, volume: 1840, onTrack: 5, atRisk: 3, delayed: 2, utilization: 81 },
-      { label: '7 Apr', open: 68, high: 71, low: 67, close: 70, volume: 1920, onTrack: 5, atRisk: 3, delayed: 2, utilization: 82 },
-      { label: '14 Apr', open: 70, high: 72, low: 69, close: 71, volume: 2050, onTrack: 6, atRisk: 3, delayed: 2, utilization: 83 },
-      { label: '21 Apr', open: 71, high: 72, low: 68, close: 69, volume: 2180, onTrack: 5, atRisk: 4, delayed: 3, utilization: 84 },
-      { label: '28 Apr', open: 69, high: 73, low: 68, close: 72, volume: 2010, onTrack: 6, atRisk: 3, delayed: 2, utilization: 85 },
-      { label: '5 May', open: 72, high: 74, low: 71, close: 73, volume: 2240, onTrack: 6, atRisk: 4, delayed: 3, utilization: 86 },
-      { label: '12 May', open: 73, high: 74, low: 70, close: 71, volume: 2090, onTrack: 6, atRisk: 4, delayed: 3, utilization: 87 },
-      { label: '19 May', open: 71, high: 73, low: 70, close: 72, volume: 2160, onTrack: 6, atRisk: 4, delayed: 3, utilization: 87 },
+      { label: '31 Mar', open: 62, high: 65, low: 60, close: 63, volume: 1840, onTrack: 8, atRisk: 10, delayed: 8, utilization: 81 },
+      { label: '7 Apr', open: 63, high: 66, low: 61, close: 64, volume: 1920, onTrack: 9, atRisk: 9, delayed: 8, utilization: 82 },
+      { label: '14 Apr', open: 64, high: 67, low: 62, close: 65, volume: 2050, onTrack: 10, atRisk: 8, delayed: 8, utilization: 83 },
+      { label: '21 Apr', open: 65, high: 67, low: 63, close: 64, volume: 2180, onTrack: 10, atRisk: 8, delayed: 8, utilization: 84 },
+      { label: '28 Apr', open: 64, high: 68, low: 63, close: 66, volume: 2010, onTrack: 11, atRisk: 7, delayed: 8, utilization: 85 },
+      { label: '5 May', open: 66, high: 68, low: 64, close: 65, volume: 2240, onTrack: 11, atRisk: 6, delayed: 9, utilization: 86 },
+      { label: '12 May', open: 65, high: 67, low: 63, close: 64, volume: 2090, onTrack: 11, atRisk: 6, delayed: 9, utilization: 87 },
+      { label: '19 May', open: 64, high: 66, low: 63, close: 65, volume: 2160, onTrack: 11, atRisk: 6, delayed: 9, utilization: 87 },
     ],
     monthly: [
-      { label: 'Dec', open: 73, high: 75, low: 72, close: 74, volume: 8200, onTrack: 5, atRisk: 2, delayed: 1, utilization: 78 },
-      { label: 'Jan', open: 74, high: 75, low: 71, close: 73, volume: 8450, onTrack: 5, atRisk: 3, delayed: 2, utilization: 80 },
-      { label: 'Feb', open: 73, high: 74, low: 70, close: 71, volume: 8680, onTrack: 5, atRisk: 3, delayed: 2, utilization: 82 },
-      { label: 'Mar', open: 71, high: 72, low: 69, close: 70, volume: 8920, onTrack: 6, atRisk: 3, delayed: 2, utilization: 83 },
-      { label: 'Apr', open: 70, high: 72, low: 69, close: 71, volume: 9100, onTrack: 6, atRisk: 4, delayed: 3, utilization: 85 },
-      { label: 'May', open: 71, high: 73, low: 70, close: 72, volume: 9280, onTrack: 6, atRisk: 4, delayed: 3, utilization: 87 },
+      { label: 'Dec', open: 68, high: 70, low: 66, close: 69, volume: 8200, onTrack: 12, atRisk: 7, delayed: 7, utilization: 78 },
+      { label: 'Jan', open: 69, high: 70, low: 65, close: 67, volume: 8450, onTrack: 11, atRisk: 7, delayed: 8, utilization: 80 },
+      { label: 'Feb', open: 67, high: 68, low: 64, close: 65, volume: 8680, onTrack: 11, atRisk: 6, delayed: 9, utilization: 82 },
+      { label: 'Mar', open: 65, high: 67, low: 63, close: 64, volume: 8920, onTrack: 10, atRisk: 7, delayed: 9, utilization: 83 },
+      { label: 'Apr', open: 64, high: 67, low: 63, close: 65, volume: 9100, onTrack: 11, atRisk: 6, delayed: 9, utilization: 85 },
+      { label: 'May', open: 65, high: 67, low: 64, close: 65, volume: 9280, onTrack: 11, atRisk: 6, delayed: 9, utilization: 87 },
     ],
   },
 
@@ -829,9 +1044,7 @@ const MODULE_STATUS = {
 };
 
 function healthColor(score) {
-  if (score >= 80) return '#059669';
-  if (score >= 65) return '#d97706';
-  return '#dc2626';
+  return getProgressBandTheme(classifyProgressBand(score))?.color ?? '#64748b';
 }
 
 function findFastCategory(id) {
@@ -994,33 +1207,51 @@ function AppSidebar({
         {pillarFasts.map((fast) => {
           const isExpanded = expandedFast === fast.id;
           const isActive = fastCategory?.id === fast.id;
+          const isSelected = isActive && layer !== 'ceo';
           return (
-            <div key={fast.id} className={`def-sidebar-group${isActive ? ' active' : ''}`}>
-              <div className="def-sidebar-row">
-                <button
-                  type="button"
-                  className={`def-sidebar-link${isActive && layer !== 'ceo' ? ' active' : ''}`}
-                  onClick={() => pickFast(fast.id)}
-                >
+            <div key={fast.id} className={`def-sidebar-group${isActive ? ' active' : ''}${isExpanded ? ' expanded' : ''}`}>
+              <div
+                className={`def-sidebar-pillar-card${isSelected ? ' is-selected' : ''}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => pickFast(fast.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    pickFast(fast.id);
+                  }
+                }}
+                aria-label={`Open ${fast.shortName} pillar`}
+              >
+                <div className="def-sidebar-pillar-head">
                   <span className="def-sidebar-tier def-sidebar-tier-mgr">{fast.shortName.slice(0, 2)}</span>
-                  <span className="def-sidebar-link-text">
+                  <div className="def-sidebar-pillar-copy">
                     <strong>{fast.shortName}</strong>
-                    <SidebarFastStatusRow fast={fast} />
-                  </span>
-                  <strong className="def-sidebar-score" style={{ color: healthColor(fast.healthScore) }}>
+                    <span>
+                      {fast.initiatives.length} initiatives · {fast.summary.activeProjects} projects
+                    </span>
+                  </div>
+                  <span
+                    className="def-sidebar-score def-sidebar-score-pillar"
+                    style={{ color: healthColor(fast.healthScore) }}
+                  >
                     {fast.healthScore}%
-                  </strong>
-                </button>
-                <button
-                  type="button"
-                  className={`def-sidebar-toggle${isExpanded ? ' open' : ''}`}
-                  onClick={() => toggleFast(fast.id)}
-                  aria-expanded={isExpanded}
-                  aria-label={`${isExpanded ? 'Hide' : 'Show'} initiatives under ${fast.shortName}`}
-                  title={`${isExpanded ? 'Hide' : 'Show'} initiatives`}
-                >
-                  {isExpanded ? '▾' : '▸'}
-                </button>
+                  </span>
+                  <button
+                    type="button"
+                    className={`def-sidebar-pillar-expand${isExpanded ? ' open' : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleFast(fast.id);
+                    }}
+                    aria-expanded={isExpanded}
+                    aria-label={`${isExpanded ? 'Hide' : 'Show'} initiatives under ${fast.shortName}`}
+                    title={`${isExpanded ? 'Hide' : 'Show'} initiatives`}
+                  >
+                    {isExpanded ? '▾' : '▸'}
+                  </button>
+                </div>
+                <SidebarFastStatusRow fast={fast} />
               </div>
               {isExpanded && (
                 <div className="def-sidebar-nested">
@@ -1112,6 +1343,12 @@ function sparkSeries(weekly, pick) {
   return weekly.map((w, ix) => ({ ix, v: pick(w) }));
 }
 
+function progressBandLabel(band) {
+  if (band === 'on-track') return 'On Track';
+  if (band === 'at-risk') return 'At Risk';
+  return 'Off Track';
+}
+
 function buildCockpitAnalytics(orgData, filterFastId) {
   const { fastCategories, ceoTrends, ceoSummary: globalSummary } = orgData;
   const pillarFasts = filterFastId ? fastCategories.filter((f) => f.id === filterFastId) : fastCategories;
@@ -1170,16 +1407,20 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
 
   const topRisks = [...projects]
-    .filter((p) => p.risk === 'high' || CRITICAL_STATUS.has(p.status))
-    .sort((a, b) => (b.delayDays || 0) - (a.delayDays || 0))
+    .filter((p) => p.risk === 'high' || CRITICAL_STATUS.has(p.status) || (p.progress ?? 0) < 80)
+    .sort((a, b) => (a.progress ?? 0) - (b.progress ?? 0))
     .slice(0, 7)
-    .map((p) => ({
-      id: p.id,
-      title: p.name,
-      level: p.risk === 'high' ? 'High risk' : p.status === 'blocked' ? 'Blocked' : 'At risk delivery',
-      note: p.delayReason || `Client: ${p.client}`,
-      risk: p.risk,
-    }));
+    .map((p) => {
+      const progress = p.progress ?? 0;
+      const band = classifyProgressBand(progress);
+      return {
+        id: p.id,
+        title: p.name,
+        progress,
+        band,
+        levelLabel: progressBandLabel(band),
+      };
+    });
 
   const upcomingMilestones = initiatives
     .flatMap((ini) =>
@@ -1213,14 +1454,20 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     health: sparkSeries(weekly, (w) => w.close),
     mix: sparkSeries(weekly, (w) => w.onTrack + w.atRisk * 1.05),
     pillars: sparkSeries(weekly, (w) => w.close * 1.03),
-    initiatives: sparkSeries(weekly, () => ceoSummary.totalInitiatives),
+    initiatives: sparkSeries(weekly, (w) => w.onTrack + w.atRisk),
     velocity: sparkSeries(weekly, (w) => w.utilization ?? 82),
     risk: sparkSeries(weekly, (w) => (w.delayed + w.atRisk) * -1.8 + 68),
     complete: sparkSeries(weekly, (w) => w.close * 0.92),
+    onTrack: sparkSeries(weekly, (w) => w.onTrack * 11),
+    atRisk: sparkSeries(weekly, (w) => w.atRisk * 12 + 18),
+    offTrack: sparkSeries(weekly, (w) => w.delayed * 10 + 8),
   };
+
+  const executiveMetrics = computeExecutiveMetrics(pillarFasts, weekly);
 
   return {
     ceoSummary,
+    executiveMetrics,
     statusMovement,
     quarterlyBars,
     recoveryTable,
@@ -1272,14 +1519,13 @@ const FAST_PILLAR_ICONS = {
 };
 
 const COCKPIT_METRIC_ICONS = {
-  'FAST pillars': '🏛',
+  'Strategic Imperatives': '🏛',
   Initiatives: '📊',
-  'Projects in flight': '📁',
-  'On-track mix': '✓',
-  'At-risk share': '◐',
-  'Off-track share': '⚠',
-  'Completed projects': '★',
-  'Portfolio health': '◆',
+  'Sub-Initiatives': '📋',
+  'On Track': '✓',
+  'At Risk': '◐',
+  'Off Track': '⚠',
+  'Portfolio Health Score': '◆',
 };
 
 function ChartLegendRow({ items }) {
@@ -1295,47 +1541,135 @@ function ChartLegendRow({ items }) {
   );
 }
 
-function CockpitMetricSpark({ data, stroke }) {
+function CockpitMetricSpark({ data, stroke, fillId = 'metricSparkFill' }) {
   const line = stroke || '#6366f1';
   return (
     <div className="def-cockpit-metric-spark">
-      <ResponsiveContainer width="100%" height={40}>
-        <LineChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+      <ResponsiveContainer width="100%" height={32}>
+        <AreaChart data={data} margin={{ top: 6, right: 2, bottom: 0, left: 2 }}>
+          <defs>
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={line} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={line} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
           <XAxis dataKey="ix" hide />
           <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
-          <Line type="monotone" dataKey="v" stroke={line} strokeWidth={2.5} dot={false} isAnimationActive animationDuration={900} />
-        </LineChart>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke={line}
+            strokeWidth={2.25}
+            fill={`url(#${fillId})`}
+            dot={false}
+            activeDot={{ r: 3.5, fill: line, stroke: '#fff', strokeWidth: 2 }}
+            isAnimationActive
+            animationDuration={900}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-function CockpitMetricCard({ title, value, subtitle, accent, spark, delay = '0ms' }) {
+function CockpitMetricCard({
+  title,
+  value,
+  valueSuffix,
+  subtitle,
+  accent,
+  spark,
+  delay = '0ms',
+  showSpark = false,
+  valueTone,
+  statusBand,
+  iconRight = false,
+  trendSub = false,
+  trendDown = false,
+}) {
+  const bandTheme = statusBand ? getProgressBandTheme(statusBand) : null;
+  const resolvedTone = bandTheme?.tone ?? valueTone;
+  const resolvedAccent = bandTheme?.accent ?? accent;
   const icon = COCKPIT_METRIC_ICONS[title] || '●';
+  const isCountCard = iconRight;
+  const isHealthCard = title === 'Portfolio Health Score';
+  const healthPct = isHealthCard
+    ? Math.max(0, Math.min(100, Number.parseInt(String(value), 10) || 0))
+    : 0;
+  const sparkFillId = `metric-spark-${title.replace(/\s+/g, '-').toLowerCase()}`;
+
   return (
-    <article className={`def-cockpit-metric-card def-cockpit-interactive def-stagger-in${accent ? ` ${accent}` : ''}`} style={{ '--stagger': delay }}>
-      <div className="def-cockpit-metric-icon" aria-hidden="true">{icon}</div>
-      <div className="def-cockpit-metric-copy">
+    <article
+      className={[
+        'def-cockpit-metric-card',
+        'def-cockpit-interactive',
+        'def-stagger-in',
+        isCountCard && 'metric-count',
+        showSpark && 'metric-status',
+        isHealthCard && 'metric-health',
+        statusBand && `status-${statusBand}`,
+        resolvedAccent,
+      ].filter(Boolean).join(' ')}
+      style={{
+        '--stagger': delay,
+        ...(bandTheme ? {
+          '--metric-band-color': bandTheme.color,
+          '--metric-band-label': bandTheme.label,
+          '--metric-band-sub': bandTheme.sub,
+          '--metric-band-border': bandTheme.border,
+          '--metric-band-bg': bandTheme.cardBg,
+          '--metric-icon-bg': bandTheme.iconBg,
+          '--metric-icon-border': bandTheme.iconBorder,
+        } : {}),
+      }}
+    >
+      {!isCountCard ? <span className="def-cockpit-metric-stripe" aria-hidden="true" /> : null}
+      <div className="def-cockpit-metric-head">
+        {!isCountCard ? (
+          <div className="def-cockpit-metric-icon" aria-hidden="true">{icon}</div>
+        ) : null}
         <span className="def-cockpit-metric-label">{title}</span>
-        <strong className="def-cockpit-metric-value">{value}</strong>
-        {subtitle ? <small className="def-cockpit-metric-sub">{subtitle}</small> : null}
+        {isCountCard ? (
+          <div className="def-cockpit-metric-icon metric-icon-tr" aria-hidden="true">{icon}</div>
+        ) : null}
       </div>
-      <CockpitMetricSpark
-        data={spark}
-        stroke={accent === 'def-accent-amber' ? '#d97706' : accent === 'def-accent-rose' ? '#dc2626' : accent === 'def-accent-emerald' ? '#059669' : undefined}
-      />
+      <div className="def-cockpit-metric-body">
+        <div className="def-cockpit-metric-value-row">
+          <strong className={`def-cockpit-metric-value${resolvedTone ? ` tone-${resolvedTone}` : ''}`}>
+            {value}
+            {valueSuffix ? <span className="def-cockpit-metric-denom">{valueSuffix}</span> : null}
+          </strong>
+          {statusBand && subtitle && !isHealthCard ? (
+            <span className="def-cockpit-metric-pill">{subtitle}</span>
+          ) : null}
+        </div>
+        {isHealthCard ? (
+          <div className="def-cockpit-metric-health-track" aria-hidden="true">
+            <span className="def-cockpit-metric-health-fill" style={{ width: `${healthPct}%` }} />
+          </div>
+        ) : null}
+        {subtitle && (isCountCard || isHealthCard) ? (
+          <small className={`def-cockpit-metric-sub${trendSub ? (trendDown ? ' trend-down' : ' trend-up') : ''}`}>
+            {subtitle}
+          </small>
+        ) : null}
+      </div>
+      {showSpark && spark ? (
+        <CockpitMetricSpark
+          data={spark}
+          stroke={bandTheme?.spark ?? (resolvedTone === 'amber' ? '#f59e0b' : resolvedTone === 'rose' ? '#ef4444' : resolvedTone === 'emerald' ? '#22c55e' : '#6366f1')}
+          fillId={sparkFillId}
+        />
+      ) : null}
     </article>
   );
 }
 
 function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
   const projects = fast.initiatives.flatMap((ini) => ini.projects);
-  const onCount = projects.filter((p) => p.status === 'on-track').length;
-  const atCount = projects.filter((p) => p.status === 'at-risk').length;
-  const lateCount = projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
+  const { onTrack: onCount, atRisk: atCount, offTrack: lateCount } = countProjectsByProgressBand(projects);
   const total = Math.max(projects.length, 1);
   const leadTeam = fast.initiatives[0]?.team?.name ?? 'Delivery team';
-  const trendUp = fast.healthScore >= 70;
 
   const data = [
     { name: 'On Track', value: onCount || 0, fill: '#22c55e' },
@@ -1351,7 +1685,7 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
       className="def-cockpit-fast-health def-cockpit-interactive def-stagger-in"
       style={{ '--stagger': `${120 + index * 70}ms` }}
       onClick={() => onSelectFast?.(fast.id)}
-      aria-label={`Open ${fast.shortName} pillar`}
+      aria-label={`View ${fast.shortName} initiatives`}
     >
       <div className="def-cockpit-fast-head">
         <span className="def-cockpit-fast-icon">{FAST_PILLAR_ICONS[fast.shortName] || '●'}</span>
@@ -1395,9 +1729,6 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
       </div>
       <div className="def-cockpit-fast-foot">
         <span className="def-cockpit-fast-team">Team · {leadTeam}</span>
-        <span className={`def-cockpit-fast-trend${trendUp ? ' up' : ' down'}`}>
-          {trendUp ? '↑' : '↓'} {Math.abs(fast.healthScore % 15) + 4}%
-        </span>
       </div>
     </button>
   );
@@ -1525,7 +1856,7 @@ function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
    LAYER VIEWS
 ───────────────────────────────────────────────────────────── */
 
-function CeoView({ theme, onSelectFast, onOpenInitiative }) {
+function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
   const vp = useViewport();
   const [portfolioScope, setPortfolioScope] = useState('all');
   const analytics = useMemo(
@@ -1538,6 +1869,8 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
     [],
   );
   const wsBlockHeight = vp.wsChartH + vp.wsBarH + 148;
+  const healthBand = classifyProgressBand(analytics.executiveMetrics.healthScore);
+  const healthTrendDown = analytics.executiveMetrics.healthTrend.startsWith('▼');
 
   return (
     <div
@@ -1545,49 +1878,107 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
       style={{ '--cockpit-chart-h': `${vp.chartH}px`, '--cockpit-ws-h': `${wsBlockHeight}px` }}
     >
       <header className="def-cockpit-top def-cockpit-interactive def-stagger-in" style={{ '--stagger': '0ms' }}>
-        <div className="def-cockpit-top-copy">
-          <p className="def-cockpit-eyebrow">Command Center</p>
-          <h1 className="def-cockpit-title">Command Center Cockpit</h1>
-        </div>
-        <div className="def-cockpit-top-controls">
-          <label className="def-cockpit-filter">
-            <span>Scope</span>
-            <select value={portfolioScope} onChange={(e) => setPortfolioScope(e.target.value)}>
-              {filterOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>{opt.label}</option>
-              ))}
-            </select>
-          </label>
-          <div className="def-updated def-live-badge def-cockpit-live">
-            <span className="def-live-dot" />
-            Live
+        <div className="def-cockpit-top-main">
+          <div className="def-cockpit-top-copy">
+            <p className="def-cockpit-eyebrow">Command Center</p>
+            <h1 className="def-cockpit-title">Command Center Cockpit</h1>
           </div>
-          <div className="def-cockpit-user-chip">
-            <Avatar name={organization.viewerName} tone="indigo" />
-            <div>
-              <strong>{organization.viewerName}</strong>
-              <small>{organization.viewerRole}</small>
+          <div className="def-cockpit-top-toolbar">
+            <label className="def-cockpit-filter">
+              <span>Scope</span>
+              <select value={portfolioScope} onChange={(e) => setPortfolioScope(e.target.value)}>
+                {filterOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="def-cockpit-top-meta">
+              <div className="def-updated def-live-badge def-cockpit-live">
+                <span className="def-live-dot" />
+                Live
+              </div>
+              <div className="def-cockpit-user-chip">
+                <Avatar name={organization.viewerName} tone="indigo" />
+                <div className="def-cockpit-user-copy">
+                  <strong>{organization.viewerName}</strong>
+                  <small>{organization.viewerRole}</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       <div className="def-cockpit-metrics-row">
-        <CockpitMetricCard title="FAST pillars" value={analytics.ceoSummary.totalFastCategories} subtitle="Active pillars" spark={analytics.sparks.pillars} delay="0ms" accent="def-accent-emerald" />
-        <CockpitMetricCard title="Initiatives" value={analytics.ceoSummary.totalInitiatives} subtitle="Active initiatives" spark={analytics.sparks.initiatives} delay="40ms" />
-        <CockpitMetricCard title="Projects in flight" value={analytics.ceoSummary.activeProjects} subtitle={`${analytics.ceoSummary.totalProjects} total`} spark={analytics.sparks.mix} delay="80ms" />
-        <CockpitMetricCard title="On-track mix" value={`${analytics.ceoSummary.onTrackPct}%`} subtitle={`${analytics.ceoSummary.onTrackProjects} projects`} spark={analytics.sparks.health} delay="120ms" accent="def-accent-emerald" />
-        <CockpitMetricCard title="At-risk share" value={`${analytics.ceoSummary.atRiskPct}%`} subtitle={`${analytics.ceoSummary.atRiskProjects} projects`} spark={analytics.sparks.risk} delay="160ms" accent="def-accent-amber" />
-        <CockpitMetricCard title="Off-track share" value={`${analytics.ceoSummary.offTrackPct}%`} subtitle={`${analytics.ceoSummary.offTrackProjects} projects`} spark={analytics.sparks.risk} delay="200ms" accent="def-accent-rose" />
-        <CockpitMetricCard title="Completed projects" value={analytics.ceoSummary.completedProjects} subtitle="Finished to date" spark={analytics.sparks.complete} delay="240ms" />
-        <CockpitMetricCard title="Portfolio health" value={`${analytics.ceoSummary.overallHealth}%`} subtitle="Overall score" spark={analytics.sparks.velocity} delay="280ms" accent="def-accent-indigo" />
+        <CockpitMetricCard
+          title="Strategic Imperatives"
+          value={analytics.executiveMetrics.strategicImperatives}
+          subtitle="Active"
+          spark={analytics.sparks.pillars}
+          delay="0ms"
+          iconRight
+        />
+        <CockpitMetricCard
+          title="Initiatives"
+          value={analytics.executiveMetrics.initiatives}
+          subtitle="Active"
+          spark={analytics.sparks.initiatives}
+          delay="40ms"
+          iconRight
+        />
+        <CockpitMetricCard
+          title="Sub-Initiatives"
+          value={analytics.executiveMetrics.subInitiatives}
+          subtitle="Active"
+          spark={analytics.sparks.mix}
+          delay="80ms"
+          iconRight
+        />
+        <CockpitMetricCard
+          title="On Track"
+          value={`${analytics.executiveMetrics.onTrackPct}%`}
+          subtitle={`${analytics.executiveMetrics.onTrackCount}`}
+          spark={analytics.sparks.onTrack}
+          delay="120ms"
+          showSpark
+          statusBand="on-track"
+        />
+        <CockpitMetricCard
+          title="At Risk"
+          value={`${analytics.executiveMetrics.atRiskPct}%`}
+          subtitle={`${analytics.executiveMetrics.atRiskCount}`}
+          spark={analytics.sparks.atRisk}
+          delay="160ms"
+          showSpark
+          statusBand="at-risk"
+        />
+        <CockpitMetricCard
+          title="Off Track"
+          value={`${analytics.executiveMetrics.offTrackPct}%`}
+          subtitle={`${analytics.executiveMetrics.offTrackCount}`}
+          spark={analytics.sparks.offTrack}
+          delay="200ms"
+          showSpark
+          statusBand="off-track"
+        />
+        <CockpitMetricCard
+          title="Portfolio Health Score"
+          value={analytics.executiveMetrics.healthScore}
+          valueSuffix="/100"
+          subtitle={analytics.executiveMetrics.healthTrend}
+          spark={analytics.sparks.health}
+          delay="240ms"
+          statusBand={healthBand}
+          trendSub
+          trendDown={healthTrendDown}
+        />
       </div>
 
       <section className="def-cockpit-section def-cockpit-interactive def-stagger-in" style={{ '--stagger': '60ms' }}>
         <h2 className="def-cockpit-section-title">FAST pillars health</h2>
         <div className="def-cockpit-fast-grid">
           {ORG_DATA.fastCategories.map((f, i) => (
-            <FastHealthCard key={f.id} fast={f} theme={theme} onSelectFast={onSelectFast} index={i} />
+            <FastHealthCard key={f.id} fast={f} theme={theme} onSelectFast={onOpenFastPillar} index={i} />
           ))}
         </div>
       </section>
@@ -1640,16 +2031,30 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
             <p className="def-cockpit-rail-label">Top delivery risks</p>
             <ul className="def-cockpit-risk-list">
               {analytics.topRisks.slice(0, 4).map((risk) => (
-                <li key={risk.id}>
-                  <div className="def-cockpit-risk-copy">
-                    <strong>{risk.title}</strong>
-                    <span>{risk.level}</span>
+                <li key={risk.id} className="def-cockpit-risk-item">
+                  <div className="def-cockpit-risk-head">
+                    <strong className="def-cockpit-risk-title">{risk.title}</strong>
+                    <span
+                      className={`def-cockpit-risk-pct def-cockpit-risk-pct-${risk.band}`}
+                      style={{ color: healthColor(risk.progress) }}
+                    >
+                      {risk.progress}%
+                    </span>
                   </div>
-                  <span className={`def-cockpit-risk-score${risk.risk === 'high' ? ' high' : ''}`}>
-                    {risk.risk === 'high' ? 25 : 18}
+                  <span className={`def-cockpit-risk-level def-cockpit-risk-level-${risk.band}`}>
+                    {risk.levelLabel}
                   </span>
+                  <div className="def-cockpit-risk-track" aria-hidden="true">
+                    <div
+                      className="def-cockpit-risk-fill"
+                      style={{ width: `${risk.progress}%`, background: healthColor(risk.progress) }}
+                    />
+                  </div>
                 </li>
               ))}
+              {analytics.topRisks.length === 0 && (
+                <li className="def-cockpit-risk-empty">No delivery risks flagged.</li>
+              )}
             </ul>
           </div>
           <div className="def-cockpit-rail-card def-cockpit-interactive subtle def-stagger-in" style={{ '--stagger': '360ms' }}>
@@ -1671,21 +2076,94 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
   );
 }
 
+function buildFastScorecardRows(fastCategory) {
+  return fastCategory.initiatives.map((ini) => {
+    const summary = buildInitiativeScorecardSummary(ini);
+    return {
+      id: ini.id,
+      initiativeId: ini.id,
+      kpi: ini.name,
+      scorecardStatus: summary.scorecardStatus,
+      current: summary.current,
+      target2029: summary.target2029,
+      targetYearOne: summary.targetYearOne,
+      comments: summary.comments,
+    };
+  });
+}
+
+function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
+  const scorecardRows = useMemo(
+    () => (fastCategory ? buildFastScorecardRows(fastCategory) : []),
+    [fastCategory],
+  );
+  const imperative = fastCategory
+    ? (IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName)
+    : '';
+
+  if (!open || !fastCategory) return null;
+
+  const handleInitiativeClick = (row) => {
+    onClose();
+    onSelectInitiative(fastCategory.id, row.initiativeId);
+  };
+
+  return (
+    <div className="def-drawer-root open" role="presentation">
+      <button type="button" className="def-drawer-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
+      <aside
+        className="def-drawer def-drawer-pro def-drawer-pillar"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="def-pillar-drawer-title"
+      >
+        <header className="def-drawer-head def-drawer-head-pillar">
+          <div className="def-drawer-head-row">
+            <span className="def-drawer-tier">{imperative}</span>
+            <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
+          <h2 id="def-pillar-drawer-title">{fastCategory.shortName} pillar</h2>
+          <p className="def-drawer-pillar-desc">{fastCategory.name}</p>
+          <div className="def-drawer-pillar-stats">
+            <StatusPill status={fastCategory.status} />
+            <span
+              className="def-drawer-pillar-score"
+              style={{ color: healthColor(fastCategory.healthScore) }}
+            >
+              {fastCategory.healthScore}% health
+            </span>
+            <span className="def-drawer-pillar-meta">
+              {fastCategory.summary.initiatives} initiatives
+              {' · '}
+              {fastCategory.summary.activeProjects} projects
+              {' · '}
+              {fastCategory.summary.teams} teams
+            </span>
+          </div>
+        </header>
+        <div className="def-drawer-body def-drawer-body-pillar">
+          <div className="def-drawer-section-bar">
+            <h3>Initiative KPIs</h3>
+            <span>{scorecardRows.length} initiatives</span>
+          </div>
+          <div className="def-drawer-pillar-table">
+            <InitiativeKpiTable
+              rows={scorecardRows}
+              onRowClick={handleInitiativeClick}
+              emptyMessage="No initiatives in this pillar."
+            />
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 function FastCategoryView({ fastCategory, onSelectInitiative, onSelectProject, onGoCeo, onBack }) {
   const scorecardRows = useMemo(
-    () => fastCategory.initiatives.map((ini) => {
-      const summary = buildInitiativeScorecardSummary(ini);
-      return {
-        id: ini.id,
-        initiativeId: ini.id,
-        kpi: ini.name,
-        scorecardStatus: summary.scorecardStatus,
-        current: summary.current,
-        target2029: summary.target2029,
-        targetYearOne: summary.targetYearOne,
-        comments: summary.comments,
-      };
-    }),
+    () => buildFastScorecardRows(fastCategory),
     [fastCategory],
   );
   const imperative = IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName;
@@ -2353,6 +2831,8 @@ function TeamView({
 ───────────────────────────────────────────────────────────── */
 
 const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   html, body, #root {
@@ -2362,8 +2842,13 @@ const STYLES = `
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-    font-size: 14px; line-height: 1.5; color: #111827; background: #f7f8fa;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: var(--font-normal);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
+    color: #111827;
+    background: #f7f8fa;
   }
   ::selection { background: rgba(20, 115, 230, 0.2); color: #2c2c2c; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -2383,7 +2868,7 @@ const STYLES = `
     --def-gradient-soft: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
     --def-radius: 18px;
     --def-radius-sm: 12px;
-    --def-sidebar-w: 256px;
+    --def-sidebar-w: 300px;
     --def-topbar-h: 56px;
     --space-1: 4px;
     --space-2: 8px;
@@ -2396,8 +2881,30 @@ const STYLES = `
     --section-gap: var(--space-5);
     --cockpit-gap: var(--space-2);
     --cockpit-pad: var(--space-2);
-    --text-min: 0.6875rem;
-    --text-xs: 0.75rem;
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    --font-extrabold: 800;
+    --leading-tight: 1.25;
+    --leading-snug: 1.35;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+    --tracking-tight: -0.02em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.025em;
+    --tracking-label: 0.06em;
+    --text-2xs: 0.625rem;
+    --text-xs: 0.6875rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.875rem;
+    --text-md: 0.9375rem;
+    --text-lg: 1.0625rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-3xl: 1.875rem;
+    --text-min: var(--text-2xs);
     --def-shadow-sm: 0 2px 8px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
     --def-touch-min: 44px;
   }
@@ -2509,10 +3016,14 @@ const STYLES = `
     border-color: rgba(255,255,255,0.16);
     box-shadow: none;
   }
-  .def-app.def-theme-dark .def-sidebar-toggle:hover,
-  .def-app.def-theme-dark .def-sidebar-toggle.open {
+  .def-app.def-theme-dark .def-sidebar-pillar-expand:hover,
+  .def-app.def-theme-dark .def-sidebar-pillar-expand.open {
     background: rgba(255,255,255,0.08);
     border-color: rgba(255,255,255,0.12);
+  }
+  .def-app.def-theme-dark .def-sidebar-nested {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.08);
   }
   .def-app.def-theme-dark .def-sidebar-link.active {
     border-color: rgba(255,255,255,0.12);
@@ -2618,12 +3129,57 @@ const STYLES = `
     flex-direction: column;
     overflow: hidden;
     background: var(--def-bg-app);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: var(--font-normal);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     color: var(--def-text);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     transition: background 0.35s ease, color 0.35s ease;
   }
   .def-app *, .def-app *::before, .def-app *::after { box-sizing: border-box; }
+  .def-app :is(button, input, select, textarea, optgroup) {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+  }
+  .def-app h1, .def-app h2, .def-app h3, .def-app h4 {
+    font-family: inherit;
+    font-weight: var(--font-extrabold);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--def-heading);
+    margin: 0;
+  }
+  .def-app strong, .def-app b { font-weight: var(--font-bold); }
+  .def-app small { font-size: var(--text-sm); line-height: var(--leading-snug); }
+  .def-app :is(.def-table, .def-cockpit-table, .def-tracker-table, .def-initiative-kpi-table) {
+    font-size: var(--text-sm);
+  }
+  .def-app :is(.def-table th, .def-cockpit-table th, .def-tracker-table thead th, .def-initiative-kpi-table th) {
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    letter-spacing: var(--tracking-label);
+  }
+  .def-app :is(
+    .def-cockpit-rail-label,
+    .def-sidebar-label,
+    .def-sidebar-sublabel,
+    .def-cockpit-eyebrow,
+    .def-cockpit-fast-kicker,
+    .def-scorecard-targets-label
+  ) {
+    font-size: var(--text-xs);
+    font-weight: var(--font-extrabold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
   .def-layer {
     width: 100%;
     min-width: 0;
@@ -2809,7 +3365,8 @@ const STYLES = `
     backdrop-filter: blur(24px) saturate(160%);
     color: var(--def-sidebar-text);
     border-right: 1px solid var(--def-sidebar-border);
-    padding: var(--space-3) var(--space-2);
+    --sidebar-inset-x: var(--space-2);
+    padding: var(--space-3) var(--sidebar-inset-x);
     min-height: 0;
     box-shadow: var(--def-sidebar-shadow);
     transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
@@ -2846,17 +3403,17 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    font-size: 0.6rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
-    letter-spacing: 0.11em;
+    letter-spacing: var(--tracking-label);
     color: var(--def-sidebar-muted);
-    font-weight: 700;
-    padding: var(--space-2) var(--space-2) var(--space-1);
+    font-weight: var(--font-bold);
+    padding: var(--space-1) 0 2px;
     margin: 0;
   }
   .def-sidebar-label-section {
     margin-top: var(--space-2);
-    padding-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--def-sidebar-border);
   }
   .def-sidebar-sublabel {
@@ -2865,11 +3422,11 @@ const STYLES = `
     justify-content: space-between;
     gap: var(--space-2);
     margin: 0 0 var(--space-1);
-    padding: 0 var(--space-1) var(--space-1);
-    font-size: 0.58rem;
-    font-weight: 800;
+    padding: 0;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-extrabold);
     text-transform: uppercase;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.08em;
     color: var(--def-sidebar-muted);
   }
   .def-sidebar-count {
@@ -2894,7 +3451,7 @@ const STYLES = `
     width: 30px;
     height: 30px;
     border-radius: 8px;
-    font-size: 0.56rem;
+    font-size: 0.54rem;
     font-weight: 900;
     letter-spacing: 0.02em;
     flex-shrink: 0;
@@ -2910,10 +3467,10 @@ const STYLES = `
     color: var(--def-sidebar-text);
   }
   .def-sidebar-tier-tl {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    font-size: 0.5rem;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 0.46rem;
     background: rgba(99,102,241,0.06);
     border: 1px solid var(--def-sidebar-border);
     color: var(--def-sidebar-muted);
@@ -2946,58 +3503,201 @@ const STYLES = `
   .def-sidebar-nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
     flex: 1;
     min-height: 0;
     padding-bottom: var(--space-2);
   }
   .def-sidebar-group {
-    margin-bottom: var(--space-1);
-    border-radius: 8px;
-  }
-  .def-sidebar-group.active > .def-sidebar-row .def-sidebar-link:not(.active) {
-    background: rgba(99,102,241,0.04);
-    border-color: rgba(99,102,241,0.1);
-  }
-  .def-sidebar-row {
     display: flex;
-    align-items: stretch;
-    gap: 2px;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
   }
-  .def-sidebar-row .def-sidebar-link { flex: 1; min-width: 0; }
-  .def-sidebar-toggle {
-    flex-shrink: 0;
-    width: 28px;
+  .def-sidebar-pillar-card {
     border: 1px solid var(--def-sidebar-border);
-    border-radius: 8px;
-    background: var(--def-topbar-pill-bg);
+    border-radius: 11px;
+    background: rgba(255,255,255,0.82);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  }
+  .def-sidebar-pillar-card:hover {
+    border-color: rgba(99,102,241,0.22);
+    background: rgba(255,255,255,0.98);
+    box-shadow: 0 4px 14px rgba(99,102,241,0.07);
+  }
+  .def-sidebar-pillar-card.is-selected {
+    border-color: rgba(99,102,241,0.3);
+    background: linear-gradient(180deg, rgba(99,102,241,0.09), rgba(168,85,247,0.04));
+    box-shadow: inset 3px 0 0 #6366f1, 0 4px 14px rgba(99,102,241,0.08);
+  }
+  .def-sidebar-pillar-card:focus-visible {
+    outline: 2px solid rgba(99,102,241,0.45);
+    outline-offset: 2px;
+  }
+  .def-sidebar-pillar-head {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto auto;
+    column-gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .def-sidebar-pillar-head .def-sidebar-tier-mgr {
+    grid-column: 1;
+    align-self: center;
+  }
+  .def-sidebar-pillar-copy {
+    grid-column: 2;
+    min-width: 0;
+    align-self: center;
+  }
+  .def-sidebar-pillar-copy strong {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--font-extrabold);
+    color: var(--def-sidebar-text);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
+  }
+  .def-sidebar-pillar-copy span {
+    display: block;
+    margin-top: 1px;
+    font-size: 0.58rem;
+    font-weight: var(--font-semibold);
+    color: var(--def-sidebar-muted);
+    line-height: var(--leading-snug);
+  }
+  .def-sidebar-score-pillar {
+    grid-column: 3;
+    justify-self: end;
+    align-self: center;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    padding: 0 7px;
+    margin: 0;
+    font-size: 0.62rem;
+  }
+  .def-sidebar-pillar-expand {
+    grid-column: 4;
+    justify-self: end;
+    align-self: center;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--def-sidebar-border);
+    border-radius: 7px;
+    background: rgba(255,255,255,0.95);
     color: var(--def-sidebar-muted);
     cursor: pointer;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     line-height: 1;
+    padding: 0;
     transition: background 0.2s, color 0.2s, border-color 0.2s;
   }
-  .def-sidebar-toggle:hover,
-  .def-sidebar-toggle.open {
+  .def-sidebar-pillar-expand:hover,
+  .def-sidebar-pillar-expand.open {
     background: rgba(99,102,241,0.12);
-    border-color: rgba(99,102,241,0.25);
+    border-color: rgba(99,102,241,0.28);
     color: var(--def-sidebar-text);
   }
-  .def-sidebar-link {
+  .def-sidebar-metric-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--def-sidebar-border);
+    background: rgba(248,250,252,0.88);
+  }
+  .def-sidebar-metric {
+    position: relative;
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: var(--space-2);
+    justify-content: center;
+    gap: 4px;
+    min-height: 0;
+    padding: 6px 4px;
+  }
+  .def-sidebar-metric:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 22%;
+    right: 0;
+    width: 1px;
+    height: 56%;
+    background: rgba(148,163,184,0.26);
+  }
+  .def-sidebar-metric-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .def-sidebar-metric-ok .def-sidebar-metric-dot { background: #22c55e; }
+  .def-sidebar-metric-risk .def-sidebar-metric-dot { background: #f59e0b; }
+  .def-sidebar-metric-late .def-sidebar-metric-dot { background: #ef4444; }
+  .def-sidebar-metric-ok .def-sidebar-metric-value { color: #059669; }
+  .def-sidebar-metric-risk .def-sidebar-metric-value { color: #d97706; }
+  .def-sidebar-metric-late .def-sidebar-metric-value { color: #dc2626; }
+  .def-sidebar-metric-value {
+    font-size: var(--text-sm);
+    font-weight: var(--font-extrabold);
+    line-height: 1;
+    color: var(--def-sidebar-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .def-sidebar-metric-label {
+    font-size: 0.52rem;
+    font-weight: var(--font-bold);
+    color: var(--def-sidebar-muted);
+    letter-spacing: 0;
+    line-height: 1;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .def-app.def-theme-dark .def-sidebar-pillar-card {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-sidebar-pillar-card:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.14);
+  }
+  .def-app.def-theme-dark .def-sidebar-pillar-card.is-selected {
+    background: linear-gradient(180deg, rgba(99,102,241,0.16), rgba(168,85,247,0.08));
+    border-color: rgba(129,140,248,0.35);
+  }
+  .def-app.def-theme-dark .def-sidebar-pillar-expand {
+    background: rgba(255,255,255,0.06);
+  }
+  .def-app.def-theme-dark .def-sidebar-metric-strip {
+    background: rgba(255,255,255,0.03);
+  }
+  .def-app.def-theme-dark .def-sidebar-metric:not(:last-child)::after {
+    background: rgba(255,255,255,0.08);
+  }
+  .def-sidebar-link {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
     width: 100%;
-    padding: 7px var(--space-2);
+    padding: 8px 10px;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 11px;
     background: transparent;
     color: inherit;
     cursor: pointer;
     text-align: left;
     font: inherit;
-    min-height: 46px;
-    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    min-height: 44px;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
   .def-sidebar-link:hover { background: var(--def-sidebar-hover); }
   .def-sidebar-link.active {
@@ -3006,7 +3706,7 @@ const STYLES = `
     box-shadow: inset 3px 0 0 #6366f1, 0 2px 10px rgba(99,102,241,0.08);
   }
   .def-sidebar-link-ceo {
-    margin-bottom: var(--space-1);
+    margin-bottom: 0;
     background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(168,85,247,0.04));
     border-color: rgba(99,102,241,0.14);
   }
@@ -3025,84 +3725,57 @@ const STYLES = `
   }
   .def-sidebar-link-icon { opacity: 0.7; font-size: 0.7rem; }
   .def-sidebar-link .def-avatar { width: 30px; height: 30px; font-size: 0.6rem; border-radius: 8px; }
-  .def-sidebar-link-text { flex: 1; min-width: 0; }
+  .def-sidebar-link-text { min-width: 0; align-self: center; }
   .def-sidebar-link-text strong {
     display: block;
-    font-size: 0.76rem;
-    font-weight: 700;
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
     color: var(--def-sidebar-text);
-    line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: var(--leading-snug);
   }
   .def-sidebar-link-text small {
     display: block;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     color: var(--def-sidebar-muted);
-    line-height: 1.3;
+    line-height: var(--leading-snug);
     margin-top: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .def-sidebar-score {
     flex-shrink: 0;
-    align-self: center;
-    font-size: 0.72rem;
-    font-weight: 800;
-    padding: 2px 7px;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.72);
+    font-size: 0.62rem;
+    font-weight: var(--font-extrabold);
+    padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.96);
     border: 1px solid var(--def-sidebar-border);
-    min-width: 36px;
-    text-align: center;
-    line-height: 1.35;
-    margin-left: auto;
-  }
-  .def-sidebar-status-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 6px;
-    margin-top: 3px;
-  }
-  .def-sidebar-status-line {
+    min-width: 40px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-size: var(--text-min);
-    font-weight: 700;
-    line-height: 1.15;
-    white-space: nowrap;
-    letter-spacing: 0.01em;
+    justify-content: center;
+    text-align: center;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.05);
+    font-variant-numeric: tabular-nums;
   }
-  .def-sidebar-status-line i {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    font-style: normal;
-  }
-  .def-sidebar-status-line.ok { color: #15803d; }
-  .def-sidebar-status-line.risk { color: #b45309; }
-  .def-sidebar-status-line.late { color: #b91c1c; }
   .def-app.def-theme-dark .def-sidebar-score {
     background: rgba(255,255,255,0.05);
   }
   .def-sidebar-nested {
-    margin: 2px 0 var(--space-1) 10px;
-    padding: var(--space-1) 0 var(--space-1) 11px;
-    border-left: 2px solid rgba(99,102,241,0.18);
+    margin: 0;
+    padding: 6px;
+    border: 1px solid var(--def-sidebar-border);
+    border-radius: 10px;
+    background: rgba(248,250,252,0.55);
     animation: defFadeUp 0.25s ease both;
   }
   .def-sidebar-nested-link {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-2);
+    column-gap: 8px;
     width: 100%;
-    padding: 6px var(--space-2);
+    padding: 5px 7px;
     border: 1px solid transparent;
     border-radius: 7px;
     background: transparent;
@@ -3110,19 +3783,23 @@ const STYLES = `
     cursor: pointer;
     font: inherit;
     text-align: left;
-    min-height: 38px;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    min-height: 34px;
+    transition: background 0.18s ease, border-color 0.18s ease;
+  }
+  .def-sidebar-nested-link .def-sidebar-tier-tl {
+    align-self: center;
+    justify-self: center;
   }
   .def-sidebar-nested-text {
-    flex: 1;
     min-width: 0;
+    align-self: center;
   }
   .def-sidebar-nested-text strong {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--def-sidebar-text);
     line-height: 1.25;
@@ -3148,13 +3825,16 @@ const STYLES = `
     box-shadow: inset 2px 0 0 #818cf8;
   }
   .def-sidebar-nested-link .def-pill {
-    transform: scale(0.78);
+    transform: none;
     flex-shrink: 0;
+    align-self: center;
+    justify-self: end;
     font-size: 0.56rem;
-    padding: 2px 6px;
+    padding: 3px 7px;
     letter-spacing: 0.02em;
+    white-space: nowrap;
   }
-  .def-sidebar-nested-link .def-pill:hover { transform: scale(0.78); }
+  .def-sidebar-nested-link .def-pill:hover { transform: none; }
 
   .def-main {
     flex: 1;
@@ -3212,7 +3892,7 @@ const STYLES = `
       top: var(--def-topbar-h);
       left: 0;
       bottom: 0;
-      width: min(var(--def-sidebar-w), 88vw);
+      width: min(var(--def-sidebar-w), 92vw);
       z-index: 160;
       min-height: 0;
       max-height: none;
@@ -3241,13 +3921,32 @@ const STYLES = `
       transform: none;
     }
     .def-sidebar-nested {
-      margin-left: 8px;
-      padding-left: 10px;
+      margin: 0;
+      padding: 6px;
     }
-    .def-sidebar-link { min-height: 46px; padding: 8px var(--space-2); }
-    .def-sidebar-status-line { font-size: var(--text-min); }
-    .def-sidebar-nested-link { min-height: 40px; }
-    .def-sidebar-toggle { min-height: 44px; min-width: 32px; }
+    .def-sidebar-link {
+      min-height: 44px;
+      padding: 8px 10px;
+      grid-template-columns: 30px minmax(0, 1fr);
+    }
+    .def-sidebar-pillar-head {
+      grid-template-columns: 30px minmax(0, 1fr) auto auto;
+      column-gap: 8px;
+      padding: 8px 10px;
+    }
+    .def-sidebar-metric {
+      padding: 6px 3px;
+    }
+    .def-sidebar-metric-value { font-size: var(--text-xs); }
+    .def-sidebar-metric-label { font-size: 0.5rem; }
+    .def-sidebar-nested-link {
+      min-height: 34px;
+      grid-template-columns: 22px minmax(0, 1fr) auto;
+      column-gap: 6px;
+      padding: 5px 6px;
+    }
+    .def-sidebar-pillar-expand { min-height: 24px; min-width: 24px; }
+    .def-sidebar-score-pillar { min-width: 38px; height: 24px; }
   }
 
   @media (max-width: 1024px) {
@@ -3381,10 +4080,10 @@ const STYLES = `
       min-width: 0 !important;
     }
     .def-section-title {
-      font-size: 1rem;
+      font-size: var(--text-md);
     }
     .def-section-desc {
-      font-size: 0.8rem;
+      font-size: var(--text-sm);
       margin-bottom: 14px;
     }
     .def-stepper {
@@ -3501,14 +4200,16 @@ const STYLES = `
       gap: var(--space-2);
     }
     .def-sidebar-score {
-      font-size: 0.66rem;
-      min-width: 32px;
-      padding: 2px 5px;
+      font-size: 0.62rem;
+      min-width: 38px;
+      height: 26px;
+      padding: 0 7px;
     }
-    .def-sidebar-status-row { gap: 2px 4px; }
-    .def-sidebar-status-line { font-size: var(--text-min); }
+    .def-sidebar-metric-label { font-size: 0.52rem; }
     .def-sidebar-nested-link .def-pill {
-      transform: scale(0.72);
+      transform: none;
+      font-size: 0.52rem;
+      padding: 2px 6px;
     }
     .def-hero-premium.def-layer-header h1,
     .def-layer-header.def-hero-premium h1 {
@@ -3895,10 +4596,10 @@ const STYLES = `
     font-size: 0.68rem; font-weight: 600; color: var(--def-muted); line-height: 1.35;
   }
   .def-initiative-title {
-    margin: 0 0 6px; font-size: clamp(1.1rem, 2.4vw, 1.45rem); font-weight: 800;
-    letter-spacing: -0.02em; color: var(--def-heading); line-height: 1.25;
+    margin: 0 0 6px; font-size: clamp(var(--text-xl), 2.4vw, var(--text-2xl)); font-weight: var(--font-extrabold);
+    letter-spacing: var(--tracking-tight); color: var(--def-heading); line-height: var(--leading-tight);
   }
-  .def-initiative-sub { margin: 0; font-size: 0.78rem; color: var(--def-muted); line-height: 1.45; }
+  .def-initiative-sub { margin: 0; font-size: var(--text-sm); color: var(--def-muted); line-height: var(--leading-relaxed); }
   .def-initiative-sub strong { color: var(--def-text); font-weight: 700; }
   .def-initiative-header-aside {
     display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;
@@ -4223,9 +4924,9 @@ const STYLES = `
   .def-section { margin-bottom: 28px; width: 100%; min-width: 0; }
   .def-section-title {
     margin: 0 0 6px;
-    font-size: 1.08rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    font-size: var(--text-lg);
+    font-weight: var(--font-bold);
+    letter-spacing: var(--tracking-tight);
     color: var(--def-heading);
     position: relative;
     display: inline-block;
@@ -4239,7 +4940,7 @@ const STYLES = `
     border-radius: 999px;
     background: var(--def-gradient);
   }
-  .def-section-desc { margin: 0 0 18px; font-size: 0.86rem; color: var(--def-muted); }
+  .def-section-desc { margin: 0 0 18px; font-size: var(--text-sm); color: var(--def-muted); line-height: var(--leading-relaxed); }
 
   .def-chart-section { width: 100%; }
   .def-health-chart { width: 100%; min-width: 0; margin-bottom: 28px; }
@@ -5005,19 +5706,19 @@ const STYLES = `
     box-shadow: var(--def-shadow-lg);
     border-color: rgba(167,139,250,0.3);
   }
-  .def-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .def-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
   .def-table th {
     text-align: left;
     padding: 14px 16px;
     background: var(--def-table-head-bg);
     color: var(--def-muted);
-    font-weight: 700;
-    font-size: 0.72rem;
+    font-weight: var(--font-bold);
+    font-size: var(--text-xs);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-label);
     border-bottom: 1px solid var(--def-border-soft);
   }
-  .def-table td { padding: 14px 16px; border-bottom: 1px solid rgba(148,163,184,0.12); vertical-align: middle; transition: background 0.2s; }
+  .def-table td { padding: 14px 16px; border-bottom: 1px solid rgba(148,163,184,0.12); vertical-align: middle; transition: background 0.2s; font-size: var(--text-sm); }
   .def-table-row { transition: background 0.22s, transform 0.22s; }
   .def-table-row:hover td { background: var(--def-table-row-hover); }
   .def-table-row:hover { transform: scale(1.002); }
@@ -5035,8 +5736,9 @@ const STYLES = `
     border: none;
     border-radius: 999px;
     padding: 8px 16px;
-    font-size: 0.76rem;
-    font-weight: 700;
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
     box-shadow: 0 8px 24px rgba(99,102,241,0.35);
@@ -5208,6 +5910,142 @@ const STYLES = `
   }
   .def-drawer-pro {
     background: linear-gradient(180deg, var(--def-surface) 0%, color-mix(in srgb, var(--def-surface) 92%, #eef2ff) 100%);
+  }
+  .def-drawer-pillar {
+    width: min(680px, 100%);
+    background: var(--def-surface);
+  }
+  .def-drawer-pillar.def-drawer-pro {
+    background: var(--def-surface);
+  }
+  .def-drawer-head-pillar {
+    flex-shrink: 0;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--def-border);
+    background: var(--def-surface);
+  }
+  .def-drawer-head-pillar .def-drawer-head-row {
+    margin-bottom: 8px;
+  }
+  .def-drawer-head-pillar h2 {
+    margin: 0 0 4px;
+    font-size: 1.12rem;
+    font-weight: var(--font-extrabold);
+    letter-spacing: var(--tracking-tight);
+    color: var(--def-heading);
+    line-height: 1.25;
+  }
+  .def-drawer-pillar-desc {
+    margin: 0 0 10px;
+    font-size: var(--text-xs);
+    color: var(--def-muted);
+    line-height: 1.4;
+  }
+  .def-drawer-pillar-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+  .def-drawer-pillar-score {
+    font-size: var(--text-2xs);
+    font-weight: var(--font-extrabold);
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.05);
+    border: 1px solid var(--def-border-soft);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .def-drawer-pillar-meta {
+    margin: 0;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-semibold);
+    color: var(--def-muted);
+    line-height: 1.3;
+  }
+  .def-drawer-body-pillar {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+  .def-drawer-section-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--def-border);
+    background: rgba(248,250,252,0.65);
+  }
+  .def-drawer-section-bar h3 {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: var(--font-extrabold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--def-heading);
+  }
+  .def-drawer-section-bar span {
+    font-size: var(--text-2xs);
+    font-weight: var(--font-semibold);
+    color: var(--def-muted);
+    white-space: nowrap;
+  }
+  .def-drawer-pillar-table {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .def-drawer-pillar-table .def-table-wrap.def-table-pro {
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .def-drawer-pillar-table .def-table-scroll-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+  .def-drawer-pillar-table .def-table-scroll-wrap::after {
+    display: none;
+  }
+  .def-drawer-pillar-table .def-table {
+    border: none;
+    border-radius: 0;
+  }
+  .def-drawer-pillar-table .def-initiative-kpi-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--def-table-head-bg);
+    box-shadow: 0 1px 0 var(--def-border);
+  }
+  .def-drawer-pillar-table .def-initiative-kpi-table th,
+  .def-drawer-pillar-table .def-initiative-kpi-table td {
+    padding: 10px 14px;
+    vertical-align: middle;
+  }
+  .def-drawer-pillar-table .def-initiative-kpi-table td:first-child,
+  .def-drawer-pillar-table .def-initiative-kpi-table th:first-child {
+    padding-left: 16px;
+  }
+  .def-drawer-pillar-table .def-initiative-kpi-table td:last-child,
+  .def-drawer-pillar-table .def-initiative-kpi-table th:last-child {
+    padding-right: 16px;
+  }
+  .def-app.def-theme-dark .def-drawer-head-pillar {
+    background: var(--def-surface);
+  }
+  .def-app.def-theme-dark .def-drawer-section-bar {
+    background: rgba(255,255,255,0.03);
+  }
+  .def-app.def-theme-dark .def-drawer-pillar-score {
+    background: rgba(255,255,255,0.06);
   }
   @keyframes defDrawerFadeIn {
     from { opacity: 0; }
@@ -5804,65 +6642,259 @@ const STYLES = `
     }
     .def-cockpit-fast-health:hover::after { opacity: 1; }
     .def-cockpit-move-stat:hover { transform: translateY(-2px); background: #fff; }
-    .def-cockpit-risk-list li:hover { background: rgba(99,102,241,0.04); padding-left: 4px; }
-    .def-cockpit-risk-list li:hover .def-cockpit-risk-score { transform: scale(1.1); }
+    .def-cockpit-risk-item:hover { background: rgba(99,102,241,0.04); }
     .def-cockpit-table tbody tr:hover { background: rgba(99,102,241,0.06); }
     .def-cockpit-top:hover { box-shadow: var(--cockpit-shadow-sm); }
     .def-cockpit-user-chip:hover { border-color: rgba(99,102,241,0.3); }
     .def-cockpit-filter select:hover { border-color: rgba(99,102,241,0.35); }
   }
   .def-cockpit-top {
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px;
-    padding: 7px 9px; margin: 0;
-    background: linear-gradient(180deg, #fff 0%, #fafbff 100%);
-    border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
-    box-shadow: var(--cockpit-shadow-sm);
-    transition: box-shadow 0.28s var(--cockpit-ease);
+    position: relative;
+    overflow: hidden;
+    margin: 0;
+    padding: 14px 16px 14px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(99,102,241,0.12);
+    background: linear-gradient(135deg, #ffffff 0%, #f8faff 52%, #f5f3ff 100%);
+    box-shadow: 0 4px 22px rgba(99,102,241,0.07);
+    transition: box-shadow 0.28s var(--cockpit-ease), border-color 0.28s ease;
   }
-  .def-cockpit-top-copy { flex: 1 1 180px; min-width: 0; }
+  .def-cockpit-top::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(180deg, #6366f1 0%, #a855f7 100%);
+  }
+  .def-cockpit-top-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    min-width: 0;
+  }
+  .def-cockpit-top-copy {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
   .def-cockpit-eyebrow {
-    margin: 0 0 2px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.08em; color: #6366f1;
+    margin: 0 0 4px;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-bold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-label);
+    color: #6366f1;
   }
   .def-cockpit-title {
-    margin: 0; font-size: clamp(1.15rem, 2.2vw, 1.35rem); font-weight: 800; color: var(--def-heading);
-    letter-spacing: -0.02em; line-height: 1.15;
+    margin: 0;
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    font-weight: var(--font-extrabold);
+    color: var(--def-heading);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+    word-break: break-word;
   }
-  .def-cockpit-top-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .def-cockpit-top-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 1 1 280px;
+    min-width: 0;
+  }
+  .def-cockpit-top-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.88);
+    border: 1px solid rgba(226,232,240,0.95);
+    box-shadow: 0 1px 4px rgba(15,23,42,0.04);
+  }
   .def-cockpit-filter {
-    display: flex; flex-direction: column; gap: 2px; font-size: 0.6rem; font-weight: 700;
-    color: var(--def-muted); text-transform: uppercase;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--def-border);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-bold);
+    color: var(--def-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+  .def-cockpit-filter:focus-within {
+    border-color: rgba(99,102,241,0.35);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
   }
   .def-cockpit-filter select {
-    min-width: 0; width: clamp(120px, 14vw, 148px); padding: 6px 10px; border-radius: 8px;
-    border: 1px solid var(--def-border); background: #fff;
-    font-size: 0.76rem; font-weight: 600; cursor: pointer;
-    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+    min-width: 0;
+    width: auto;
+    max-width: min(160px, 28vw);
+    padding: 0 18px 0 0;
+    border: none;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right center;
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--def-heading);
+    cursor: pointer;
+    appearance: none;
   }
-  .def-cockpit-filter select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+  .def-cockpit-filter select:focus { outline: none; }
   .def-cockpit-live {
-    padding: 5px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; color: #15803d;
-    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.18);
-    animation: cockpitPulse 2.4s ease-in-out infinite;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    color: #15803d;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.22);
+    white-space: nowrap;
+  }
+  .def-cockpit-live .def-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
   }
   .def-cockpit-user-chip {
-    display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px;
-    border-radius: 999px; border: 1px solid var(--def-border); background: #fff;
-    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 3px 12px 3px 3px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    transition: background 0.22s ease;
   }
-  .def-cockpit-user-chip strong { font-size: 0.74rem; color: var(--def-heading); }
-  .def-cockpit-user-chip small { font-size: 0.64rem; color: var(--def-muted); }
+  .def-cockpit-user-chip:hover {
+    background: rgba(99,102,241,0.06);
+  }
+  .def-cockpit-user-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    line-height: 1.2;
+  }
+  .def-cockpit-user-chip strong {
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    color: var(--def-heading);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .def-cockpit-user-chip small {
+    font-size: 0.62rem;
+    color: var(--def-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .def-cockpit-metrics-row {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--cockpit-gap);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 10px;
   }
   .def-cockpit-metric-card {
-    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto;
-    align-items: center; gap: 2px var(--space-2);
-    padding: var(--cockpit-pad) var(--space-3); min-height: 62px;
-    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
-    box-shadow: var(--cockpit-shadow-sm);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 13px 10px;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(226,232,240,0.92);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 2px rgba(15,23,42,0.04),
+      0 8px 24px rgba(15,23,42,0.05);
+    transition:
+      transform 0.28s var(--cockpit-ease),
+      box-shadow 0.28s var(--cockpit-ease),
+      border-color 0.28s ease;
+  }
+  .def-cockpit-metric-card:hover {
+    transform: translateY(-2px);
+  }
+  .def-cockpit-metric-card.metric-status {
+    min-height: 118px;
+  }
+  .def-cockpit-metric-card.metric-count {
+    min-height: 96px;
+  }
+  .def-cockpit-metric-card.metric-health {
+    min-height: 108px;
+  }
+  .def-cockpit-metric-card.metric-count:hover {
+    border-color: rgba(99,102,241,0.28);
+    box-shadow:
+      0 2px 4px rgba(99,102,241,0.06),
+      0 14px 32px rgba(99,102,241,0.1);
+  }
+  .def-cockpit-metric-card.metric-count::after {
+    content: '';
+    position: absolute;
+    inset: auto -18px -18px auto;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 72%);
+    pointer-events: none;
+  }
+  .def-cockpit-metric-stripe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--metric-band-color, rgba(99,102,241,0.55));
+    border-radius: 14px 14px 0 0;
+    opacity: 0.9;
+  }
+  .def-cockpit-metric-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .def-cockpit-metric-card.metric-count .def-cockpit-metric-head {
+    justify-content: space-between;
+  }
+  .def-cockpit-metric-body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .def-cockpit-metric-value-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
   }
   .def-cockpit-metric-card.def-accent-emerald { border-color: rgba(5,150,105,0.2); }
   .def-cockpit-metric-card.def-accent-emerald:hover { border-color: rgba(5,150,105,0.38); box-shadow: 0 10px 28px rgba(5,150,105,0.12); }
@@ -5873,28 +6905,199 @@ const STYLES = `
   .def-cockpit-metric-card.def-accent-indigo { border-color: rgba(99,102,241,0.2); }
   .def-cockpit-metric-card.def-accent-indigo:hover { border-color: rgba(99,102,241,0.38); box-shadow: var(--cockpit-shadow-lg); }
   .def-cockpit-metric-icon {
-    grid-row: 1 / span 2; width: 28px; height: 28px; display: grid; place-items: center;
-    border-radius: 7px; background: rgba(99,102,241,0.08); font-size: 0.82rem;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.14);
+    font-size: 0.82rem;
+    line-height: 1;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
     transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
   }
-  .def-cockpit-metric-copy { min-width: 0; grid-column: 2; grid-row: 1 / -1; }
+  .def-cockpit-metric-card.metric-count .def-cockpit-metric-icon.metric-icon-tr {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, rgba(99,102,241,0.14) 0%, rgba(129,140,248,0.08) 100%);
+    border-color: rgba(99,102,241,0.18);
+  }
+  .def-cockpit-metric-card:hover .def-cockpit-metric-icon {
+    transform: scale(1.04);
+  }
+  .def-cockpit-metric-pill {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: var(--font-extrabold);
+    line-height: 1.2;
+    color: var(--metric-band-color);
+    background: var(--metric-icon-bg);
+    border: 1px solid var(--metric-icon-border);
+    font-variant-numeric: tabular-nums;
+  }
+  .def-cockpit-metric-health-track {
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(148,163,184,0.22);
+    overflow: hidden;
+  }
+  .def-cockpit-metric-health-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--metric-band-color) 0%, rgba(255,255,255,0.35) 140%);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--metric-band-color) 40%, transparent);
+    transition: width 0.8s var(--cockpit-ease);
+  }
+  .def-cockpit-metric-card.metric-health {
+    background: var(--metric-band-bg);
+    border-color: var(--metric-band-border);
+  }
+  .def-cockpit-metric-card.metric-health .def-cockpit-metric-label {
+    color: var(--metric-band-label);
+  }
+  .def-cockpit-metric-card.metric-health .def-cockpit-metric-value {
+    color: var(--metric-band-color);
+  }
+  .def-cockpit-metric-card.metric-health .def-cockpit-metric-icon {
+    background: var(--metric-icon-bg);
+    border-color: var(--metric-icon-border);
+    color: var(--metric-band-color);
+  }
+  .def-cockpit-metric-value.tone-emerald { color: #059669; }
+  .def-cockpit-metric-value.tone-amber { color: #d97706; }
+  .def-cockpit-metric-value.tone-rose { color: #dc2626; }
+  .def-cockpit-metric-value.tone-blue { color: #2563eb; }
+  .def-cockpit-metric-card.status-on-track,
+  .def-cockpit-metric-card.status-at-risk,
+  .def-cockpit-metric-card.status-off-track {
+    background: var(--metric-band-bg);
+    border-color: var(--metric-band-border);
+    padding-top: 14px;
+  }
+  .def-cockpit-metric-card.status-on-track .def-cockpit-metric-label,
+  .def-cockpit-metric-card.status-at-risk .def-cockpit-metric-label,
+  .def-cockpit-metric-card.status-off-track .def-cockpit-metric-label {
+    color: var(--metric-band-label);
+    font-weight: var(--font-extrabold);
+  }
+  .def-cockpit-metric-card.status-on-track .def-cockpit-metric-value,
+  .def-cockpit-metric-card.status-at-risk .def-cockpit-metric-value,
+  .def-cockpit-metric-card.status-off-track .def-cockpit-metric-value {
+    color: var(--metric-band-color);
+    font-size: clamp(1.05rem, 1.35vw, 1.2rem);
+  }
+  .def-cockpit-metric-card.status-on-track .def-cockpit-metric-icon,
+  .def-cockpit-metric-card.status-at-risk .def-cockpit-metric-icon,
+  .def-cockpit-metric-card.status-off-track .def-cockpit-metric-icon {
+    background: var(--metric-icon-bg);
+    border: 1px solid var(--metric-icon-border);
+    color: var(--metric-band-color);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+  .def-cockpit-metric-card.status-on-track:hover {
+    border-color: rgba(5,150,105,0.38);
+    box-shadow: 0 12px 28px rgba(5,150,105,0.12);
+  }
+  .def-cockpit-metric-card.status-at-risk:hover {
+    border-color: rgba(217,119,6,0.38);
+    box-shadow: 0 12px 28px rgba(217,119,6,0.12);
+  }
+  .def-cockpit-metric-card.status-off-track:hover {
+    border-color: rgba(220,38,38,0.38);
+    box-shadow: 0 12px 28px rgba(239,68,68,0.12);
+  }
+  .def-app.def-theme-dark .def-cockpit-metric-card.status-on-track,
+  .def-app.def-theme-dark .def-cockpit-metric-card.metric-health.status-on-track {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(34,197,94,0.08) 100%);
+  }
+  .def-app.def-theme-dark .def-cockpit-metric-card.status-at-risk,
+  .def-app.def-theme-dark .def-cockpit-metric-card.metric-health.status-at-risk {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(245,158,11,0.08) 100%);
+  }
+  .def-app.def-theme-dark .def-cockpit-metric-card.status-off-track,
+  .def-app.def-theme-dark .def-cockpit-metric-card.metric-health.status-off-track {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(239,68,68,0.08) 100%);
+  }
+  .def-cockpit-metric-denom {
+    font-size: 0.58em;
+    font-weight: var(--font-bold);
+    color: var(--def-muted);
+    margin-left: 1px;
+    opacity: 0.85;
+  }
+  .def-cockpit-metric-sub.trend-up {
+    color: #059669;
+    font-weight: var(--font-semibold);
+  }
+  .def-cockpit-metric-sub.trend-down {
+    color: #dc2626;
+    font-weight: var(--font-semibold);
+  }
+  .def-cockpit-metric-card.metric-health .def-cockpit-metric-sub.trend-up,
+  .def-cockpit-metric-card.metric-health .def-cockpit-metric-sub.trend-down {
+    color: var(--metric-band-sub);
+  }
   .def-cockpit-metric-label {
-    display: block; font-size: 0.62rem; font-weight: 700; color: var(--def-muted);
-    text-transform: uppercase; letter-spacing: 0.04em;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.58rem;
+    font-weight: var(--font-extrabold);
+    color: var(--def-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .def-cockpit-metric-card.metric-count .def-cockpit-metric-label {
+    color: #64748b;
   }
   .def-cockpit-metric-value {
-    display: block; font-size: clamp(1rem, 1.8vw, 1.15rem); font-weight: 800;
-    color: var(--def-heading); line-height: 1.05; margin-top: 1px;
+    display: block;
+    font-size: clamp(1.05rem, 1.35vw, 1.22rem);
+    font-weight: var(--font-extrabold);
+    color: var(--def-heading);
+    line-height: var(--leading-tight);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .def-cockpit-metric-card.metric-count .def-cockpit-metric-value {
+    font-size: clamp(1.15rem, 1.5vw, 1.35rem);
   }
   .def-cockpit-metric-sub {
-    display: block; font-size: 0.62rem; color: var(--def-subtle);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: block;
+    font-size: 0.62rem;
+    color: var(--def-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .def-cockpit-metric-card.metric-count .def-cockpit-metric-sub {
+    color: #94a3b8;
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.02em;
   }
   .def-cockpit-metric-spark {
-    width: clamp(52px, 8vw, 64px); height: 34px; grid-column: 3; grid-row: 1 / -1; align-self: center;
-    flex-shrink: 0;
-    opacity: 0.88; transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
+    width: 100%;
+    height: 32px;
+    margin-top: auto;
+    opacity: 0.95;
+    transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
+  }
+  .def-cockpit-metric-card:hover .def-cockpit-metric-spark {
+    opacity: 1;
+    transform: translateY(-1px);
   }
   .def-cockpit-section {
     background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
@@ -5906,7 +7109,8 @@ const STYLES = `
     border-color: rgba(99,102,241,0.18);
   }
   .def-cockpit-section-title {
-    margin: 0 0 5px; font-size: 0.78rem; font-weight: 800; color: var(--def-heading);
+    margin: 0 0 5px; font-size: var(--text-md); font-weight: var(--font-extrabold); color: var(--def-heading);
+    letter-spacing: var(--tracking-tight); line-height: var(--leading-snug);
   }
   .def-cockpit-section-head-row {
     display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 5px;
@@ -5954,20 +7158,21 @@ const STYLES = `
   .def-tracker-count { font-size: 0.64rem; font-weight: 700; color: var(--def-muted); white-space: nowrap; }
   .def-tracker-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .def-tracker-table {
-    width: 100%; min-width: 880px; border-collapse: collapse; font-size: 0.68rem;
+    width: 100%; min-width: 880px; border-collapse: collapse; font-size: var(--text-xs);
   }
-  .def-tracker-table .def-scorecard-status { font-size: 0.62rem; gap: 5px; }
-  .def-tracker-table .def-scorecard-dot { width: 8px; height: 8px; }
   .def-tracker-table thead th {
     background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
-    color: #fff; font-weight: 700; text-align: left; padding: 8px 10px;
+    color: #fff; font-weight: var(--font-bold); text-align: left; padding: 8px 10px;
     border: 1px solid rgba(255,255,255,0.08); white-space: nowrap;
-    font-size: 0.64rem; letter-spacing: 0.01em;
+    font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
   }
   .def-tracker-table tbody td {
     padding: 6px 10px; border: 1px solid rgba(226,232,240,0.95);
-    vertical-align: middle; line-height: 1.35; background: #fff;
+    vertical-align: middle; line-height: var(--leading-snug); background: #fff;
+    font-size: var(--text-xs);
   }
+  .def-tracker-table .def-scorecard-status { font-size: var(--text-2xs); gap: 5px; }
+  .def-tracker-table .def-scorecard-dot { width: 8px; height: 8px; }
   .def-tracker-table tbody tr:nth-child(even) td { background: #f8fafc; }
   .def-tracker-row-click { cursor: pointer; transition: background 0.18s ease; }
   .def-tracker-row-click:hover td { background: rgba(99,102,241,0.06) !important; }
@@ -6103,8 +7308,8 @@ const STYLES = `
     padding: var(--cockpit-pad) var(--space-3); min-width: 0; min-height: 0; box-shadow: var(--cockpit-shadow-sm);
   }
   .def-cockpit-card-title, .def-cockpit-chart-head .def-cockpit-card-title {
-    margin: 0; font-size: 0.74rem; font-weight: 800; color: var(--def-heading);
-    line-height: 1.25;
+    margin: 0; font-size: var(--text-sm); font-weight: var(--font-extrabold); color: var(--def-heading);
+    line-height: var(--leading-snug); letter-spacing: var(--tracking-tight);
   }
   .def-cockpit-chart-head {
     display: flex;
@@ -6134,10 +7339,10 @@ const STYLES = `
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.64rem;
-    font-weight: 600;
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
     color: var(--def-muted);
-    line-height: 1.2;
+    line-height: var(--leading-snug);
     white-space: nowrap;
   }
   .def-chart-legend-item i {
@@ -6194,22 +7399,76 @@ const STYLES = `
   .def-cockpit-bullets.tight { font-size: 0.66rem; color: var(--def-muted); }
   .def-cockpit-bullets li { margin-bottom: 4px; }
   .def-cockpit-risk-list { list-style: none; margin: 0; padding: 0; }
-  .def-cockpit-risk-list li {
-    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-    padding: 5px 2px; border-bottom: 1px solid rgba(226,232,240,0.9);
-    border-radius: 6px; transition: background 0.22s ease, padding-left 0.22s ease;
+  .def-cockpit-risk-item {
+    padding: 8px 2px 10px;
+    border-bottom: 1px solid rgba(226,232,240,0.9);
+    border-radius: 6px;
+    transition: background 0.22s ease;
   }
-  .def-cockpit-risk-list li:last-child { border-bottom: none; padding-bottom: 0; }
-  .def-cockpit-risk-copy { flex: 1; min-width: 0; }
-  .def-cockpit-risk-list strong { display: block; font-size: 0.68rem; color: var(--def-heading); line-height: 1.25; }
-  .def-cockpit-risk-list span { display: block; font-size: 0.58rem; font-weight: 700; color: #ea580c; margin-top: 1px; }
-  .def-cockpit-risk-score {
-    flex-shrink: 0; width: 28px; height: 28px; display: grid; place-items: center;
-    border-radius: 50%; font-size: 0.66rem; font-weight: 800; color: #b45309;
-    background: rgba(251,191,36,0.15); border: 2px solid rgba(251,191,36,0.35);
-    transition: transform 0.28s var(--cockpit-ease);
+  .def-cockpit-risk-item:last-child { border-bottom: none; padding-bottom: 2px; }
+  .def-cockpit-risk-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+    min-width: 0;
   }
-  .def-cockpit-risk-score.high { color: #b91c1c; background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.35); }
+  .def-cockpit-risk-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--def-heading);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .def-cockpit-risk-pct {
+    flex-shrink: 0;
+    align-self: flex-start;
+    font-size: 0.62rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 6px;
+    line-height: 1.3;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(226,232,240,0.95);
+    white-space: nowrap;
+  }
+  .def-cockpit-risk-pct-on-track { border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); }
+  .def-cockpit-risk-pct-at-risk { border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.08); }
+  .def-cockpit-risk-pct-off-track { border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.08); }
+  .def-cockpit-risk-level {
+    display: block;
+    font-size: 0.56rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 5px;
+  }
+  .def-cockpit-risk-level-on-track { color: #15803d; }
+  .def-cockpit-risk-level-at-risk { color: #b45309; }
+  .def-cockpit-risk-level-off-track { color: #b91c1c; }
+  .def-cockpit-risk-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(226,232,240,0.95);
+    overflow: hidden;
+  }
+  .def-cockpit-risk-fill {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 2px;
+    transition: width 0.35s ease;
+  }
+  .def-cockpit-risk-empty {
+    padding: 8px 2px;
+    font-size: 0.64rem;
+    color: var(--def-muted);
+    font-style: italic;
+  }
   .def-cockpit-dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
   .def-cockpit-dl div { display: flex; justify-content: space-between; gap: 6px; font-size: 0.68rem; padding: 4px 0; }
   .def-cockpit-dl dt { color: var(--def-muted); font-weight: 600; }
@@ -6230,15 +7489,54 @@ const STYLES = `
     }
     .def-cockpit-rail-card { flex: 1 1 min(100%, 220px); }
   }
+  @media (max-width: 1280px) {
+    .def-cockpit-metrics-row {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      padding-bottom: 2px;
+    }
+    .def-cockpit-metric-card {
+      flex: 0 0 158px;
+      scroll-snap-align: start;
+    }
+  }
   @media (max-width: 1024px) {
-    .def-cockpit-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-cockpit-fast-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 768px) {
-    .def-cockpit-top { flex-direction: column; align-items: stretch; }
-    .def-cockpit-top-controls { width: 100%; justify-content: flex-start; }
-    .def-cockpit-filter { flex: 1 1 140px; }
-    .def-cockpit-filter select { width: 100%; max-width: none; }
+    .def-cockpit-top { padding: 12px 14px 12px 16px; }
+    .def-cockpit-top-main { flex-direction: column; align-items: stretch; gap: 12px; }
+    .def-cockpit-top-toolbar {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .def-cockpit-filter {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .def-cockpit-filter select {
+      flex: 1;
+      max-width: none;
+      text-align: right;
+    }
+    .def-cockpit-top-meta {
+      width: 100%;
+      justify-content: space-between;
+      border-radius: 12px;
+      padding: 6px 8px;
+    }
+    .def-cockpit-user-chip {
+      flex: 1;
+      min-width: 0;
+      justify-content: flex-end;
+    }
     .def-cockpit-workspace {
       grid-template-columns: 1fr;
       grid-template-rows: auto;
@@ -6268,11 +7566,21 @@ const STYLES = `
   }
   @media (max-width: 640px) {
     .def-cockpit { --cockpit-pad: var(--space-3); }
-    .def-cockpit-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-cockpit-top-meta {
+      flex-direction: column;
+      align-items: stretch;
+      border-radius: 12px;
+      gap: 6px;
+    }
+    .def-cockpit-live { justify-content: center; }
+    .def-cockpit-user-chip {
+      justify-content: center;
+      padding: 6px 10px;
+    }
+    .def-cockpit-user-copy { align-items: center; text-align: center; }
+    .def-cockpit-metric-card { flex: 0 0 124px; }
     .def-cockpit-fast-grid { grid-template-columns: 1fr; }
     .def-cockpit-movement-stats { grid-template-columns: 1fr; }
-    .def-cockpit-top-controls { flex-direction: column; align-items: stretch; }
-    .def-cockpit-user-chip { justify-content: center; }
     .def-cockpit-metric-label { font-size: var(--text-min); }
     .def-cockpit-table { font-size: var(--text-xs); }
     .def-cockpit-card-title { font-size: var(--text-xs); }
@@ -6281,9 +7589,8 @@ const STYLES = `
   }
   @media (max-width: 480px) {
     .def-cockpit-metrics-row,
-    .def-cockpit-fast-grid { grid-template-columns: 1fr; }
-    .def-cockpit-metric-spark { display: none; }
-    .def-cockpit-metric-card { grid-template-columns: auto 1fr; min-height: 56px; }
+    .def-cockpit-fast-grid { grid-template-columns: unset; }
+    .def-cockpit-metric-card { flex: 0 0 118px; min-height: 0; }
     .def-cockpit-user-chip small { display: none; }
     .def-cockpit-table-recovery,
     .def-cockpit-table-teams { min-width: min(100%, 480px); }
@@ -6344,11 +7651,27 @@ const STYLES = `
   .def-cockpit-theme-dark .def-cockpit-chart-card,
   .def-cockpit-theme-dark .def-cockpit-table-card,
   .def-cockpit-theme-dark .def-cockpit-rail-card {
-    background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
+    background: rgba(30,41,59,0.88);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-cockpit-theme-dark .def-cockpit-top {
+    background: linear-gradient(135deg, rgba(30,41,59,0.96) 0%, rgba(15,23,42,0.92) 100%);
+    border-color: rgba(129,140,248,0.18);
+  }
+  .def-cockpit-theme-dark .def-cockpit-top-meta {
+    background: rgba(15,23,42,0.55);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-cockpit-theme-dark .def-cockpit-filter {
+    background: rgba(15,23,42,0.6);
+    border-color: rgba(255,255,255,0.1);
+  }
+  .def-cockpit-theme-dark .def-cockpit-filter select {
+    color: var(--def-text);
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2394949e' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right center;
   }
   .def-cockpit-theme-dark .def-cockpit-fast-health { background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.9)); }
-  .def-cockpit-theme-dark .def-cockpit-filter select,
-  .def-cockpit-theme-dark .def-cockpit-user-chip { background: rgba(15,23,42,0.6); }
+  .def-cockpit-theme-dark .def-cockpit-user-chip { background: transparent; }
   .def-cockpit-theme-dark .def-cockpit-table th { background: rgba(15,23,42,0.5); }
   .def-cockpit-theme-dark .def-cockpit-move-stat { background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08); }
   .def-cockpit-theme-dark .def-cockpit-rail-card.subtle { background: rgba(15,23,42,0.45); }
@@ -6420,7 +7743,7 @@ const STYLES = `
     .def-initiative-quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-initiative-title { font-size: 1.05rem; }
     .def-scorecard-targets-row { gap: var(--space-2); }
-    .def-cockpit-metrics-row { grid-template-columns: 1fr; }
+    .def-cockpit-metrics-row { grid-template-columns: unset; }
     .def-bc-current { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
 
@@ -6442,6 +7765,7 @@ const DEF = () => {
   const [fastId, setFastId] = useState(null);
   const [initiativeId, setInitiativeId] = useState(null);
   const [drawerProjectId, setDrawerProjectId] = useState(null);
+  const [fastPillarDrawerId, setFastPillarDrawerId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const contentRef = useRef(null);
   const [theme, setTheme] = useState(() => {
@@ -6461,6 +7785,10 @@ const DEF = () => {
   }, [theme]);
 
   const fastCategory = useMemo(() => findFastCategory(fastId), [fastId]);
+  const fastPillarDrawer = useMemo(
+    () => findFastCategory(fastPillarDrawerId),
+    [fastPillarDrawerId],
+  );
   const initiative = useMemo(() => findInitiative(fastCategory, initiativeId), [fastCategory, initiativeId]);
   const drawerProject = useMemo(
     () => findProject(initiative, drawerProjectId),
@@ -6517,6 +7845,7 @@ const DEF = () => {
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
     setSidebarOpen(false);
+    setFastPillarDrawerId(null);
   }, [layer]);
 
   useEffect(() => {
@@ -6524,7 +7853,9 @@ const DEF = () => {
   }, [layer]);
 
   useEffect(() => {
-    const lockScroll = (sidebarOpen && window.innerWidth <= 960) || Boolean(drawerProjectId);
+    const lockScroll = (sidebarOpen && window.innerWidth <= 960)
+      || Boolean(drawerProjectId)
+      || Boolean(fastPillarDrawerId);
     const content = contentRef.current;
     if (content) {
       content.style.overflow = lockScroll ? 'hidden' : '';
@@ -6532,7 +7863,7 @@ const DEF = () => {
     return () => {
       if (content) content.style.overflow = '';
     };
-  }, [sidebarOpen, drawerProjectId]);
+  }, [sidebarOpen, drawerProjectId, fastPillarDrawerId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -6592,7 +7923,11 @@ const DEF = () => {
           <div className="def-content-wrap" ref={contentRef}>
             <main className="def-main" key={layer}>
           {layer === 'ceo' && (
-            <CeoView theme={theme} onSelectFast={goFast} onOpenInitiative={goInitiative} />
+            <CeoView
+              theme={theme}
+              onOpenFastPillar={setFastPillarDrawerId}
+              onOpenInitiative={goInitiative}
+            />
           )}
 
           {layer === 'fast' && fastCategory && (
@@ -6638,6 +7973,15 @@ const DEF = () => {
                 theme={theme}
                 open={Boolean(drawerProjectId)}
                 onClose={() => setDrawerProjectId(null)}
+              />
+            )}
+
+            {layer === 'ceo' && (
+              <FastPillarDrawer
+                fastCategory={fastPillarDrawer}
+                open={Boolean(fastPillarDrawerId && fastPillarDrawer)}
+                onClose={() => setFastPillarDrawerId(null)}
+                onSelectInitiative={goInitiative}
               />
             )}
           </div>
