@@ -3701,7 +3701,10 @@ const STYLES = `
     background: radial-gradient(circle, var(--def-mesh-3), transparent 70%);
     animation-delay: -12s;
   }
-  .def-topbar, .def-layout { position: relative; z-index: 1; }
+  .def-layout {
+    position: relative;
+    /* No z-index — mobile drawer must stack above backdrop (z-index 150). */
+  }
 
   .def-topbar {
     position: relative;
@@ -4413,6 +4416,7 @@ const STYLES = `
     }
     .def-layout {
       grid-template-columns: 1fr;
+      overflow: visible;
     }
     .def-menu-toggle {
       display: inline-flex;
@@ -4435,7 +4439,7 @@ const STYLES = `
       left: 0;
       bottom: 0;
       width: min(var(--def-sidebar-w), 92vw);
-      z-index: 160;
+      z-index: 170;
       min-height: 0;
       max-height: none;
       align-self: auto;
@@ -4446,6 +4450,7 @@ const STYLES = `
       overflow-y: auto;
       overflow-x: hidden;
       overscroll-behavior: contain;
+      box-shadow: 12px 0 40px rgba(15,23,42,0.18);
     }
     .def-sidebar.def-sidebar-open {
       transform: translateX(0);
