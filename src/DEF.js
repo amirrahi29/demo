@@ -8,7 +8,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
   Pie,
@@ -74,20 +73,22 @@ function useResponsiveChart() {
     isSmall,
     tick: isMobile ? 9 : isTablet ? 10 : 11,
     tickSmall: isMobile ? 8 : isTablet ? 9 : 10,
-    yAxisWidth: isMobile ? 44 : isTablet ? 56 : 72,
+    yAxisWidth: isMobile ? 48 : isTablet ? 60 : 76,
+    barYAxisWidth: isMobile ? 56 : isTablet ? 72 : 88,
     barSize: isMobile ? 7 : isTablet ? 9 : 12,
     pieRadius: isMobile ? 52 : isTablet ? 72 : 90,
     chartMargin: isMobile
-      ? { top: 8, right: 6, left: -12, bottom: 0 }
+      ? { top: 6, right: 8, left: 2, bottom: 0 }
       : isTablet
-        ? { top: 10, right: 12, left: -4, bottom: 4 }
-        : { top: 12, right: 16, left: 4, bottom: 5 },
+        ? { top: 8, right: 12, left: 4, bottom: 2 }
+        : { top: 10, right: 16, left: 6, bottom: 4 },
     axisMargin: isMobile
-      ? { top: 8, right: 8, left: 0, bottom: 0 }
-      : { top: 10, right: 16, left: 0, bottom: 5 },
+      ? { top: 6, right: 10, left: 4, bottom: 2 }
+      : { top: 8, right: 16, left: 6, bottom: 4 },
+    xAxisHeight: isMobile ? 46 : isTablet ? 36 : 30,
     legendProps: isMobile
-      ? { verticalAlign: 'bottom', align: 'center', wrapperStyle: { fontSize: 10, paddingTop: 8 } }
-      : { wrapperStyle: { fontSize: 11 } },
+      ? { verticalAlign: 'bottom', align: 'center', wrapperStyle: { fontSize: 10, paddingTop: 6, lineHeight: 1.3 } }
+      : { verticalAlign: 'bottom', align: 'left', wrapperStyle: { fontSize: 11, paddingTop: 8, lineHeight: 1.35 } },
     showDualAxis: !isMobile,
   };
 }
@@ -420,17 +421,14 @@ function StrategicTargetCards({ targets }) {
 
 function InitiativeKpiTable({
   rows,
-  showImperativeColumn = false,
   onRowClick,
   emptyMessage = 'No KPI rows to display.',
 }) {
-  const colSpan = showImperativeColumn ? 7 : 6;
   return (
-    <div className="def-scorecard-table-scroll def-table-scroll-wrap">
-      <table className={`def-scorecard-table${showImperativeColumn ? ' def-scorecard-table-grouped' : ''}`}>
+    <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
+      <table className="def-table def-initiative-kpi-table">
         <thead>
           <tr>
-            {showImperativeColumn ? <th>Strategic imperative</th> : null}
             <th>KPI</th>
             <th>Status</th>
             <th>Current</th>
@@ -443,16 +441,13 @@ function InitiativeKpiTable({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={onRowClick ? 'def-scorecard-row-click' : undefined}
+              className={onRowClick ? 'def-table-row def-table-row-click' : 'def-table-row'}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter') onRowClick(row); } : undefined}
               tabIndex={onRowClick ? 0 : undefined}
               role={onRowClick ? 'button' : undefined}
             >
-              {showImperativeColumn && row.showImperative ? (
-                <td className="def-scorecard-imperative" rowSpan={row.imperativeSpan}>{row.imperative}</td>
-              ) : null}
-              <td className="def-scorecard-kpi"><strong>{row.kpi}</strong></td>
+              <td><strong>{row.kpi}</strong></td>
               <td><ScorecardStatusCell status={row.scorecardStatus} /></td>
               <td>{row.current}</td>
               <td>{row.target2029}</td>
@@ -461,7 +456,7 @@ function InitiativeKpiTable({
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colSpan={colSpan} className="def-cockpit-empty">{emptyMessage}</td></tr>
+            <tr><td colSpan={6} className="def-cockpit-empty">{emptyMessage}</td></tr>
           )}
         </tbody>
       </table>
@@ -475,13 +470,17 @@ function formatBudgetM(totalM, spentM, pct) {
 
 function applyTrackerRowSpans(rows) {
   const normalized = rows.map((row) => {
-    const { imperativeSpan, showImperative, ...rest } = row;
+    const {
+      imperativeSpan, initiativeSpan, showImperative, showInitiative, ...rest
+    } = row;
     return rest;
   });
   const withSpans = normalized.map((row) => ({
     ...row,
     imperativeSpan: 0,
+    initiativeSpan: 0,
     showImperative: false,
+    showInitiative: false,
   }));
   let i = 0;
   while (i < withSpans.length) {
@@ -490,6 +489,15 @@ function applyTrackerRowSpans(rows) {
     while (impEnd < withSpans.length && withSpans[impEnd].imperative === imp) impEnd += 1;
     withSpans[i].showImperative = true;
     withSpans[i].imperativeSpan = impEnd - i;
+    let j = i;
+    while (j < impEnd) {
+      const iniName = withSpans[j].initiative;
+      let iniEnd = j;
+      while (iniEnd < impEnd && withSpans[iniEnd].initiative === iniName) iniEnd += 1;
+      withSpans[j].showInitiative = true;
+      withSpans[j].initiativeSpan = iniEnd - j;
+      j = iniEnd;
+    }
     i = impEnd;
   }
   return withSpans;
@@ -530,6 +538,7 @@ function buildInitiativeTrackerRows(fastCategories) {
         initiativeId: ini.id,
         imperative,
         initiative: ref?.initiative ?? defaultInitiative,
+        subInitiative: ini.name,
         kpi: ini.name,
         scorecardStatus,
         current: scorecardSummary.current,
@@ -537,7 +546,6 @@ function buildInitiativeTrackerRows(fastCategories) {
         targetYearOne: scorecardSummary.targetYearOne,
         comments: scorecardSummary.comments,
         source: ref?.source ?? 'sample',
-        subInitiative: ini.name,
         budgetPct,
         budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
         schedulePct,
@@ -556,7 +564,8 @@ function buildInitiativeTrackerRows(fastCategories) {
     (a, b) =>
       (imperativeOrder[a.imperative] ?? 9) - (imperativeOrder[b.imperative] ?? 9)
       || a.imperative.localeCompare(b.imperative)
-      || a.kpi.localeCompare(b.kpi),
+      || a.initiative.localeCompare(b.initiative)
+      || a.subInitiative.localeCompare(b.subInitiative),
   );
 
   return applyTrackerRowSpans(rows);
@@ -609,8 +618,8 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
       : rows.filter(
         (r) =>
           r.imperative.toLowerCase().includes(q)
-          || r.kpi.toLowerCase().includes(q)
-          || r.initiative?.toLowerCase().includes(q),
+          || r.initiative.toLowerCase().includes(q)
+          || r.subInitiative.toLowerCase().includes(q),
       );
     return applyTrackerRowSpans(base);
   }, [rows, query]);
@@ -621,7 +630,7 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
     <section className="def-cockpit-section def-cockpit-tracker def-cockpit-interactive def-stagger-in" style={{ '--stagger': '400ms' }}>
       <div className="def-tracker-head">
         <div className="def-tracker-head-main">
-          <h2 className="def-cockpit-section-title">Initiative scorecard</h2>
+          <h2 className="def-cockpit-section-title">Initiative tracker</h2>
           <p className="def-tracker-updated">Last updated: {updatedLabel}</p>
         </div>
         <div className="def-tracker-legend">
@@ -641,12 +650,53 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
         </label>
         <span className="def-tracker-count">{filtered.length} initiatives</span>
       </div>
-      <InitiativeKpiTable
-        rows={filtered}
-        showImperativeColumn
-        onRowClick={onOpenInitiative ? (row) => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
-        emptyMessage="No initiatives match your search."
-      />
+      <div className="def-tracker-table-scroll def-table-scroll-wrap">
+        <table className="def-tracker-table">
+          <thead>
+            <tr>
+              <th>Strategic imperative</th>
+              <th>Initiative</th>
+              <th>KPI</th>
+              <th>Status</th>
+              <th>Current</th>
+              <th>2029 Target</th>
+              <th>Year One Target</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => (
+              <tr
+                key={row.id}
+                className={`def-tracker-row def-tracker-source-${row.source}${onOpenInitiative ? ' def-tracker-row-click' : ''}`}
+                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
+                onKeyDown={onOpenInitiative ? (event) => { if (event.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
+                tabIndex={onOpenInitiative ? 0 : undefined}
+                role={onOpenInitiative ? 'button' : undefined}
+              >
+                {row.showImperative ? (
+                  <td className="def-tracker-imperative" rowSpan={row.imperativeSpan}>{row.imperative}</td>
+                ) : null}
+                {row.showInitiative ? (
+                  <td className="def-tracker-initiative" rowSpan={row.initiativeSpan}>{row.initiative}</td>
+                ) : null}
+                <td className="def-tracker-sub">
+                  <strong>{row.subInitiative}</strong>
+                  {row.source === 'sample' ? <span className="def-tracker-tag sample">Sample</span> : null}
+                </td>
+                <td><ScorecardStatusCell status={row.scorecardStatus} /></td>
+                <td>{row.current}</td>
+                <td>{row.target2029}</td>
+                <td>{row.targetYearOne}</td>
+                <td>{row.comments}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={8} className="def-cockpit-empty">No initiatives match your search.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -1232,6 +1282,19 @@ const COCKPIT_METRIC_ICONS = {
   'Portfolio health': '◆',
 };
 
+function ChartLegendRow({ items }) {
+  return (
+    <div className="def-chart-legend-row" aria-label="Chart legend">
+      {items.map((item) => (
+        <span key={item.label} className="def-chart-legend-item">
+          <i style={{ background: item.color }} aria-hidden="true" />
+          {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CockpitMetricSpark({ data, stroke }) {
   const line = stroke || '#6366f1';
   return (
@@ -1356,32 +1419,49 @@ function CockpitStackedArea({ data, theme, height = 240 }) {
       <div className="def-cockpit-chart-head">
         <h3 className="def-cockpit-card-title">Status movement</h3>
       </div>
-      <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={data} margin={chart.chartMargin}>
-          <defs>
-            <linearGradient id="cockpitOn" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
-              <stop offset="95%" stopColor="#34d399" stopOpacity={0.06} />
-            </linearGradient>
-            <linearGradient id="cockpitRisk" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.42} />
-              <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.06} />
-            </linearGradient>
-            <linearGradient id="cockpitLate" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#f87171" stopOpacity={0.45} />
-              <stop offset="95%" stopColor="#f87171" stopOpacity={0.06} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 8" stroke={grid} vertical={false} />
-          <XAxis dataKey="label" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={4} />
-          <YAxis width={chart.yAxisWidth} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={2} />
-          <Tooltip />
-          <Legend {...chart.legendProps} iconSize={8} formatter={(value) => <span style={{ color: tick }}>{value}</span>} />
-          <Area name="On track" type="monotone" dataKey="OnTrack" stackId="mix" stroke="#059669" fill="url(#cockpitOn)" isAnimationActive animationDuration={900} />
-          <Area name="At risk" type="monotone" dataKey="AtRisk" stackId="mix" stroke="#d97706" fill="url(#cockpitRisk)" isAnimationActive animationDuration={900} />
-          <Area name="Delayed / blocked" type="monotone" dataKey="Delayed" stackId="mix" stroke="#dc2626" fill="url(#cockpitLate)" isAnimationActive animationDuration={900} />
-        </AreaChart>
-      </ResponsiveContainer>
+      <div className="def-cockpit-chart-plot">
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart data={data} margin={chart.chartMargin}>
+            <defs>
+              <linearGradient id="cockpitOn" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
+                <stop offset="95%" stopColor="#34d399" stopOpacity={0.06} />
+              </linearGradient>
+              <linearGradient id="cockpitRisk" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.42} />
+                <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.06} />
+              </linearGradient>
+              <linearGradient id="cockpitLate" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f87171" stopOpacity={0.45} />
+                <stop offset="95%" stopColor="#f87171" stopOpacity={0.06} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 8" stroke={grid} vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: tick, fontSize: chart.tickSmall }}
+              axisLine={{ stroke: grid }}
+              tickMargin={4}
+              interval={chart.isMobile ? 'preserveStartEnd' : 0}
+              angle={chart.isMobile ? -28 : 0}
+              textAnchor={chart.isMobile ? 'end' : 'middle'}
+              height={chart.xAxisHeight}
+            />
+            <YAxis width={chart.yAxisWidth} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={2} />
+            <Tooltip />
+            <Area name="On track" type="monotone" dataKey="OnTrack" stackId="mix" stroke="#059669" fill="url(#cockpitOn)" isAnimationActive animationDuration={900} />
+            <Area name="At risk" type="monotone" dataKey="AtRisk" stackId="mix" stroke="#d97706" fill="url(#cockpitRisk)" isAnimationActive animationDuration={900} />
+            <Area name="Delayed / blocked" type="monotone" dataKey="Delayed" stackId="mix" stroke="#dc2626" fill="url(#cockpitLate)" isAnimationActive animationDuration={900} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <ChartLegendRow
+        items={[
+          { label: 'On track', color: '#059669' },
+          { label: 'At risk', color: '#d97706' },
+          { label: 'Delayed / blocked', color: '#dc2626' },
+        ]}
+      />
       <div className="def-cockpit-movement-stats">
         <div className="def-cockpit-move-stat improved">
           <span>Improved</span>
@@ -1410,18 +1490,33 @@ function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
       <div className="def-cockpit-chart-head">
         <h3 className="def-cockpit-card-title">Quarterly throughput</h3>
       </div>
-      <ResponsiveContainer width="100%" height={height}>
-        <BarChart layout="vertical" data={rows} margin={chart.axisMargin}>
-          <CartesianGrid strokeDasharray="3 8" stroke={grid} horizontal={false} />
-          <XAxis type="number" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
-          <YAxis type="category" dataKey="quarter" width={compact ? chart.yAxisWidth - 16 : chart.yAxisWidth - 8} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
-          <Tooltip />
-          <Legend {...chart.legendProps} iconSize={8} />
-          <Bar dataKey="onTrack" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
-          <Bar dataKey="atRisk" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
-          <Bar dataKey="delayed" name="Delayed" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="def-cockpit-chart-plot">
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart layout="vertical" data={rows} margin={chart.axisMargin}>
+            <CartesianGrid strokeDasharray="3 8" stroke={grid} horizontal={false} />
+            <XAxis type="number" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
+            <YAxis
+              type="category"
+              dataKey="quarter"
+              width={compact ? chart.barYAxisWidth - 12 : chart.barYAxisWidth}
+              tick={{ fill: tick, fontSize: chart.tickSmall }}
+              axisLine={{ stroke: grid }}
+              tickMargin={4}
+            />
+            <Tooltip />
+            <Bar dataKey="onTrack" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
+            <Bar dataKey="atRisk" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
+            <Bar dataKey="delayed" name="Delayed" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <ChartLegendRow
+        items={[
+          { label: 'On track', color: '#34d399' },
+          { label: 'At risk', color: '#fbbf24' },
+          { label: 'Delayed', color: '#f87171' },
+        ]}
+      />
     </div>
   );
 }
@@ -1442,7 +1537,7 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
     () => [{ id: 'all', label: 'All FAST pillars' }, ...ORG_DATA.fastCategories.map((f) => ({ id: f.id, label: f.shortName }))],
     [],
   );
-  const wsBlockHeight = vp.wsChartH + vp.wsBarH + 108;
+  const wsBlockHeight = vp.wsChartH + vp.wsBarH + 148;
 
   return (
     <div
@@ -1674,7 +1769,7 @@ function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam,
           </div>
           <h1 className="def-initiative-title">{initiative.name}</h1>
           <p className="def-initiative-sub">
-            Executive initiative scorecard — Q2 2026
+            Executive initiative scorecard
             {' · '}
             Team: <strong>{team?.name ?? 'Unassigned'}</strong>
           </p>
@@ -1873,6 +1968,7 @@ function ProjectProgressGauge({ progress, theme }) {
 }
 
 function ProjectDetailCharts({ project, theme }) {
+  const chart = useResponsiveChart();
   const isDark = theme === 'dark';
   const tick = isDark ? '#94949e' : '#64748b';
   const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(148,163,184,0.2)';
@@ -1923,8 +2019,8 @@ function ProjectDetailCharts({ project, theme }) {
           <span>Planned vs actual</span>
         </div>
         <div className="def-drawer-chart-wrap">
-          <ResponsiveContainer width="100%" height={150} minWidth={0}>
-            <ComposedChart data={burndownData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+          <ResponsiveContainer width="100%" height={160} minWidth={0}>
+            <ComposedChart data={burndownData} margin={{ ...chart.chartMargin, top: 10, right: 10, left: 2, bottom: 0 }}>
               <defs>
                 <linearGradient id="defDrawerArea" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
@@ -1932,23 +2028,36 @@ function ProjectDetailCharts({ project, theme }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 6" stroke={grid} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: chart.tickSmall, fill: tick }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                tickMargin={4}
+                height={chart.xAxisHeight}
+              />
               <YAxis
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
-                tick={{ fontSize: 10, fill: tick }}
+                tick={{ fontSize: chart.tickSmall, fill: tick }}
                 axisLine={false}
                 tickLine={false}
-                width={42}
+                width={chart.yAxisWidth}
                 tickFormatter={(value) => `${value}%`}
               />
               <Tooltip content={<DrawerChartTooltip />} />
-              <Legend verticalAlign="top" align="right" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingBottom: '4px' }} />
               <Line type="monotone" dataKey="planned" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Planned" />
               <Area type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} fill="url(#defDrawerArea)" name="Actual" connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+        <ChartLegendRow
+          items={[
+            { label: 'Planned', color: '#94a3b8' },
+            { label: 'Actual', color: '#6366f1' },
+          ]}
+        />
       </div>
     </div>
   );
@@ -3188,7 +3297,7 @@ const STYLES = `
     .def-initiative-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-initiative-quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-scorecard-targets-row { grid-template-columns: 1fr; }
-    .def-scorecard-table { min-width: min(640px, 100%); font-size: var(--text-xs); }
+    .def-initiative-kpi-table { min-width: min(640px, 100%); }
     .def-kpi-item {
       padding: 12px;
       gap: 10px;
@@ -3883,29 +3992,9 @@ const STYLES = `
   .def-scorecard-target-card strong {
     display: block; font-size: 0.82rem; font-weight: 700; color: var(--def-heading); line-height: 1.35;
   }
-  .def-scorecard-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .def-scorecard-table {
-    width: 100%; min-width: 720px; border-collapse: collapse; font-size: 0.72rem;
-  }
-  .def-scorecard-table thead th {
-    background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
-    color: #fff; font-weight: 700; text-align: left; padding: 8px 10px;
-    border: 1px solid rgba(255,255,255,0.08); white-space: nowrap; font-size: 0.66rem;
-  }
-  .def-scorecard-table tbody td {
-    padding: 8px 10px; border: 1px solid rgba(226,232,240,0.95);
-    vertical-align: middle; line-height: 1.35; background: #fff;
-  }
-  .def-scorecard-table tbody tr:nth-child(even) td { background: #f8fafc; }
-  .def-scorecard-table tbody tr { transition: background 0.18s ease; }
-  .def-scorecard-table tbody tr:hover td { background: rgba(99,102,241,0.06) !important; }
-  .def-scorecard-row-click { cursor: pointer; }
-  .def-scorecard-row-click:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
-  .def-scorecard-imperative {
-    font-weight: 800; color: var(--def-heading); vertical-align: top;
-    background: #f1f5f9 !important; text-transform: capitalize; min-width: 88px;
-  }
-  .def-scorecard-kpi strong { font-weight: 700; color: var(--def-heading); }
+  .def-initiative-kpi-table .def-scorecard-status { font-size: 0.78rem; }
+  .def-table-row-click { cursor: pointer; }
+  .def-table-row-click:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
   .def-scorecard-status {
     display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap;
   }
@@ -5425,10 +5514,12 @@ const STYLES = `
   }
   .def-drawer-chart-head {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 8px;
+    min-width: 0;
+    flex-wrap: wrap;
   }
   .def-drawer-chart-head h3 {
     margin: 0;
@@ -5436,11 +5527,21 @@ const STYLES = `
     font-weight: 800;
     color: var(--def-heading);
     letter-spacing: -0.01em;
+    line-height: 1.25;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .def-drawer-chart-head span {
     font-size: 0.68rem;
     color: var(--def-muted);
     font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .def-drawer-chart-card .def-chart-legend-row {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top-color: var(--def-border-soft);
   }
   .def-drawer-donut-wrap { position: relative; }
   .def-drawer-donut-legend {
@@ -5757,7 +5858,8 @@ const STYLES = `
     gap: var(--cockpit-gap);
   }
   .def-cockpit-metric-card {
-    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px var(--space-2);
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto;
+    align-items: center; gap: 2px var(--space-2);
     padding: var(--cockpit-pad) var(--space-3); min-height: 62px;
     background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
     box-shadow: var(--cockpit-shadow-sm);
@@ -5775,18 +5877,23 @@ const STYLES = `
     border-radius: 7px; background: rgba(99,102,241,0.08); font-size: 0.82rem;
     transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
   }
-  .def-cockpit-metric-copy { min-width: 0; }
+  .def-cockpit-metric-copy { min-width: 0; grid-column: 2; grid-row: 1 / -1; }
   .def-cockpit-metric-label {
     display: block; font-size: 0.62rem; font-weight: 700; color: var(--def-muted);
     text-transform: uppercase; letter-spacing: 0.04em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .def-cockpit-metric-value {
     display: block; font-size: clamp(1rem, 1.8vw, 1.15rem); font-weight: 800;
     color: var(--def-heading); line-height: 1.05; margin-top: 1px;
   }
-  .def-cockpit-metric-sub { display: block; font-size: 0.62rem; color: var(--def-subtle); }
+  .def-cockpit-metric-sub {
+    display: block; font-size: 0.62rem; color: var(--def-subtle);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .def-cockpit-metric-spark {
-    width: clamp(52px, 8vw, 64px); height: 34px; grid-row: 1 / span 2; align-self: center;
+    width: clamp(52px, 8vw, 64px); height: 34px; grid-column: 3; grid-row: 1 / -1; align-self: center;
+    flex-shrink: 0;
     opacity: 0.88; transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
   }
   .def-cockpit-section {
@@ -5847,8 +5954,10 @@ const STYLES = `
   .def-tracker-count { font-size: 0.64rem; font-weight: 700; color: var(--def-muted); white-space: nowrap; }
   .def-tracker-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .def-tracker-table {
-    width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.68rem;
+    width: 100%; min-width: 880px; border-collapse: collapse; font-size: 0.68rem;
   }
+  .def-tracker-table .def-scorecard-status { font-size: 0.62rem; gap: 5px; }
+  .def-tracker-table .def-scorecard-dot { width: 8px; height: 8px; }
   .def-tracker-table thead th {
     background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
     color: #fff; font-weight: 700; text-align: left; padding: 8px 10px;
@@ -5935,8 +6044,11 @@ const STYLES = `
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; text-align: center;
   }
-  .def-cockpit-fast-donut-center strong { font-size: 0.95rem; font-weight: 800; color: var(--def-heading); line-height: 1; }
-  .def-cockpit-fast-donut-center span { font-size: 0.52rem; font-weight: 700; color: var(--def-muted); text-transform: uppercase; }
+  .def-cockpit-fast-donut-center strong { font-size: clamp(0.78rem, 2vw, 0.95rem); font-weight: 800; color: var(--def-heading); line-height: 1; }
+  .def-cockpit-fast-donut-center span {
+    font-size: 0.48rem; font-weight: 700; color: var(--def-muted); text-transform: uppercase;
+    max-width: 52px; line-height: 1.15; margin-top: 1px;
+  }
   .def-cockpit-fast-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 88px; display: flex; flex-direction: column; gap: 4px; }
   .def-cockpit-fast-legend li { display: flex; align-items: center; gap: 5px; font-size: 0.64rem; color: var(--def-muted); font-weight: 600; }
   .def-cockpit-fast-legend li i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; font-style: normal; }
@@ -5991,10 +6103,51 @@ const STYLES = `
     padding: var(--cockpit-pad) var(--space-3); min-width: 0; min-height: 0; box-shadow: var(--cockpit-shadow-sm);
   }
   .def-cockpit-card-title, .def-cockpit-chart-head .def-cockpit-card-title {
-    margin: 0 0 4px; font-size: 0.74rem; font-weight: 800; color: var(--def-heading);
+    margin: 0; font-size: 0.74rem; font-weight: 800; color: var(--def-heading);
+    line-height: 1.25;
   }
-  .def-cockpit-chart-head { margin-bottom: 4px; }
-  .def-cockpit-movement-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+  .def-cockpit-chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    min-width: 0;
+  }
+  .def-cockpit-chart-plot {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .def-cockpit-chart-plot .recharts-responsive-container {
+    min-width: 0 !important;
+  }
+  .def-chart-legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(226,232,240,0.9);
+  }
+  .def-chart-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: var(--def-muted);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .def-chart-legend-item i {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    font-style: normal;
+  }
+  .def-cockpit-movement-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
   .def-cockpit-move-stat {
     padding: 6px 8px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;
     transition: transform 0.25s var(--cockpit-ease), background 0.25s ease;
@@ -6123,6 +6276,8 @@ const STYLES = `
     .def-cockpit-metric-label { font-size: var(--text-min); }
     .def-cockpit-table { font-size: var(--text-xs); }
     .def-cockpit-card-title { font-size: var(--text-xs); }
+    .def-chart-legend-row { gap: 6px 10px; }
+    .def-chart-legend-item { font-size: var(--text-min); white-space: normal; }
   }
   @media (max-width: 480px) {
     .def-cockpit-metrics-row,
@@ -6214,18 +6369,6 @@ const STYLES = `
   .def-app.def-theme-dark .def-initiative-progress-card {
     background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
   }
-  .def-app.def-theme-dark .def-initiative-stat {
-    background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08);
-  }
-  .def-app.def-theme-dark .def-scorecard-target-card,
-  .def-app.def-theme-dark .def-scorecard-table tbody td {
-    background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
-  }
-  .def-app.def-theme-dark .def-scorecard-table tbody tr:nth-child(even) td {
-    background: rgba(15,23,42,0.45);
-  }
-  .def-app.def-theme-dark .def-scorecard-imperative { background: rgba(15,23,42,0.65) !important; }
-  .def-app.def-theme-dark .def-scorecard-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
 
   .def-cockpit-theme-dark .def-tracker-search input {
     background: rgba(15,23,42,0.6); border-color: rgba(255,255,255,0.1); color: var(--def-text);
@@ -6235,44 +6378,40 @@ const STYLES = `
   .def-cockpit-theme-dark .def-tracker-imperative { background: rgba(15,23,42,0.65) !important; }
   .def-cockpit-theme-dark .def-tracker-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
 
-  /* Responsive polish — scorecard, drawer, touch targets */
+  /* Responsive polish — tracker, detail tables, drawer, touch targets */
   @media (max-width: 768px) {
     .def-panel:hover { transform: none; box-shadow: var(--def-shadow); }
     .def-initiative-header { padding: var(--space-3); }
     .def-initiative-header::after { display: none; }
     .def-initiative-stat:hover { transform: none; }
     .def-scorecard-target-card:hover { transform: none; }
-    .def-scorecard-table-scroll {
+    .def-tracker-table-scroll {
       margin-inline: calc(-1 * var(--content-pad-x));
       padding-inline: var(--content-pad-x);
       scroll-padding-left: var(--content-pad-x);
     }
-    .def-scorecard-table-scroll .def-scorecard-table th:first-child,
-    .def-scorecard-table-scroll .def-scorecard-table td:first-child {
+    .def-tracker-table-scroll .def-tracker-table th:first-child,
+    .def-tracker-table-scroll .def-tracker-table td.def-tracker-imperative {
       position: sticky;
       left: 0;
       z-index: 2;
-      background: #fff;
       box-shadow: 2px 0 8px rgba(15,23,42,0.06);
     }
-    .def-scorecard-table-scroll .def-scorecard-table thead th:first-child {
+    .def-tracker-table-scroll .def-tracker-table thead th:first-child {
       z-index: 3;
-      background: #1e3a8a;
     }
-    .def-scorecard-table-grouped .def-scorecard-table th:nth-child(2),
-    .def-scorecard-table-grouped .def-scorecard-table td:nth-child(2) {
+    .def-tracker-table th:nth-child(2),
+    .def-tracker-table td.def-tracker-initiative {
       position: sticky;
-      left: 0;
+      left: 72px;
       z-index: 2;
-      background: #fff;
       box-shadow: 2px 0 8px rgba(15,23,42,0.06);
     }
-    .def-scorecard-table-grouped .def-scorecard-table thead th:nth-child(2) {
-      z-index: 3;
-      background: #1e3a8a;
-    }
-    .def-scorecard-table th:nth-last-child(-n+2),
-    .def-scorecard-table td:nth-last-child(-n+2) { display: none; }
+    .def-tracker-table thead th:nth-child(2) { z-index: 3; }
+    .def-tracker-table th:nth-last-child(-n+2),
+    .def-tracker-table td:nth-last-child(-n+2) { display: none; }
+    .def-initiative-kpi-table th:nth-last-child(-n+2),
+    .def-initiative-kpi-table td:nth-last-child(-n+2) { display: none; }
     .def-drawer { width: 100%; max-width: 100%; }
     .def-btn-sm { min-height: var(--def-touch-min); padding: 8px 14px; }
     .def-back-btn { min-height: var(--def-touch-min); width: 100%; justify-content: center; }
