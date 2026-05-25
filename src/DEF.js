@@ -1,80 +1,558 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import useResponsiveChart from './hooks/useResponsiveChart';
+import { formatAppDate as formatDate, formatAppDateTime } from './utils/locale';
 import {
   Area,
+  AreaChart,
   Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
+  Legend,
   Line,
+  LineChart,
   Pie,
   PieChart,
-  ReferenceArea,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 
-const getChartViewportWidth = () => (typeof window !== 'undefined' ? window.innerWidth : 1200);
 
-function useResponsiveChart() {
-  const [width, setWidth] = useState(getChartViewportWidth);
+function toSlug(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 56);
+}
 
-  useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize, { passive: true });
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const isMobile = width <= 480;
-  const isTablet = width <= 768;
-  const isSmall = width <= 1024;
-
+function createDemoProject(id, name, index = 0) {
+  const statuses = ['on-track', 'on-track', 'at-risk', 'delayed', 'on-track', 'blocked', 'on-track'];
+  const risks = ['low', 'medium', 'medium', 'high', 'low', 'high', 'medium'];
+  const status = statuses[index % statuses.length];
+  const risk = risks[index % risks.length];
+  const progress = [82, 71, 58, 35, 88, 52, 67, 44, 90, 64][index % 10];
+  const delayDays = status === 'delayed' || status === 'blocked' ? [28, 23, 76, 5][index % 4] : (index % 5 === 0 ? 4 : 0);
+  const delayReason = delayDays > 20
+    ? 'Cross-team dependency awaiting sign-off'
+    : delayDays > 0
+      ? 'Minor scope adjustment from stakeholders'
+      : null;
+  const clients = ['Internal', 'Enterprise', 'GPT Portfolio', 'Strategic Client'];
   return {
-    width,
-    isMobile,
-    isTablet,
-    isSmall,
-    tick: isMobile ? 9 : isTablet ? 10 : 11,
-    tickSmall: isMobile ? 8 : isTablet ? 9 : 10,
-    yAxisWidth: isMobile ? 44 : isTablet ? 56 : 72,
-    barSize: isMobile ? 7 : isTablet ? 9 : 12,
-    pieRadius: isMobile ? 52 : isTablet ? 72 : 90,
-    chartMargin: isMobile
-      ? { top: 8, right: 6, left: -12, bottom: 0 }
-      : isTablet
-        ? { top: 10, right: 12, left: -4, bottom: 4 }
-        : { top: 12, right: 16, left: 4, bottom: 5 },
-    axisMargin: isMobile
-      ? { top: 8, right: 8, left: 0, bottom: 0 }
-      : { top: 10, right: 16, left: 0, bottom: 5 },
-    legendProps: isMobile
-      ? { verticalAlign: 'bottom', align: 'center', wrapperStyle: { fontSize: 10, paddingTop: 8 } }
-      : { wrapperStyle: { fontSize: 11 } },
-    showDualAxis: !isMobile,
+    id,
+    name,
+    status,
+    risk,
+    client: clients[index % clients.length],
+    progress,
+    duration: {
+      plannedDays: 90,
+      elapsedDays: Math.round(progress * 0.9),
+      remainingDays: Math.max(0, 90 - Math.round(progress * 0.9)),
+    },
+    timeline: {
+      startDate: '2026-02-01',
+      expectedEndDate: '2026-05-30',
+      projectedEndDate: delayDays ? '2026-06-20' : '2026-05-28',
+    },
+    teamSize: 3 + (index % 4),
+    delayDays,
+    delayReason,
+    blockers: status === 'blocked' ? ['Approval pending', 'Environment unavailable'] : [],
+    modules: [
+      { id: `${id}-m1`, name: 'Discovery & Planning', status: 'done', estimatedDays: 12, actualDays: 11, assignee: 'Lead' },
+      { id: `${id}-m2`, name: 'Build & Integrate', status: progress > 70 ? 'done' : 'in-progress', estimatedDays: 24, actualDays: Math.round(progress * 0.2), assignee: 'Engineer' },
+      { id: `${id}-m3`, name: 'Validation & Rollout', status: progress > 85 ? 'in-progress' : 'pending', estimatedDays: 14, actualDays: 0, assignee: 'Engineer' },
+    ],
+    developers: [
+      { id: `${id}-d1`, name: 'Delivery Lead', role: 'Lead', utilization: 82 + (index % 10), currentModule: 'Build & Integrate' },
+      { id: `${id}-d2`, name: 'Engineer A', role: 'Engineer', utilization: 75 + (index % 12), currentModule: 'Build & Integrate' },
+      { id: `${id}-d3`, name: 'Engineer B', role: 'Engineer', utilization: 68 + (index % 15), currentModule: 'Validation & Rollout' },
+    ],
   };
 }
+
+const LAY_OF_LAND_ROWS = [
+  { fast: 'FOCUS & Deliver on BU & Functional Priorities', fastShort: 'FOCUS', initiative: 'Deliver against medium term Guidance', team: 'BU Leaders' },
+  { fast: 'FOCUS & Deliver on BU & Functional Priorities', fastShort: 'FOCUS', initiative: 'Client 0 Lyric', team: 'BU Leaders' },
+  { fast: 'FOCUS & Deliver on BU & Functional Priorities', fastShort: 'FOCUS', initiative: 'NextGen development per plan', team: 'BU Leaders' },
+  { fast: 'FOCUS & Deliver on BU & Functional Priorities', fastShort: 'FOCUS', initiative: 'PI Acceleration', team: 'PI Leaders' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'AI tool adoption (% of assoc.)', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'AI Productivity Benefit (Cumulative %)', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'AI Infrastructure Progress (AI Studio)', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'AI Infrastructure Progress (Personalization Engine & Data Central)', team: 'Amin & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'Deliver on Persona based agent plan', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'AI Centric (BU) Roadmaps', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'Accelerate NG dev. & Migration Factory via AI', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'Portfolio & TAM Expansion', team: 'Prasanna & Team' },
+  { fast: 'ACCELERATE - Product Portfolio Impact', fastShort: 'ACCELERATE', initiative: 'H2A (Human to Agent) Standards', team: 'Prasanna & Team' },
+  { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Breakthrough Business Revenue - Marketplace', team: 'Oz & Team' },
+  { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Breakthrough Business Revenue - Data', team: 'Oz & Team' },
+  { fast: 'SCALE - GPT Led Growth Bets', fastShort: 'SCALE', initiative: 'Investment and Revenue Gains from Ventures', team: 'Oz & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Vendor Management (TESM)', team: 'Varun & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'GPT Global Delivery Model', team: 'Varun & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'SDLC/ADLC', team: 'Ram & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'People Excellence (Workforce & Talent Strategy)', team: 'Emma & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Stakeholder Excellence', team: 'Varun & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Collaboration / Associate Experience', team: 'Prakash & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Cloud Migration', team: 'Prakash & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'IAM', team: 'Prakash & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'Risk and Resiliency', team: 'Ram & Team' },
+  { fast: 'TRANSFORM - GPT Operations & Engagement', fastShort: 'TRANSFORM', initiative: 'GPT Performance Management (Control Tower)', team: 'Varun & Team' },
+];
+
+function summarizeProjects(projects) {
+  const delayed = projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
+  const pendingModules = projects.reduce((sum, p) => sum + p.modules.filter((m) => m.status === 'pending').length, 0);
+  const avgUtilization = projects.length
+    ? Math.round(projects.reduce((sum, p) => sum + (p.developers.reduce((s, d) => s + d.utilization, 0) / Math.max(p.developers.length, 1)), 0) / projects.length)
+    : 0;
+  const teamSize = projects.reduce((sum, p) => sum + p.teamSize, 0);
+  const status = delayed >= 2 ? 'at-risk' : delayed === 1 ? 'delayed' : 'on-track';
+  return { activeProjects: projects.length, delayedProjects: delayed, pendingModules, developers: teamSize, avgUtilization, status };
+}
+
+function summarizeFastStatusCounts(fast) {
+  const projects = fast.initiatives.flatMap((ini) => ini.projects);
+  return {
+    onTrack: projects.filter((p) => p.status === 'on-track').length,
+    atRisk: projects.filter((p) => p.status === 'at-risk').length,
+    offTrack: projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length,
+  };
+}
+
+function SidebarFastStatusRow({ fast }) {
+  const counts = summarizeFastStatusCounts(fast);
+  return (
+    <span className="def-sidebar-status-row" aria-label="Project status mix">
+      <span className="def-sidebar-status-line ok">
+        <i style={{ background: '#22c55e' }} aria-hidden="true" />
+        On {counts.onTrack}
+      </span>
+      <span className="def-sidebar-status-line risk">
+        <i style={{ background: '#f59e0b' }} aria-hidden="true" />
+        Risk {counts.atRisk}
+      </span>
+      <span className="def-sidebar-status-line late">
+        <i style={{ background: '#ef4444' }} aria-hidden="true" />
+        Off {counts.offTrack}
+      </span>
+    </span>
+  );
+}
+
+const IMPERATIVE_LABELS = {
+  FOCUS: 'Focus',
+  ACCELERATE: 'Accelerate',
+  SCALE: 'Scale',
+  TRANSFORM: 'Transform',
+};
+
+/** Reference rows aligned to Command Center Initiative Tracker (EXL / ADP). */
+const INITIATIVE_TRACKER_REF = {
+  'pi acceleration': {
+    initiative: 'Deliver on BU & Functional Priorities & KTLO',
+    budgetPct: 10, budgetTotalM: 24, budgetSpentM: 2, schedulePct: 60,
+    target: '100%', ctt: '20% of 100%', trend: [24, 22, 20, 20], trendUp: false, risk: 'high', source: 'adp',
+  },
+  'ai tool adoption (% of assoc.)': {
+    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 5, budgetSpentM: 2, schedulePct: 60,
+    target: '$8M Revenue', ctt: '$1M of $8M (12.5%)', trend: [14, 13, 12, 12.5], trendUp: false, risk: 'medium', source: 'adp',
+  },
+  'ai productivity benefit (cumulative %)': {
+    initiative: 'AI Foundation', budgetPct: 45, budgetTotalM: 12, budgetSpentM: 5, schedulePct: 75,
+    target: '$12M Revenue', ctt: '$4M of $12M (33.3%)', trend: [28, 30, 31, 33], trendUp: true, risk: 'medium', source: 'sample',
+  },
+  'deliver on persona based agent plan': {
+    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 1, budgetSpentM: 0.4, schedulePct: 50,
+    target: '50%', ctt: '20% of 50%', trend: [22, 21, 20, 20], trendUp: false, risk: 'medium', source: 'sample',
+  },
+  'ai infrastructure progress (ai studio)': {
+    initiative: 'AI Foundation', budgetPct: 40, budgetTotalM: 1, budgetSpentM: 0.4, schedulePct: 60,
+    target: '25%', ctt: '10% of 25%', trend: [12, 11, 10, 10], trendUp: false, risk: 'medium', source: 'sample',
+  },
+  'portfolio & tam expansion': {
+    initiative: 'Data and Intelligence Layer', budgetPct: 50, budgetTotalM: 18, budgetSpentM: 9, schedulePct: 60,
+    target: '$108M', ctt: '$12M of $108M (11%)', trend: [14, 13, 12, 11], trendUp: false, risk: 'high', source: 'adp',
+  },
+  'ai centric (bu) roadmaps': {
+    initiative: 'Data and Intelligence Layer', budgetPct: 50, budgetTotalM: 24, budgetSpentM: 12, schedulePct: 50,
+    target: '$108M', ctt: '$25M of $108M (23%)', trend: [26, 25, 24, 23], trendUp: false, risk: 'medium', source: 'adp',
+  },
+  'accelerate ng dev. & migration factory via ai': {
+    initiative: 'AI Accelerated EVC Revenue', budgetPct: 50, budgetTotalM: 8, budgetSpentM: 4, schedulePct: 40,
+    target: '$108M', ctt: '$5M of $108M (4.6%)', trend: [6, 5.5, 5, 4.6], trendUp: false, risk: 'high', source: 'sample',
+  },
+  'h2a (human to agent) standards': {
+    initiative: 'AI Accelerated EVC Revenue', budgetPct: 50, budgetTotalM: 5, budgetSpentM: 2.5, schedulePct: 50,
+    target: '100%', ctt: '30% of 100%', trend: [34, 32, 31, 30], trendUp: false, risk: 'medium', source: 'sample',
+  },
+  'breakthrough business revenue - marketplace': {
+    initiative: 'AI Accelerated AVM Revenue', budgetPct: 50, budgetTotalM: 3, budgetSpentM: 1.6, schedulePct: 50,
+    target: '100%', ctt: '30% of 100%', trend: [33, 32, 31, 30], trendUp: false, risk: 'medium', source: 'sample',
+  },
+  'breakthrough business revenue - data': {
+    initiative: 'AI Accelerated CXP Revenue', budgetPct: 100, budgetTotalM: 4, budgetSpentM: 4, schedulePct: 75,
+    target: '100%', ctt: '50% of 100%', trend: [42, 45, 48, 50], trendUp: true, risk: 'low', source: 'sample',
+  },
+  'investment and revenue gains from ventures': {
+    initiative: 'AI Accelerated CXP Revenue', budgetPct: 100, budgetTotalM: 2, budgetSpentM: 2, schedulePct: 75,
+    target: '100%', ctt: '50% of 100%', trend: [44, 46, 48, 50], trendUp: true, risk: 'low', source: 'sample',
+  },
+};
+
+function formatBudgetM(totalM, spentM, pct) {
+  return `${pct}% of $${totalM}M ($${spentM}M spent)`;
+}
+
+function applyTrackerRowSpans(rows) {
+  const normalized = rows.map((row) => {
+    const {
+      imperativeSpan, initiativeSpan, showImperative, showInitiative, ...rest
+    } = row;
+    return rest;
+  });
+  const withSpans = normalized.map((row) => ({
+    ...row,
+    imperativeSpan: 0,
+    initiativeSpan: 0,
+    showImperative: false,
+    showInitiative: false,
+  }));
+  let i = 0;
+  while (i < withSpans.length) {
+    const imp = withSpans[i].imperative;
+    let impEnd = i;
+    while (impEnd < withSpans.length && withSpans[impEnd].imperative === imp) impEnd += 1;
+    withSpans[i].showImperative = true;
+    withSpans[i].imperativeSpan = impEnd - i;
+    let j = i;
+    while (j < impEnd) {
+      const iniName = withSpans[j].initiative;
+      let iniEnd = j;
+      while (iniEnd < impEnd && withSpans[iniEnd].initiative === iniName) iniEnd += 1;
+      withSpans[j].showInitiative = true;
+      withSpans[j].initiativeSpan = iniEnd - j;
+      j = iniEnd;
+    }
+    i = impEnd;
+  }
+  return withSpans;
+}
+
+function buildInitiativeTrackerRows(fastCategories) {
+  const imperativeOrder = { Focus: 0, Accelerate: 1, Scale: 2, Transform: 3 };
+  const rows = [];
+
+  fastCategories.forEach((fast) => {
+    const imperative = IMPERATIVE_LABELS[fast.shortName] || fast.shortName;
+    const defaultInitiative = fast.name
+      .replace(/^FOCUS &\s*|^ACCELERATE -\s*|^SCALE -\s*|^TRANSFORM -\s*/i, '')
+      .trim();
+
+    fast.initiatives.forEach((ini, index) => {
+      const ref = INITIATIVE_TRACKER_REF[ini.name.toLowerCase()];
+      const progress = ini.projects[0]?.progress ?? 55;
+      const budgetPct = ref?.budgetPct ?? Math.min(95, 15 + (index % 6) * 12);
+      const budgetTotalM = ref?.budgetTotalM ?? 2 + (index % 5);
+      const budgetSpentM = ref?.budgetSpentM ?? Math.round(budgetTotalM * (budgetPct / 100) * 10) / 10;
+      const schedulePct = ref?.schedulePct ?? progress;
+      const risk = ref?.risk ?? (ini.status === 'on-track' ? 'low' : ini.status === 'at-risk' ? 'medium' : 'high');
+      const trend = ref?.trend ?? [
+        Math.max(5, progress - 12),
+        Math.max(5, progress - 8),
+        Math.max(5, progress - 4),
+        progress,
+      ];
+      const trendUp = ref?.trendUp ?? trend[trend.length - 1] >= trend[0];
+
+      rows.push({
+        id: `${fast.id}-${ini.id}`,
+        fastId: fast.id,
+        initiativeId: ini.id,
+        imperative,
+        initiative: ref?.initiative ?? defaultInitiative,
+        subInitiative: ini.name,
+        budgetPct,
+        budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
+        schedulePct,
+        target: ref?.target ?? `${Math.min(100, progress + 15)}%`,
+        ctt: ref?.ctt ?? `${progress}% of ${Math.min(100, progress + 15)}%`,
+        trend,
+        trendUp,
+        risk,
+        source: ref?.source ?? 'sample',
+        notes: '—',
+        budgetTone: budgetPct >= 80 ? 'warn' : 'ok',
+      });
+    });
+  });
+
+  rows.sort(
+    (a, b) =>
+      (imperativeOrder[a.imperative] ?? 9) - (imperativeOrder[b.imperative] ?? 9)
+      || a.initiative.localeCompare(b.initiative)
+      || a.subInitiative.localeCompare(b.subInitiative),
+  );
+
+  return applyTrackerRowSpans(rows);
+}
+
+function getInitiativeTrackerDetail(initiative, fastCategory) {
+  const ref = INITIATIVE_TRACKER_REF[initiative.name.toLowerCase()];
+  const progress = Math.round(
+    initiative.projects.reduce((sum, project) => sum + project.progress, 0)
+      / Math.max(initiative.projects.length, 1),
+  );
+  const defaultParent = fastCategory.name
+    .replace(/^FOCUS &\s*|^ACCELERATE -\s*|^SCALE -\s*|^TRANSFORM -\s*/i, '')
+    .trim();
+  const delayed = initiative.projects.filter(
+    (project) => project.status === 'delayed' || project.status === 'blocked',
+  ).length;
+  const budgetPct = ref?.budgetPct ?? Math.min(95, 18 + progress / 2);
+  const budgetTotalM = ref?.budgetTotalM ?? 2 + (initiative.projects.length % 4);
+  const budgetSpentM = ref?.budgetSpentM ?? Math.round(budgetTotalM * (budgetPct / 100) * 10) / 10;
+
+  return {
+    parentInitiative: ref?.initiative ?? defaultParent,
+    imperative: IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName,
+    budgetPct,
+    budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
+    budgetTone: budgetPct >= 80 ? 'warn' : 'ok',
+    schedulePct: ref?.schedulePct ?? progress,
+    target: ref?.target ?? `${Math.min(100, progress + 15)}%`,
+    ctt: ref?.ctt ?? `${progress}% of ${Math.min(100, progress + 15)}%`,
+    trend: ref?.trend ?? [
+      Math.max(0, progress - 10),
+      Math.max(0, progress - 6),
+      Math.max(0, progress - 3),
+      progress,
+    ],
+    trendUp: ref?.trendUp ?? progress >= (ref?.trend?.[0] ?? progress - 5),
+    risk: ref?.risk ?? (initiative.status === 'on-track' ? 'low' : initiative.status === 'at-risk' ? 'medium' : 'high'),
+    source: ref?.source ?? 'sample',
+    delayed,
+  };
+}
+
+function trackerRiskLabel(risk) {
+  if (risk === 'high') return 'High';
+  if (risk === 'medium') return 'Medium';
+  return 'Low';
+}
+
+function TrackerRiskDot({ risk }) {
+  const tone = risk === 'high' ? 'high' : risk === 'medium' ? 'medium' : 'low';
+  return <span className={`def-tracker-risk def-tracker-risk-${tone}`} title={`${tone} risk`} aria-label={`${tone} risk`} />;
+}
+
+function TrackerTrendSpark({ data, trendUp }) {
+  const stroke = trendUp ? '#16a34a' : '#dc2626';
+  const fill = trendUp ? 'url(#trackerTrendUp)' : 'url(#trackerTrendDown)';
+  const chartData = data.map((v, ix) => ({ ix, v }));
+  return (
+    <div className="def-tracker-spark">
+      <ResponsiveContainer width="100%" height={36}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
+          <defs>
+            <linearGradient id="trackerTrendUp" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#16a34a" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#16a34a" stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="trackerTrendDown" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#dc2626" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#dc2626" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <Area type="monotone" dataKey="v" stroke={stroke} fill={fill} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = !q
+      ? rows
+      : rows.filter(
+        (r) =>
+          r.imperative.toLowerCase().includes(q)
+          || r.initiative.toLowerCase().includes(q)
+          || r.subInitiative.toLowerCase().includes(q),
+      );
+    return applyTrackerRowSpans(base);
+  }, [rows, query]);
+
+  const updatedLabel = useMemo(() => formatAppDateTime(lastUpdated), [lastUpdated]);
+
+  return (
+    <section className="def-cockpit-section def-cockpit-tracker def-cockpit-interactive def-stagger-in" style={{ '--stagger': '400ms' }}>
+      <div className="def-tracker-head">
+        <div className="def-tracker-head-main">
+          <h2 className="def-cockpit-section-title">Initiative tracker</h2>
+          <p className="def-tracker-updated">Last updated: {updatedLabel}</p>
+        </div>
+        <div className="def-tracker-legend">
+          <span className="def-tracker-legend-item adp"><i aria-hidden="true" /> Source: ADP / Provided by ADP</span>
+          <span className="def-tracker-legend-item sample"><i aria-hidden="true" /> Illustrative data / Sample data</span>
+        </div>
+      </div>
+      <div className="def-tracker-toolbar">
+        <label className="def-tracker-search">
+          <span className="sr-only">Search initiatives</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search initiative…"
+          />
+        </label>
+        <span className="def-tracker-count">{filtered.length} initiatives</span>
+      </div>
+      <div className="def-tracker-table-scroll def-table-scroll-wrap">
+        <table className="def-tracker-table">
+          <thead>
+            <tr>
+              <th>Strategic imperative</th>
+              <th>Initiative</th>
+              <th>Sub initiative</th>
+              <th>Budget burn progress</th>
+              <th>Schedule progress</th>
+              <th>Target</th>
+              <th>Current to target</th>
+              <th>MoM CTT trend</th>
+              <th>Risk</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => (
+              <tr
+                key={row.id}
+                className={`def-tracker-row def-tracker-source-${row.source}${onOpenInitiative ? ' def-tracker-row-click' : ''}`}
+                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
+                onKeyDown={onOpenInitiative ? (e) => { if (e.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
+                tabIndex={onOpenInitiative ? 0 : undefined}
+                role={onOpenInitiative ? 'button' : undefined}
+              >
+                {row.showImperative ? (
+                  <td className="def-tracker-imperative" rowSpan={row.imperativeSpan}>{row.imperative}</td>
+                ) : null}
+                {row.showInitiative ? (
+                  <td className="def-tracker-initiative" rowSpan={row.initiativeSpan}>{row.initiative}</td>
+                ) : null}
+                <td className="def-tracker-sub">
+                  <strong>{row.subInitiative}</strong>
+                  {row.source === 'sample' ? <span className="def-tracker-tag sample">Sample</span> : null}
+                </td>
+                <td>
+                  <div className="def-tracker-metric">
+                    <span>{row.budgetLabel}</span>
+                    <ProgressBar value={row.budgetPct} color={row.budgetTone === 'warn' ? '#d97706' : '#059669'} />
+                  </div>
+                </td>
+                <td>
+                  <div className="def-tracker-metric">
+                    <span>{row.schedulePct}% complete</span>
+                    <ProgressBar value={row.schedulePct} />
+                  </div>
+                </td>
+                <td>{row.target}</td>
+                <td>{row.ctt}</td>
+                <td><TrackerTrendSpark data={row.trend} trendUp={row.trendUp} /></td>
+                <td className="def-tracker-risk-cell"><TrackerRiskDot risk={row.risk} /></td>
+                <td>{row.notes}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={10} className="def-cockpit-empty">No initiatives match your search.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function buildLayOfLandCategories() {
+  const fastMap = new Map();
+  LAY_OF_LAND_ROWS.forEach((row, index) => {
+    const fastId = toSlug(row.fast);
+    if (!fastMap.has(fastId)) fastMap.set(fastId, { id: fastId, name: row.fast, shortName: row.fastShort, initiatives: [] });
+    const initiativeId = toSlug(row.initiative);
+    const projects = [createDemoProject(`prj-${index + 1}`, row.initiative, index)];
+    const teamSummary = summarizeProjects(projects);
+    fastMap.get(fastId).initiatives.push({
+      id: initiativeId, name: row.initiative, status: teamSummary.status,
+      team: { id: toSlug(`${row.team}-${initiativeId}`), name: row.team, status: teamSummary.status, summary: teamSummary },
+      projects,
+    });
+  });
+  return Array.from(fastMap.values()).map((fast) => {
+    const allProjects = fast.initiatives.flatMap((i) => i.projects);
+    const delayed = allProjects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
+    const healthScore = Math.max(52, Math.min(92, Math.round(allProjects.reduce((s, p) => s + p.progress, 0) / Math.max(allProjects.length, 1))));
+    return {
+      ...fast,
+      status: delayed >= 3 ? 'at-risk' : delayed >= 1 ? 'delayed' : 'on-track',
+      healthScore,
+      summary: {
+        initiatives: fast.initiatives.length,
+        teams: new Set(fast.initiatives.map((i) => i.team.name)).size,
+        activeProjects: allProjects.length,
+        delayedProjects: delayed,
+        avgUtilization: Math.round(allProjects.reduce((s, p) => s + p.progress, 0) / Math.max(allProjects.length, 1)),
+      },
+    };
+  });
+}
+
+function computePortfolioSummary(fastCategories) {
+  const initiatives = fastCategories.flatMap((f) => f.initiatives);
+  const projects = initiatives.flatMap((i) => i.projects);
+  const teams = new Set(initiatives.map((i) => i.team.name));
+  const activeProjects = projects.filter((p) => p.status !== 'completed').length;
+  const delayedProjects = projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
+  const atRiskProjects = projects.filter((p) => p.status === 'at-risk' || p.risk === 'high').length;
+  const onTrackProjects = projects.filter((p) => p.status === 'on-track').length;
+  const completedProjects = projects.filter((p) => p.status === 'completed').length;
+  const offTrackProjects = projects.filter((p) => ['at-risk', 'delayed', 'blocked'].includes(p.status)).length;
+  const overallHealth = projects.length ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length) : 0;
+  const denom = Math.max(projects.length, 1);
+  return {
+    totalFastCategories: fastCategories.length,
+    totalInitiatives: initiatives.length,
+    totalTeams: teams.size,
+    totalProjects: projects.length,
+    activeProjects,
+    delayedProjects,
+    atRiskProjects,
+    onTrackProjects,
+    completedProjects,
+    offTrackProjects,
+    onTrackPct: Math.round((onTrackProjects / denom) * 100),
+    atRiskPct: Math.round((atRiskProjects / denom) * 100),
+    offTrackPct: Math.round((offTrackProjects / denom) * 100),
+    overallHealth,
+    totalDevelopers: projects.reduce((s, p) => s + p.teamSize, 0),
+  };
+}
+
+const FAST_CATEGORIES = buildLayOfLandCategories();
 
 const ORG_DATA = {
   organization: {
     name: 'ADP Demo',
-    reportingPeriod: 'Q2 2026',
     lastUpdated: '2026-05-25T09:30:00+05:30',
+    viewerName: 'C. Coleman',
+    viewerRole: 'Chief Executive',
   },
 
-  ceoSummary: {
-    totalManagers: 4,
-    totalTeamLeads: 9,
-    totalProjects: 14,
-    activeProjects: 10,
-    delayedProjects: 3,
-    atRiskProjects: 4,
-    onTrackProjects: 6,
-    completedProjects: 4,
-    overallHealth: 72,
-    totalDevelopers: 38,
-  },
+  ceoSummary: computePortfolioSummary(FAST_CATEGORIES),
 
   ceoTrends: {
     targetHealth: 80,
@@ -100,530 +578,7 @@ const ORG_DATA = {
     ],
   },
 
-  managers: [
-    {
-      id: 'mgr-01',
-      name: 'Priya Sharma',
-      department: 'Engineering — Platform',
-      status: 'at-risk',
-      healthScore: 68,
-      summary: {
-        teamLeads: 3,
-        activeProjects: 4,
-        delayedProjects: 2,
-        completedProjects: 1,
-        developers: 12,
-        avgUtilization: 87,
-      },
-      teamLeads: [
-        {
-          id: 'tl-01',
-          name: 'Rahul Mehta',
-          team: 'Core Platform',
-          status: 'at-risk',
-          summary: {
-            activeProjects: 2,
-            developers: 5,
-            delayedProjects: 1,
-            pendingModules: 4,
-            avgUtilization: 92,
-          },
-          projects: [
-            {
-              id: 'prj-01',
-              name: 'Identity Gateway v2',
-              status: 'delayed',
-              risk: 'high',
-              client: 'Internal',
-              progress: 58,
-              duration: { plannedDays: 90, elapsedDays: 78, remainingDays: 28 },
-              timeline: {
-                startDate: '2026-02-10',
-                expectedEndDate: '2026-05-10',
-                projectedEndDate: '2026-06-07',
-              },
-              teamSize: 5,
-              delayDays: 28,
-              delayReason: 'OAuth module integration blocked on vendor SDK',
-              blockers: ['Vendor SDK v3.2 not released', 'Security audit pending'],
-              modules: [
-                { id: 'm1', name: 'Auth Service', status: 'done', estimatedDays: 14, actualDays: 16, assignee: 'Dev A' },
-                { id: 'm2', name: 'OAuth Integration', status: 'in-progress', estimatedDays: 21, actualDays: 28, assignee: 'Dev B' },
-                { id: 'm3', name: 'Session Management', status: 'pending', estimatedDays: 12, actualDays: 0, assignee: 'Dev C' },
-                { id: 'm4', name: 'Admin Console', status: 'pending', estimatedDays: 18, actualDays: 0, assignee: 'Dev D' },
-              ],
-              developers: [
-                { id: 'd1', name: 'Amit Kumar', role: 'Senior Dev', utilization: 95, currentModule: 'OAuth Integration' },
-                { id: 'd2', name: 'Sneha Patel', role: 'Backend Dev', utilization: 88, currentModule: 'Auth Service (wrap-up)' },
-                { id: 'd3', name: 'Vikram Singh', role: 'Full Stack', utilization: 90, currentModule: 'OAuth Integration' },
-                { id: 'd4', name: 'Neha Gupta', role: 'Frontend Dev', utilization: 82, currentModule: 'Admin Console (planning)' },
-                { id: 'd5', name: 'Rohan Das', role: 'QA Engineer', utilization: 75, currentModule: 'Auth Service testing' },
-              ],
-            },
-            {
-              id: 'prj-02',
-              name: 'API Rate Limiter',
-              status: 'on-track',
-              risk: 'low',
-              client: 'Internal',
-              progress: 82,
-              duration: { plannedDays: 45, elapsedDays: 34, remainingDays: 11 },
-              timeline: {
-                startDate: '2026-04-01',
-                expectedEndDate: '2026-05-15',
-                projectedEndDate: '2026-05-12',
-              },
-              teamSize: 3,
-              delayDays: 0,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm5', name: 'Rate Engine', status: 'done', estimatedDays: 10, actualDays: 9, assignee: 'Dev E' },
-                { id: 'm6', name: 'Redis Cache Layer', status: 'in-progress', estimatedDays: 8, actualDays: 6, assignee: 'Dev F' },
-                { id: 'm7', name: 'Monitoring Hooks', status: 'pending', estimatedDays: 5, actualDays: 0, assignee: 'Dev G' },
-              ],
-              developers: [
-                { id: 'd6', name: 'Karan Joshi', role: 'Backend Dev', utilization: 85, currentModule: 'Redis Cache Layer' },
-                { id: 'd7', name: 'Pooja Reddy', role: 'DevOps', utilization: 70, currentModule: 'Monitoring Hooks' },
-                { id: 'd8', name: 'Arjun Nair', role: 'Junior Dev', utilization: 78, currentModule: 'Rate Engine (docs)' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 'tl-02',
-          name: 'Ananya Iyer',
-          team: 'Data Pipeline',
-          status: 'on-track',
-          summary: {
-            activeProjects: 1,
-            developers: 4,
-            delayedProjects: 0,
-            pendingModules: 2,
-            avgUtilization: 80,
-          },
-          projects: [
-            {
-              id: 'prj-03',
-              name: 'Real-time ETL Pipeline',
-              status: 'on-track',
-              risk: 'medium',
-              client: 'RetailCo',
-              progress: 71,
-              duration: { plannedDays: 60, elapsedDays: 40, remainingDays: 20 },
-              timeline: {
-                startDate: '2026-03-15',
-                expectedEndDate: '2026-05-14',
-                projectedEndDate: '2026-05-18',
-              },
-              teamSize: 4,
-              delayDays: 4,
-              delayReason: 'Minor schema changes from client',
-              blockers: [],
-              modules: [
-                { id: 'm8', name: 'Ingestion Layer', status: 'done', estimatedDays: 12, actualDays: 11, assignee: 'Dev H' },
-                { id: 'm9', name: 'Transform Engine', status: 'in-progress', estimatedDays: 15, actualDays: 12, assignee: 'Dev I' },
-                { id: 'm10', name: 'Output Connectors', status: 'pending', estimatedDays: 10, actualDays: 0, assignee: 'Dev J' },
-                { id: 'm11', name: 'Dashboard Integration', status: 'pending', estimatedDays: 8, actualDays: 0, assignee: 'Dev K' },
-              ],
-              developers: [
-                { id: 'd9', name: 'Manish Rao', role: 'Data Engineer', utilization: 88, currentModule: 'Transform Engine' },
-                { id: 'd10', name: 'Divya Shah', role: 'Backend Dev', utilization: 82, currentModule: 'Ingestion Layer (support)' },
-                { id: 'd11', name: 'Ishaan Verma', role: 'Junior Dev', utilization: 76, currentModule: 'Output Connectors (prep)' },
-                { id: 'd12', name: 'Lakshmi N', role: 'QA', utilization: 65, currentModule: 'Ingestion testing' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 'tl-03',
-          name: 'Suresh Kulkarni',
-          team: 'Infrastructure',
-          status: 'blocked',
-          summary: {
-            activeProjects: 1,
-            developers: 3,
-            delayedProjects: 1,
-            pendingModules: 3,
-            avgUtilization: 91,
-          },
-          projects: [
-            {
-              id: 'prj-04',
-              name: 'K8s Migration Phase 2',
-              status: 'blocked',
-              risk: 'high',
-              client: 'Internal',
-              progress: 35,
-              duration: { plannedDays: 75, elapsedDays: 52, remainingDays: 38 },
-              timeline: {
-                startDate: '2026-01-20',
-                expectedEndDate: '2026-04-05',
-                projectedEndDate: '2026-06-20',
-              },
-              teamSize: 3,
-              delayDays: 76,
-              delayReason: 'Cloud provider quota approval stuck with finance',
-              blockers: ['Finance approval pending 3 weeks', 'Staging cluster unavailable'],
-              modules: [
-                { id: 'm12', name: 'Cluster Setup', status: 'done', estimatedDays: 10, actualDays: 14, assignee: 'Dev L' },
-                { id: 'm13', name: 'Service Migration', status: 'in-progress', estimatedDays: 25, actualDays: 30, assignee: 'Dev M' },
-                { id: 'm14', name: 'CI/CD Pipeline', status: 'pending', estimatedDays: 12, actualDays: 0, assignee: 'Dev N' },
-                { id: 'm15', name: 'Rollback Strategy', status: 'pending', estimatedDays: 8, actualDays: 0, assignee: 'Dev L' },
-              ],
-              developers: [
-                { id: 'd13', name: 'Rajesh Pillai', role: 'DevOps Lead', utilization: 98, currentModule: 'Service Migration' },
-                { id: 'd14', name: 'Meera Thomas', role: 'SRE', utilization: 92, currentModule: 'Cluster Setup (support)' },
-                { id: 'd15', name: 'Farhan Ali', role: 'DevOps', utilization: 85, currentModule: 'CI/CD Pipeline (blocked)' },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'mgr-02',
-      name: 'Arun Desai',
-      department: 'Engineering — Products',
-      status: 'on-track',
-      healthScore: 84,
-      summary: {
-        teamLeads: 2,
-        activeProjects: 3,
-        delayedProjects: 0,
-        completedProjects: 2,
-        developers: 10,
-        avgUtilization: 79,
-      },
-      teamLeads: [
-        {
-          id: 'tl-04',
-          name: 'Kavita Menon',
-          team: 'Mobile Apps',
-          status: 'on-track',
-          summary: {
-            activeProjects: 2,
-            developers: 6,
-            delayedProjects: 0,
-            pendingModules: 3,
-            avgUtilization: 81,
-          },
-          projects: [
-            {
-              id: 'prj-05',
-              name: 'Customer App v4.0',
-              status: 'on-track',
-              risk: 'low',
-              client: 'FinServe Ltd',
-              progress: 88,
-              duration: { plannedDays: 120, elapsedDays: 98, remainingDays: 22 },
-              timeline: {
-                startDate: '2025-12-01',
-                expectedEndDate: '2026-05-30',
-                projectedEndDate: '2026-05-25',
-              },
-              teamSize: 4,
-              delayDays: 0,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm16', name: 'UI Redesign', status: 'done', estimatedDays: 30, actualDays: 28, assignee: 'Dev O' },
-                { id: 'm17', name: 'Payment Flow', status: 'in-progress', estimatedDays: 20, actualDays: 15, assignee: 'Dev P' },
-                { id: 'm18', name: 'Push Notifications', status: 'pending', estimatedDays: 10, actualDays: 0, assignee: 'Dev Q' },
-              ],
-              developers: [
-                { id: 'd16', name: 'Tarun Bhatia', role: 'Mobile Lead', utilization: 90, currentModule: 'Payment Flow' },
-                { id: 'd17', name: 'Anjali Roy', role: 'iOS Dev', utilization: 85, currentModule: 'Payment Flow' },
-                { id: 'd18', name: 'Mohit Saxena', role: 'Android Dev', utilization: 88, currentModule: 'Push Notifications (prep)' },
-                { id: 'd19', name: 'Ritu Malhotra', role: 'UI/UX Dev', utilization: 72, currentModule: 'UI Redesign (polish)' },
-              ],
-            },
-            {
-              id: 'prj-06',
-              name: 'Partner SDK',
-              status: 'on-track',
-              risk: 'medium',
-              client: 'External Partners',
-              progress: 64,
-              duration: { plannedDays: 50, elapsedDays: 30, remainingDays: 20 },
-              timeline: {
-                startDate: '2026-04-01',
-                expectedEndDate: '2026-05-20',
-                projectedEndDate: '2026-05-22',
-              },
-              teamSize: 2,
-              delayDays: 2,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm19', name: 'Core SDK', status: 'in-progress', estimatedDays: 18, actualDays: 14, assignee: 'Dev R' },
-                { id: 'm20', name: 'Documentation', status: 'pending', estimatedDays: 8, actualDays: 0, assignee: 'Dev S' },
-              ],
-              developers: [
-                { id: 'd20', name: 'Gaurav Mishra', role: 'SDK Engineer', utilization: 86, currentModule: 'Core SDK' },
-                { id: 'd21', name: 'Shweta Kulkarni', role: 'Technical Writer', utilization: 60, currentModule: 'Documentation (outline)' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 'tl-05',
-          name: 'Deepak Choudhary',
-          team: 'Web Products',
-          status: 'on-track',
-          summary: {
-            activeProjects: 1,
-            developers: 4,
-            delayedProjects: 0,
-            pendingModules: 1,
-            avgUtilization: 77,
-          },
-          projects: [
-            {
-              id: 'prj-07',
-              name: 'Admin Portal Rewrite',
-              status: 'on-track',
-              risk: 'low',
-              client: 'Internal',
-              progress: 76,
-              duration: { plannedDays: 80, elapsedDays: 55, remainingDays: 25 },
-              timeline: {
-                startDate: '2026-02-20',
-                expectedEndDate: '2026-05-10',
-                projectedEndDate: '2026-05-08',
-              },
-              teamSize: 4,
-              delayDays: 0,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm21', name: 'User Management', status: 'done', estimatedDays: 15, actualDays: 14, assignee: 'Dev T' },
-                { id: 'm22', name: 'Reporting Module', status: 'in-progress', estimatedDays: 20, actualDays: 16, assignee: 'Dev U' },
-                { id: 'm23', name: 'Settings & Config', status: 'pending', estimatedDays: 12, actualDays: 0, assignee: 'Dev V' },
-              ],
-              developers: [
-                { id: 'd22', name: 'Nitin Agarwal', role: 'Frontend Lead', utilization: 84, currentModule: 'Reporting Module' },
-                { id: 'd23', name: 'Preeti Sinha', role: 'React Dev', utilization: 80, currentModule: 'Reporting Module' },
-                { id: 'd24', name: 'Harsh Vardhan', role: 'Backend Dev', utilization: 75, currentModule: 'Settings & Config (API design)' },
-                { id: 'd25', name: 'Yash Malhotra', role: 'QA', utilization: 68, currentModule: 'User Management testing' },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'mgr-03',
-      name: 'Meena Krishnan',
-      department: 'Engineering — Analytics',
-      status: 'on-track',
-      healthScore: 79,
-      summary: {
-        teamLeads: 2,
-        activeProjects: 2,
-        delayedProjects: 1,
-        completedProjects: 1,
-        developers: 9,
-        avgUtilization: 83,
-      },
-      teamLeads: [
-        {
-          id: 'tl-06',
-          name: 'Sanjay Bhatt',
-          team: 'BI & Reporting',
-          status: 'at-risk',
-          summary: {
-            activeProjects: 1,
-            developers: 5,
-            delayedProjects: 1,
-            pendingModules: 2,
-            avgUtilization: 86,
-          },
-          projects: [
-            {
-              id: 'prj-08',
-              name: 'Executive Dashboard Suite',
-              status: 'delayed',
-              risk: 'medium',
-              client: 'C-Suite',
-              progress: 52,
-              duration: { plannedDays: 70, elapsedDays: 60, remainingDays: 22 },
-              timeline: {
-                startDate: '2026-02-25',
-                expectedEndDate: '2026-05-05',
-                projectedEndDate: '2026-05-28',
-              },
-              teamSize: 5,
-              delayDays: 23,
-              delayReason: 'Scope creep — 3 new KPI widgets added mid-sprint',
-              blockers: ['Data source API unstable'],
-              modules: [
-                { id: 'm24', name: 'KPI Widgets', status: 'in-progress', estimatedDays: 18, actualDays: 22, assignee: 'Dev W' },
-                { id: 'm25', name: 'Drill-down Views', status: 'pending', estimatedDays: 14, actualDays: 0, assignee: 'Dev X' },
-                { id: 'm26', name: 'Export & Scheduling', status: 'pending', estimatedDays: 10, actualDays: 0, assignee: 'Dev Y' },
-              ],
-              developers: [
-                { id: 'd26', name: 'Abhishek Nanda', role: 'Analytics Lead', utilization: 92, currentModule: 'KPI Widgets' },
-                { id: 'd27', name: 'Chitra Deshmukh', role: 'Data Viz Dev', utilization: 88, currentModule: 'KPI Widgets' },
-                { id: 'd28', name: 'Varun Kapoor', role: 'Backend Dev', utilization: 85, currentModule: 'Data source fixes' },
-                { id: 'd29', name: 'Komal Jain', role: 'Frontend Dev', utilization: 80, currentModule: 'Drill-down (wireframes)' },
-                { id: 'd30', name: 'Aditya Bose', role: 'QA', utilization: 70, currentModule: 'KPI Widgets testing' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 'tl-07',
-          name: 'Rekha Sundaram',
-          team: 'ML Engineering',
-          status: 'on-track',
-          summary: {
-            activeProjects: 1,
-            developers: 4,
-            delayedProjects: 0,
-            pendingModules: 1,
-            avgUtilization: 78,
-          },
-          projects: [
-            {
-              id: 'prj-09',
-              name: 'Churn Prediction Model',
-              status: 'on-track',
-              risk: 'low',
-              client: 'Sales Team',
-              progress: 90,
-              duration: { plannedDays: 55, elapsedDays: 48, remainingDays: 7 },
-              timeline: {
-                startDate: '2026-03-01',
-                expectedEndDate: '2026-04-25',
-                projectedEndDate: '2026-04-22',
-              },
-              teamSize: 4,
-              delayDays: 0,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm27', name: 'Feature Engineering', status: 'done', estimatedDays: 12, actualDays: 11, assignee: 'Dev Z' },
-                { id: 'm28', name: 'Model Training', status: 'done', estimatedDays: 15, actualDays: 14, assignee: 'Dev AA' },
-                { id: 'm29', name: 'API Deployment', status: 'in-progress', estimatedDays: 8, actualDays: 5, assignee: 'Dev AB' },
-              ],
-              developers: [
-                { id: 'd31', name: 'Pranav Iyer', role: 'ML Engineer', utilization: 90, currentModule: 'API Deployment' },
-                { id: 'd32', name: 'Nandini Rao', role: 'Data Scientist', utilization: 85, currentModule: 'Model tuning' },
-                { id: 'd33', name: 'Sameer Khan', role: 'MLOps', utilization: 82, currentModule: 'API Deployment' },
-                { id: 'd34', name: 'Olivia Fernandes', role: 'Junior DS', utilization: 65, currentModule: 'Documentation' },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'mgr-04',
-      name: 'Vikash Malhotra',
-      department: 'Engineering — Integrations',
-      status: 'on-track',
-      healthScore: 81,
-      summary: {
-        teamLeads: 2,
-        activeProjects: 2,
-        delayedProjects: 0,
-        completedProjects: 0,
-        developers: 7,
-        avgUtilization: 74,
-      },
-      teamLeads: [
-        {
-          id: 'tl-08',
-          name: 'Nisha Agarwal',
-          team: 'Third-party Integrations',
-          status: 'on-track',
-          summary: {
-            activeProjects: 1,
-            developers: 4,
-            delayedProjects: 0,
-            pendingModules: 2,
-            avgUtilization: 76,
-          },
-          projects: [
-            {
-              id: 'prj-10',
-              name: 'Salesforce Connector',
-              status: 'on-track',
-              risk: 'medium',
-              client: 'Enterprise Sales',
-              progress: 67,
-              duration: { plannedDays: 65, elapsedDays: 42, remainingDays: 23 },
-              timeline: {
-                startDate: '2026-03-10',
-                expectedEndDate: '2026-05-14',
-                projectedEndDate: '2026-05-16',
-              },
-              teamSize: 4,
-              delayDays: 2,
-              delayReason: null,
-              blockers: [],
-              modules: [
-                { id: 'm30', name: 'OAuth & Auth', status: 'done', estimatedDays: 10, actualDays: 9, assignee: 'Dev AC' },
-                { id: 'm31', name: 'Sync Engine', status: 'in-progress', estimatedDays: 18, actualDays: 14, assignee: 'Dev AD' },
-                { id: 'm32', name: 'Error Handling', status: 'pending', estimatedDays: 8, actualDays: 0, assignee: 'Dev AE' },
-              ],
-              developers: [
-                { id: 'd35', name: 'Rahul Verma', role: 'Integration Lead', utilization: 84, currentModule: 'Sync Engine' },
-                { id: 'd36', name: 'Sonia Mehta', role: 'Backend Dev', utilization: 78, currentModule: 'Sync Engine' },
-                { id: 'd37', name: 'Kunal Shah', role: 'Junior Dev', utilization: 72, currentModule: 'Error Handling (research)' },
-                { id: 'd38', name: 'Pallavi Nair', role: 'QA', utilization: 68, currentModule: 'OAuth testing' },
-              ],
-            },
-          ],
-        },
-        {
-          id: 'tl-09',
-          name: 'Harish Pillai',
-          team: 'Legacy Modernization',
-          status: 'on-track',
-          summary: {
-            activeProjects: 1,
-            developers: 3,
-            delayedProjects: 0,
-            pendingModules: 4,
-            avgUtilization: 71,
-          },
-          projects: [
-            {
-              id: 'prj-11',
-              name: 'Mainframe API Wrapper',
-              status: 'on-track',
-              risk: 'high',
-              client: 'Banking Client',
-              progress: 44,
-              duration: { plannedDays: 100, elapsedDays: 38, remainingDays: 62 },
-              timeline: {
-                startDate: '2026-03-20',
-                expectedEndDate: '2026-06-28',
-                projectedEndDate: '2026-06-28',
-              },
-              teamSize: 3,
-              delayDays: 0,
-              delayReason: null,
-              blockers: ['Legacy documentation incomplete'],
-              modules: [
-                { id: 'm33', name: 'COBOL Parser', status: 'in-progress', estimatedDays: 25, actualDays: 18, assignee: 'Dev AF' },
-                { id: 'm34', name: 'REST API Layer', status: 'pending', estimatedDays: 20, actualDays: 0, assignee: 'Dev AG' },
-                { id: 'm35', name: 'Security Layer', status: 'pending', estimatedDays: 15, actualDays: 0, assignee: 'Dev AH' },
-                { id: 'm36', name: 'Load Testing', status: 'pending', estimatedDays: 10, actualDays: 0, assignee: 'Dev AF' },
-              ],
-              developers: [
-                { id: 'd39', name: 'George Mathew', role: 'Legacy Specialist', utilization: 88, currentModule: 'COBOL Parser' },
-                { id: 'd40', name: 'Bhavna Joshi', role: 'Backend Dev', utilization: 70, currentModule: 'REST API (design)' },
-                { id: 'd41', name: 'Chetan Rao', role: 'Security Engineer', utilization: 55, currentModule: 'Security Layer (planning)' },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ],
+  fastCategories: FAST_CATEGORIES,
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -650,127 +605,22 @@ const MODULE_STATUS = {
   pending: { label: 'Pending', color: '#64748b', bg: '#f1f5f9' },
 };
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 function healthColor(score) {
   if (score >= 80) return '#059669';
   if (score >= 65) return '#d97706';
   return '#dc2626';
 }
 
-function movingAverage(values, window) {
-  return values.map((_, i) => {
-    if (i < window - 1) return null;
-    const slice = values.slice(i - window + 1, i + 1);
-    return Math.round((slice.reduce((a, b) => a + b, 0) / slice.length) * 10) / 10;
-  });
+function findFastCategory(id) {
+  return ORG_DATA.fastCategories.find((f) => f.id === id);
 }
 
-function buildHealthSeries(points, fastWindow, slowWindow) {
-  const closes = points.map((p) => p.close);
-  const maFast = movingAverage(closes, fastWindow);
-  const maSlow = movingAverage(closes, slowWindow);
-
-  return points.map((p, i) => {
-    const prevClose = i > 0 ? points[i - 1].close : p.open;
-    const change = +(p.close - prevClose).toFixed(1);
-    const changePct = prevClose ? +((change / prevClose) * 100).toFixed(2) : 0;
-    return {
-      ...p,
-      health: p.close,
-      maFast: maFast[i],
-      maSlow: maSlow[i],
-      change,
-      changePct,
-      isUp: p.close >= p.open,
-    };
-  });
+function findInitiative(fastCategory, initiativeId) {
+  return fastCategory?.initiatives.find((i) => i.id === initiativeId);
 }
 
-function HealthChartDot({ cx, cy, payload }) {
-  if (cx == null || cy == null || !payload) return null;
-  const color = healthColor(payload.close);
-  return <circle cx={cx} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={2} />;
-}
-
-function HealthChartActiveDot({ cx, cy, payload }) {
-  if (cx == null || cy == null || !payload) return null;
-  const color = healthColor(payload.close);
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={12} fill={color} opacity={0.18} />
-      <circle cx={cx} cy={cy} r={6} fill={color} stroke="#fff" strokeWidth={2.5} />
-    </g>
-  );
-}
-
-function formatVolume(value) {
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return `${value}`;
-}
-
-function HealthChartTooltip({ active, payload, label, statusFilters, showProjects, showTrend }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-
-  const rows = [];
-  if (showTrend) {
-    rows.push({ label: 'Health Index', value: `${d.close}%`, color: healthColor(d.close) });
-    rows.push({ label: 'Range', value: `${d.low}% – ${d.high}%` });
-  }
-  if (showProjects) {
-    if (statusFilters.onTrack) rows.push({ label: 'On Track', value: d.onTrack, color: '#059669' });
-    if (statusFilters.atRisk) rows.push({ label: 'At Risk', value: d.atRisk, color: '#d97706' });
-    if (statusFilters.delayed) rows.push({ label: 'Delayed', value: d.delayed, color: '#dc2626' });
-    if (statusFilters.utilization) rows.push({ label: 'Utilization', value: `${d.utilization}%`, color: '#7c3aed' });
-  }
-  if (!showProjects) {
-    rows.push({ label: 'Volume', value: formatVolume(d.volume) });
-  }
-
-  return (
-    <div className="def-health-tooltip">
-      <div className="def-health-tooltip-head">
-        <div>
-          <p className="def-health-tooltip-period">{label}</p>
-          {showTrend && (
-            <strong className="def-health-tooltip-score" style={{ color: healthColor(d.close) }}>{d.close}%</strong>
-          )}
-        </div>
-        {showTrend && (
-          <span className={`def-health-tooltip-delta${d.change >= 0 ? ' up' : ' down'}`}>
-            {d.change >= 0 ? '▲' : '▼'} {Math.abs(d.change)} ({d.changePct >= 0 ? '+' : ''}{d.changePct}%)
-          </span>
-        )}
-      </div>
-      {rows.length > 0 && (
-        <div className="def-health-tooltip-grid">
-          {rows.map((row) => (
-            <div key={row.label}>
-              <span>{row.label}</span>
-              <strong style={row.color ? { color: row.color } : undefined}>{row.value}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function findManager(id) {
-  return ORG_DATA.managers.find((m) => m.id === id);
-}
-
-function findTeamLead(manager, id) {
-  return manager?.teamLeads.find((tl) => tl.id === id);
-}
-
-function findProject(teamLead, id) {
-  return teamLead?.projects.find((p) => p.id === id);
+function findProject(initiative, projectId) {
+  return initiative?.projects.find((p) => p.id === projectId);
 }
 
 function getInitials(name) {
@@ -841,7 +691,7 @@ function KpiStrip({ items }) {
   };
 
   return (
-    <div className="def-kpi-strip">
+    <div className={`def-kpi-strip${items.length === 4 ? ' def-kpi-strip-quad' : ''}`}>
       {items.map((item, index) => (
         <div
           key={item.label}
@@ -905,89 +755,93 @@ function HierarchyTrail({ items }) {
 
 function AppSidebar({
   layer,
-  manager,
-  teamLead,
+  fastCategory,
+  initiative,
   onGoCeo,
-  onSelectManager,
-  onSelectTeamLead,
+  onSelectFast,
+  onSelectInitiative,
   open,
   onNavigate,
 }) {
-  const [expandedMgr, setExpandedMgr] = useState(manager?.id ?? null);
+  const pillarFasts = ORG_DATA.fastCategories;
+  /** Placeholder slice for portfolios outside pillars (empty in demo lay-of-land). */
+  const otherInitiatives = [];
+
+  const [expandedFast, setExpandedFast] = useState(fastCategory?.id ?? pillarFasts[0]?.id ?? null);
 
   useEffect(() => {
-    if (manager?.id) setExpandedMgr(manager.id);
-  }, [manager?.id]);
-
-  const toggleManager = (mgrId) => {
-    setExpandedMgr((prev) => (prev === mgrId ? null : mgrId));
-  };
+    if (fastCategory?.id) setExpandedFast(fastCategory.id);
+  }, [fastCategory?.id]);
 
   const goCeo = () => {
     onGoCeo();
     onNavigate?.();
   };
 
-  const selectManager = (mgrId) => {
-    onSelectManager(mgrId);
+  const pickFast = (fastId) => {
+    onSelectFast(fastId);
+    setExpandedFast(fastId);
     onNavigate?.();
   };
 
-  const selectTeamLead = (mgrId, tlId) => {
-    onSelectTeamLead(mgrId, tlId);
-    setExpandedMgr(mgrId);
+  const pickInitiative = (fastId, initiativeId) => {
+    onSelectInitiative(fastId, initiativeId);
+    setExpandedFast(fastId);
     onNavigate?.();
+  };
+
+  const toggleFast = (fastId) => {
+    setExpandedFast((prev) => (prev === fastId ? null : fastId));
   };
 
   return (
     <aside className={`def-sidebar${open ? ' def-sidebar-open' : ''}`}>
       <nav className="def-sidebar-nav">
-        <p className="def-sidebar-label">Organization</p>
+        <p className="def-sidebar-label">Executive</p>
         <button
           type="button"
           className={`def-sidebar-link def-sidebar-link-ceo${layer === 'ceo' ? ' active' : ''}`}
           onClick={goCeo}
         >
-          <span className="def-sidebar-tier def-sidebar-tier-ceo">CEO</span>
+          <span className="def-sidebar-tier def-sidebar-tier-ceo">CC</span>
           <span className="def-sidebar-link-text">
-            <strong>CEO Overview</strong>
-            <small>Executive dashboard</small>
+            <strong>Command Center Cockpit</strong>
+            <small>Portfolio health & FAST pillars</small>
           </span>
         </button>
 
         <p className="def-sidebar-label def-sidebar-label-section">
-          Managers
-          <span className="def-sidebar-count">{ORG_DATA.managers.length}</span>
+          FAST pillars
+          <span className="def-sidebar-count">{pillarFasts.length}</span>
         </p>
 
-        {ORG_DATA.managers.map((mgr) => {
-          const isExpanded = expandedMgr === mgr.id;
-          const isActive = manager?.id === mgr.id;
+        {pillarFasts.map((fast) => {
+          const isExpanded = expandedFast === fast.id;
+          const isActive = fastCategory?.id === fast.id;
           return (
-            <div key={mgr.id} className={`def-sidebar-group${isActive ? ' active' : ''}`}>
+            <div key={fast.id} className={`def-sidebar-group${isActive ? ' active' : ''}`}>
               <div className="def-sidebar-row">
                 <button
                   type="button"
-                  className={`def-sidebar-link${isActive ? ' active' : ''}`}
-                  onClick={() => selectManager(mgr.id)}
+                  className={`def-sidebar-link${isActive && layer !== 'ceo' ? ' active' : ''}`}
+                  onClick={() => pickFast(fast.id)}
                 >
-                  <span className="def-sidebar-tier def-sidebar-tier-mgr">M</span>
+                  <span className="def-sidebar-tier def-sidebar-tier-mgr">{fast.shortName.slice(0, 2)}</span>
                   <span className="def-sidebar-link-text">
-                    <strong>{mgr.name}</strong>
-                    <small>
-                      <span className="def-sidebar-role">Manager</span>
-                      · {mgr.department}
-                    </small>
+                    <strong>{fast.shortName}</strong>
+                    <SidebarFastStatusRow fast={fast} />
                   </span>
-                  <span className="def-sidebar-score" style={{ color: healthColor(mgr.healthScore) }}>{mgr.healthScore}%</span>
+                  <strong className="def-sidebar-score" style={{ color: healthColor(fast.healthScore) }}>
+                    {fast.healthScore}%
+                  </strong>
                 </button>
                 <button
                   type="button"
                   className={`def-sidebar-toggle${isExpanded ? ' open' : ''}`}
-                  onClick={() => toggleManager(mgr.id)}
+                  onClick={() => toggleFast(fast.id)}
                   aria-expanded={isExpanded}
-                  aria-label={`${isExpanded ? 'Hide' : 'Show'} team leads under ${mgr.name}`}
-                  title={`${isExpanded ? 'Hide' : 'Show'} team leads`}
+                  aria-label={`${isExpanded ? 'Hide' : 'Show'} initiatives under ${fast.shortName}`}
+                  title={`${isExpanded ? 'Hide' : 'Show'} initiatives`}
                 >
                   {isExpanded ? '▾' : '▸'}
                 </button>
@@ -995,24 +849,24 @@ function AppSidebar({
               {isExpanded && (
                 <div className="def-sidebar-nested">
                   <p className="def-sidebar-sublabel">
-                    Team Leads
-                    <span className="def-sidebar-count">{mgr.teamLeads.length}</span>
+                    Initiatives
+                    <span className="def-sidebar-count">{fast.initiatives.length}</span>
                   </p>
-                  {mgr.teamLeads.map((tl) => {
-                    const isTlActive = teamLead?.id === tl.id;
+                  {fast.initiatives.map((ini) => {
+                    const isIniActive = initiative?.id === ini.id && fastCategory?.id === fast.id;
                     return (
                       <button
-                        key={tl.id}
+                        key={ini.id}
                         type="button"
-                        className={`def-sidebar-nested-link${isTlActive ? ' active' : ''}`}
-                        onClick={() => selectTeamLead(mgr.id, tl.id)}
+                        className={`def-sidebar-nested-link${isIniActive ? ' active' : ''}`}
+                        onClick={() => pickInitiative(fast.id, ini.id)}
                       >
-                        <span className="def-sidebar-tier def-sidebar-tier-tl">TL</span>
+                        <span className="def-sidebar-tier def-sidebar-tier-tl">★</span>
                         <span className="def-sidebar-nested-text">
-                          <strong>{tl.name}</strong>
-                          <small>Team Lead · {tl.team}</small>
+                          <strong>{ini.name}</strong>
+                          <small>{ini.team?.name ?? 'Team'}</small>
                         </span>
-                        <StatusPill status={tl.status} />
+                        <StatusPill status={ini.status} />
                       </button>
                     );
                   })}
@@ -1021,14 +875,37 @@ function AppSidebar({
             </div>
           );
         })}
+
+        {otherInitiatives.length > 0 && (
+          <>
+            <p className="def-sidebar-label def-sidebar-label-section">
+              Other portfolios
+              <span className="def-sidebar-count">{otherInitiatives.length}</span>
+            </p>
+            {otherInitiatives.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="def-sidebar-link"
+                onClick={() => pickInitiative(item.fastId, item.id)}
+              >
+                <span className="def-sidebar-tier def-sidebar-tier-tl">+</span>
+                <span className="def-sidebar-link-text">
+                  <strong>{item.name}</strong>
+                  <small>Outside FAST taxonomy</small>
+                </span>
+              </button>
+            ))}
+          </>
+        )}
       </nav>
     </aside>
   );
 }
 
-function AppFooter() {
+function AppFooter({ compact = false }) {
   return (
-    <footer className="def-footer">
+    <footer className={`def-footer${compact ? ' def-footer-compact' : ''}`}>
       <span>{ORG_DATA.ceoSummary.totalProjects} projects tracked</span>
     </footer>
   );
@@ -1054,408 +931,372 @@ function ThemeToggle({ theme, onToggle }) {
 
 const THEME_STORAGE_KEY = 'adp-demo-theme';
 
-const CEO_CHART_RANGES = ['8W', '6M'];
 
-const CEO_STATUS_FILTERS = [
-  { key: 'onTrack', label: 'On Track', legendClass: 'def-lg-ontrack' },
-  { key: 'atRisk', label: 'At Risk', legendClass: 'def-lg-atrisk' },
-  { key: 'delayed', label: 'Delayed', legendClass: 'def-lg-delayed' },
-  { key: 'utilization', label: 'Utilization', legendClass: 'def-lg-util', line: true },
-];
+function sparkSeries(weekly, pick) {
+  return weekly.map((w, ix) => ({ ix, v: pick(w) }));
+}
 
-const DEFAULT_STATUS_FILTERS = {
-  onTrack: true,
-  atRisk: true,
-  delayed: true,
-  utilization: true,
-};
+function buildCockpitAnalytics(orgData, filterFastId) {
+  const { fastCategories, ceoTrends, ceoSummary: globalSummary } = orgData;
+  const pillarFasts = filterFastId ? fastCategories.filter((f) => f.id === filterFastId) : fastCategories;
+  const initiatives = pillarFasts.flatMap((f) => f.initiatives.map((i) => ({
+    ...i,
+    pillar: f.shortName,
+    fastId: f.id,
+  })));
+  const projects = initiatives.flatMap((i) => i.projects);
+  const ceoSummary = filterFastId ? computePortfolioSummary(pillarFasts) : globalSummary;
 
-/** Lets the page scroll when the wheel is used over Recharts SVG areas. */
-function ScrollPass({ children, className, scrollRootRef }) {
-  const ref = useRef(null);
+  const weekly = ceoTrends.weekly;
+  const monthly = ceoTrends.monthly.slice(-4);
+
+  const statusMovement = weekly.map((w) => ({
+    label: w.label,
+    OnTrack: w.onTrack ?? 0,
+    AtRisk: w.atRisk ?? 0,
+    Delayed: w.delayed ?? 0,
+  }));
+
+  const quarterlyBars = monthly.map((m, i) => ({
+    quarter: `${m.label}`,
+    onTrack: m.onTrack ?? 0,
+    atRisk: m.atRisk ?? 0,
+    delayed: m.delayed ?? 0,
+    sortKey: i,
+  }));
+
+  const recoveryTable = initiatives
+    .filter((ini) => ini.projects.some((p) => CRITICAL_STATUS.has(p.status)))
+    .slice(0, 8)
+    .map((ini) => {
+      const flagged = [...ini.projects].filter((p) => CRITICAL_STATUS.has(p.status)).sort((a, b) => (b.delayDays || 0) - (a.delayDays || 0))[0];
+      return {
+        id: `${ini.fastId}-${ini.id}`,
+        initiative: ini.name,
+        pillar: ini.pillar,
+        path: flagged?.delayReason || 'Remediation + dependency burn-down plan',
+        eta: formatDate(flagged?.timeline.projectedEndDate || flagged?.timeline.expectedEndDate),
+        sponsor: ini.team?.name ?? 'Delivery sponsor',
+      };
+    });
+
+  const teamOverview = initiatives.map((ini) => ({
+    id: `${ini.fastId}-${ini.team?.id}-${ini.id}`,
+    team: ini.team?.name ?? 'Team',
+    initiative: ini.name,
+    pillar: ini.pillar,
+    status: ini.status,
+    projects: ini.projects.length,
+    utilization: ini.team?.summary?.avgUtilization ?? 0,
+    health: Math.round(ini.projects.reduce((s, p) => s + p.progress, 0) / Math.max(ini.projects.length, 1)),
+  }));
+
+  const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
+
+  const topRisks = [...projects]
+    .filter((p) => p.risk === 'high' || CRITICAL_STATUS.has(p.status))
+    .sort((a, b) => (b.delayDays || 0) - (a.delayDays || 0))
+    .slice(0, 7)
+    .map((p) => ({
+      id: p.id,
+      title: p.name,
+      level: p.risk === 'high' ? 'High risk' : p.status === 'blocked' ? 'Blocked' : 'At risk delivery',
+      note: p.delayReason || `Client: ${p.client}`,
+      risk: p.risk,
+    }));
+
+  const upcomingMilestones = initiatives
+    .flatMap((ini) =>
+      ini.projects.flatMap((p) =>
+        p.modules
+          .filter((m) => m.status !== 'done')
+          .map((m) => ({
+            id: `${p.id}-${m.id}`,
+            initiative: ini.name,
+            pillar: ini.pillar,
+            project: p.name,
+            milestone: m.name,
+            pacing: `${m.actualDays}/${m.estimatedDays}d`,
+          }))))
+    .slice(0, 6);
+
+  const insightLines = [];
+  insightLines.push(`The FAST framework tracks ${ceoSummary.totalInitiatives} initiatives across ${ceoSummary.totalTeams} delivery teams.`);
+  insightLines.push(`Portfolio health is ${ceoSummary.overallHealth}%. ${ceoSummary.offTrackPct}% of projects need attention or escalation.`);
+  insightLines.push(ceoSummary.delayedProjects || ceoSummary.atRiskProjects
+    ? `Review PI acceleration and open dependencies — ${ceoSummary.delayedProjects} delayed or blocked projects remain.`
+    : 'Progress is stable week over week. Monitor vendor and cloud migration risks.');
+
+  const lastQuarterBullets = [
+    `Average team utilization was ${weekly[weekly.length - 1]?.utilization ?? 85}%. Portfolio health ended near ${weekly[weekly.length - 1]?.close ?? ceoSummary.overallHealth}%.`,
+    `${ceoSummary.onTrackPct}% of projects are on track across FAST pillars.`,
+    `${ceoSummary.atRiskProjects > 0 ? `${ceoSummary.atRiskProjects} initiatives need executive sponsorship` : 'No major executive sponsorship gaps this quarter'}.`,
+  ];
+
+  const sparks = {
+    health: sparkSeries(weekly, (w) => w.close),
+    mix: sparkSeries(weekly, (w) => w.onTrack + w.atRisk * 1.05),
+    pillars: sparkSeries(weekly, (w) => w.close * 1.03),
+    initiatives: sparkSeries(weekly, () => ceoSummary.totalInitiatives),
+    velocity: sparkSeries(weekly, (w) => w.utilization ?? 82),
+    risk: sparkSeries(weekly, (w) => (w.delayed + w.atRisk) * -1.8 + 68),
+    complete: sparkSeries(weekly, (w) => w.close * 0.92),
+  };
+
+  return {
+    ceoSummary,
+    statusMovement,
+    quarterlyBars,
+    recoveryTable,
+    teamOverview,
+    initiativeTracker,
+    topRisks,
+    upcomingMilestones,
+    insightLines,
+    lastQuarterBullets,
+    sparks,
+  };
+}
+
+function useViewport() {
+  const [vp, setVp] = useState(() => ({
+    compact: false,
+    isMobile: false,
+    isTablet: false,
+    chartH: 210,
+    wsChartH: 192,
+    wsBarH: 156,
+  }));
 
   useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-
-    const getScrollEl = () => scrollRootRef?.current
-      || root.closest('.def-content-wrap')
-      || document.scrollingElement
-      || document.documentElement;
-
-    const onWheel = (e) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      const inChart = e.target.closest('.recharts-wrapper, .recharts-surface, svg');
-      if (!inChart || !root.contains(inChart)) return;
-      e.preventDefault();
-      getScrollEl().scrollBy({ top: e.deltaY, left: 0 });
+    const sync = () => {
+      const width = window.innerWidth;
+      setVp({
+        compact: width < 640,
+        isMobile: width < 480,
+        isTablet: width < 768,
+        chartH: width < 480 ? 160 : width < 640 ? 180 : width < 768 ? 195 : width < 1024 ? 205 : 220,
+        wsChartH: width < 480 ? 148 : width < 640 ? 168 : width < 768 ? 176 : width < 1024 ? 184 : 192,
+        wsBarH: width < 480 ? 118 : width < 640 ? 132 : width < 768 ? 140 : width < 1024 ? 148 : 156,
+      });
     };
+    sync();
+    window.addEventListener('resize', sync, { passive: true });
+    return () => window.removeEventListener('resize', sync);
+  }, []);
 
-    root.addEventListener('wheel', onWheel, { passive: false, capture: true });
-    return () => root.removeEventListener('wheel', onWheel, { capture: true });
-  }, [scrollRootRef]);
+  return vp;
+}
 
+const FAST_PILLAR_ICONS = {
+  FOCUS: '◎',
+  ACCELERATE: '⚡',
+  SCALE: '◆',
+  TRANSFORM: '↻',
+};
+
+const COCKPIT_METRIC_ICONS = {
+  'FAST pillars': '🏛',
+  Initiatives: '📊',
+  'Projects in flight': '📁',
+  'On-track mix': '✓',
+  'At-risk share': '◐',
+  'Off-track share': '⚠',
+  'Completed projects': '★',
+  'Portfolio health': '◆',
+};
+
+function CockpitMetricSpark({ data, stroke }) {
+  const line = stroke || '#6366f1';
   return (
-    <div ref={ref} className={className}>
-      {children}
+    <div className="def-cockpit-metric-spark">
+      <ResponsiveContainer width="100%" height={40}>
+        <LineChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <XAxis dataKey="ix" hide />
+          <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
+          <Line type="monotone" dataKey="v" stroke={line} strokeWidth={2.5} dot={false} isAnimationActive animationDuration={900} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-function CeoExecutiveChart({ theme = 'light', scrollRootRef }) {
-  const r = useResponsiveChart();
-  const { ceoTrends } = ORG_DATA;
-  const [range, setRange] = useState('8W');
-  const [showTrend, setShowTrend] = useState(true);
-  const [showProjects, setShowProjects] = useState(true);
-  const [statusFilters, setStatusFilters] = useState(DEFAULT_STATUS_FILTERS);
-
-  const toggleStatusFilter = (key) => {
-    setStatusFilters((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      const anyActive = Object.values(next).some(Boolean);
-      return anyActive ? next : prev;
-    });
-  };
-
-  const rawData = range === '8W' ? ceoTrends.weekly : ceoTrends.monthly;
-  const maFastWindow = range === '8W' ? 3 : 2;
-  const maSlowWindow = range === '8W' ? 5 : 3;
-  const data = useMemo(
-    () => buildHealthSeries(rawData, maFastWindow, maSlowWindow),
-    [rawData, maFastWindow, maSlowWindow],
+function CockpitMetricCard({ title, value, subtitle, accent, spark, delay = '0ms' }) {
+  const icon = COCKPIT_METRIC_ICONS[title] || '●';
+  return (
+    <article className={`def-cockpit-metric-card def-cockpit-interactive def-stagger-in${accent ? ` ${accent}` : ''}`} style={{ '--stagger': delay }}>
+      <div className="def-cockpit-metric-icon" aria-hidden="true">{icon}</div>
+      <div className="def-cockpit-metric-copy">
+        <span className="def-cockpit-metric-label">{title}</span>
+        <strong className="def-cockpit-metric-value">{value}</strong>
+        {subtitle ? <small className="def-cockpit-metric-sub">{subtitle}</small> : null}
+      </div>
+      <CockpitMetricSpark
+        data={spark}
+        stroke={accent === 'def-accent-amber' ? '#d97706' : accent === 'def-accent-rose' ? '#dc2626' : accent === 'def-accent-emerald' ? '#059669' : undefined}
+      />
+    </article>
   );
+}
 
-  const hasBarFilters = statusFilters.onTrack || statusFilters.atRisk || statusFilters.delayed;
-  const hasUtilFilter = statusFilters.utilization;
-  const activeFilterLabels = CEO_STATUS_FILTERS.filter(({ key }) => statusFilters[key]).map(({ label }) => label);
+function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
+  const projects = fast.initiatives.flatMap((ini) => ini.projects);
+  const onCount = projects.filter((p) => p.status === 'on-track').length;
+  const atCount = projects.filter((p) => p.status === 'at-risk').length;
+  const lateCount = projects.filter((p) => p.status === 'delayed' || p.status === 'blocked').length;
+  const total = Math.max(projects.length, 1);
+  const leadTeam = fast.initiatives[0]?.team?.name ?? 'Delivery team';
+  const trendUp = fast.healthScore >= 70;
 
-  const projectsStackMax = useMemo(() => {
-    if (!showProjects || !hasBarFilters) return 4;
-    return Math.max(
-      ...data.map((d) => {
-        let sum = 0;
-        if (statusFilters.onTrack) sum += d.onTrack;
-        if (statusFilters.atRisk) sum += d.atRisk;
-        if (statusFilters.delayed) sum += d.delayed;
-        return sum;
-      }),
-      1,
-    );
-  }, [data, showProjects, hasBarFilters, statusFilters]);
-
-  const countSeriesMax = useMemo(() => Math.max(
-    ...data.flatMap((d) => [
-      statusFilters.onTrack ? d.onTrack : 0,
-      statusFilters.atRisk ? d.atRisk : 0,
-      statusFilters.delayed ? d.delayed : 0,
-    ]),
-    1,
-  ), [data, statusFilters]);
-
-  const mainHeight = r.isMobile ? 220 : r.isTablet ? 280 : 340;
-  const subHeight = showTrend ? (r.isMobile ? 130 : 130) : (r.isMobile ? 200 : 220);
-  const margin = useMemo(
-    () => (r.isMobile
-      ? { top: 8, right: 2, left: -6, bottom: 0 }
-      : r.isTablet
-        ? { top: 12, right: 8, left: 0, bottom: 0 }
-        : { top: 16, right: 12, left: 4, bottom: 0 }),
-    [r.isMobile, r.isTablet],
-  );
-
-  const topMargin = useMemo(() => {
-    if (!showProjects || (!hasBarFilters && !hasUtilFilter)) return margin;
-    return { ...margin, right: r.isMobile ? 28 : 36 };
-  }, [margin, showProjects, hasBarFilters, hasUtilFilter, r.isMobile]);
-
-  const healthDomain = useMemo(() => {
-    const lows = data.map((d) => d.low);
-    const highs = data.map((d) => d.high);
-    const pad = 4;
-    return [Math.max(0, Math.floor(Math.min(...lows) - pad)), Math.min(100, Math.ceil(Math.max(...highs) + pad))];
-  }, [data]);
+  const data = [
+    { name: 'On Track', value: onCount || 0, fill: '#22c55e' },
+    { name: 'At Risk', value: atCount, fill: '#f59e0b' },
+    { name: 'Off Track', value: lateCount, fill: '#ef4444' },
+  ].filter((d) => d.value > 0);
 
   const isDark = theme === 'dark';
-  const chartTick = isDark ? '#94949e' : '#64748b';
-  const chartGrid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.12)';
-  const chartAxis = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.2)';
-  const cursorColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.12)';
-  const tooltipProps = { statusFilters, showProjects, showTrend };
 
   return (
-    <section className="def-section def-health-chart def-stagger-in" style={{ '--stagger': '80ms' }}>
-      <div className="def-chart-head">
-        <div>
-          <h2 className="def-section-title">Portfolio Health</h2>
-          <p className="def-section-desc">
-            {showProjects && activeFilterLabels.length
-              ? `Filtered · ${activeFilterLabels.join(' · ')} · ${range === '8W' ? '8 weeks' : '6 months'}`
-              : 'Org health trend · project mix · delivery volume'}
-          </p>
-        </div>
-        <div className="def-chart-controls">
-          <div className="def-chart-chip-group">
-            <button type="button" className={`def-chart-chip${showTrend ? ' active' : ''}`} onClick={() => setShowTrend((v) => !v)} aria-pressed={showTrend}>
-              Trend
-            </button>
-            <button type="button" className={`def-chart-chip${showProjects ? ' active' : ''}`} onClick={() => setShowProjects((v) => !v)} aria-pressed={showProjects}>
-              Projects
-            </button>
-          </div>
-          {showProjects && (
-            <div className="def-chart-chip-group def-chart-status-group">
-              {CEO_STATUS_FILTERS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`def-chart-chip def-chart-status-chip def-chart-status-${key}${statusFilters[key] ? ' active' : ''}`}
-                  onClick={() => toggleStatusFilter(key)}
-                  aria-pressed={statusFilters[key]}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="def-chart-chip-group">
-            {CEO_CHART_RANGES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={`def-chart-chip${range === item ? ' active' : ''}`}
-                onClick={() => setRange(item)}
-              >
-                {item === '8W' ? '8W' : '6M'}
-              </button>
-            ))}
-          </div>
+    <button
+      type="button"
+      className="def-cockpit-fast-health def-cockpit-interactive def-stagger-in"
+      style={{ '--stagger': `${120 + index * 70}ms` }}
+      onClick={() => onSelectFast?.(fast.id)}
+      aria-label={`Open ${fast.shortName} pillar`}
+    >
+      <div className="def-cockpit-fast-head">
+        <span className="def-cockpit-fast-icon">{FAST_PILLAR_ICONS[fast.shortName] || '●'}</span>
+        <div className="def-cockpit-fast-titles">
+          <p className="def-cockpit-fast-kicker">{fast.shortName}</p>
+          <h3>{fast.name}</h3>
         </div>
       </div>
-
-      <ScrollPass className="def-health-chart-card" scrollRootRef={scrollRootRef}>
-        {showTrend && (
-          <ResponsiveContainer width="100%" height={mainHeight}>
-            <ComposedChart data={data} margin={topMargin} syncId="healthExec">
-              <defs>
-                <linearGradient id="defHealthAreaFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.42} />
-                  <stop offset="55%" stopColor="#a855f7" stopOpacity={0.18} />
-                  <stop offset="100%" stopColor="#ec4899" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="defHealthLine" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#6366f1" />
-                  <stop offset="50%" stopColor="#a855f7" />
-                  <stop offset="100%" stopColor="#ec4899" />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 8" stroke={chartGrid} vertical={false} />
-              <ReferenceArea yAxisId="health" y1={80} y2={100} fill="#34d399" fillOpacity={0.08} />
-              <ReferenceArea yAxisId="health" y1={65} y2={80} fill="#fbbf24" fillOpacity={0.06} />
-              <ReferenceArea yAxisId="health" y1={healthDomain[0]} y2={65} fill="#f87171" fillOpacity={0.05} />
-
-              <XAxis dataKey="label" tick={false} axisLine={{ stroke: chartAxis }} tickLine={false} height={1} />
-              <YAxis
-                yAxisId="health"
-                domain={healthDomain}
-                tick={{ fontSize: r.tickSmall, fill: chartTick, fontWeight: 600 }}
-                axisLine={false}
-                tickLine={false}
-                width={r.isMobile ? 36 : 44}
-                tickFormatter={(v) => `${v}%`}
-              />
-              {showProjects && hasBarFilters && (
-                <YAxis
-                  yAxisId="counts"
-                  orientation="right"
-                  domain={[0, countSeriesMax + 1]}
-                  tick={{ fontSize: r.tickSmall, fill: chartTick, fontWeight: 600 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={r.isMobile ? 28 : 34}
-                  allowDecimals={false}
-                />
-              )}
-              {showProjects && hasUtilFilter && (
-                <YAxis
-                  yAxisId="utilTop"
-                  orientation="right"
-                  domain={[70, 100]}
-                  tick={{ fontSize: r.tickSmall, fill: chartTick, fontWeight: 600 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={r.isMobile ? 28 : 34}
-                  tickFormatter={(v) => `${v}%`}
-                />
-              )}
-              <Tooltip
-                content={<HealthChartTooltip {...tooltipProps} />}
-                cursor={{ stroke: '#a855f7', strokeWidth: 1.5, strokeDasharray: '4 4' }}
-                isAnimationActive={false}
-              />
-              <ReferenceLine
-                yAxisId="health"
-                y={ceoTrends.targetHealth}
-                stroke="#34d399"
-                strokeDasharray="6 4"
-                strokeWidth={2}
-                label={r.isMobile ? undefined : {
-                  value: `Target ${ceoTrends.targetHealth}%`,
-                  position: 'insideTopRight',
-                  fill: '#34d399',
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}
-              />
-
-              <Area
-                yAxisId="health"
-                type="monotone"
-                dataKey="close"
+      <div className="def-cockpit-fast-body">
+        <div className="def-cockpit-fast-chart">
+          <ResponsiveContainer width="100%" height={88}>
+            <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <Pie
+                data={data.length ? data : [{ name: 'Empty', value: 1, fill: isDark ? '#334155' : '#e2e8f0' }]}
+                dataKey="value"
+                cx="50%"
+                cy="50%"
+                innerRadius="58%"
+                outerRadius="88%"
+                paddingAngle={3}
                 stroke="none"
-                fill="url(#defHealthAreaFill)"
                 isAnimationActive
                 animationDuration={800}
-              />
-              <Line
-                yAxisId="health"
-                type="monotone"
-                dataKey="high"
-                stroke="#4ade80"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                opacity={0.45}
-                name="High"
-              />
-              <Line
-                yAxisId="health"
-                type="monotone"
-                dataKey="low"
-                stroke="#f87171"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                opacity={0.45}
-                name="Low"
-              />
-              <Line
-                yAxisId="health"
-                type="monotone"
-                dataKey="close"
-                stroke="url(#defHealthLine)"
-                strokeWidth={3}
-                dot={<HealthChartDot />}
-                activeDot={<HealthChartActiveDot />}
-                name="Health"
-              />
-              <Line yAxisId="health" type="monotone" dataKey="maFast" stroke="#fbbf24" strokeWidth={2} dot={false} connectNulls opacity={0.85} name="MA Fast" />
-              <Line yAxisId="health" type="monotone" dataKey="maSlow" stroke="#c4b5fd" strokeWidth={2} dot={false} connectNulls strokeDasharray="6 4" opacity={0.85} name="MA Slow" />
-
-              {showProjects && statusFilters.onTrack && (
-                <Line yAxisId="counts" type="monotone" dataKey="onTrack" stroke="#4ade80" strokeWidth={2.5} dot={{ r: 3, fill: '#4ade80' }} name="On Track" />
-              )}
-              {showProjects && statusFilters.atRisk && (
-                <Line yAxisId="counts" type="monotone" dataKey="atRisk" stroke="#fbbf24" strokeWidth={2.5} dot={{ r: 3, fill: '#fbbf24' }} name="At Risk" />
-              )}
-              {showProjects && statusFilters.delayed && (
-                <Line yAxisId="counts" type="monotone" dataKey="delayed" stroke="#f87171" strokeWidth={2.5} dot={{ r: 3, fill: '#f87171' }} name="Delayed" />
-              )}
-              {showProjects && statusFilters.utilization && (
-                <Line yAxisId="utilTop" type="monotone" dataKey="utilization" stroke="#a855f7" strokeWidth={2.5} strokeDasharray="5 3" dot={{ r: 3, fill: '#a855f7' }} name="Utilization" />
-              )}
-            </ComposedChart>
+              >
+                {(data.length ? data : [{ fill: isDark ? '#334155' : '#e2e8f0' }]).map((e) => (
+                  <Cell key={e.name || 'empty'} fill={e.fill} />
+                ))}
+              </Pie>
+            </PieChart>
           </ResponsiveContainer>
-        )}
-
-        <div className="def-health-chart-divider">
-          <span>
-            {showProjects
-              ? (activeFilterLabels.length ? `Project Mix · ${activeFilterLabels.join(', ')}` : 'Project Status Mix')
-              : 'Delivery Volume'}
-          </span>
-          <span className="def-health-chart-divider-hint">
-            {showTrend && showProjects ? 'Top trend + bottom mix synced' : showTrend ? 'Health trend view' : 'Project mix view'}
-          </span>
+          <div className="def-cockpit-fast-donut-center">
+            <strong>{total}</strong>
+            <span>Initiatives</span>
+          </div>
         </div>
+        <ul className="def-cockpit-fast-legend">
+          <li><i style={{ background: '#22c55e' }} />On Track <strong>{onCount}</strong></li>
+          <li><i style={{ background: '#f59e0b' }} />At Risk <strong>{atCount}</strong></li>
+          <li><i style={{ background: '#ef4444' }} />Off Track <strong>{lateCount}</strong></li>
+        </ul>
+      </div>
+      <div className="def-cockpit-fast-foot">
+        <span className="def-cockpit-fast-team">Team · {leadTeam}</span>
+        <span className={`def-cockpit-fast-trend${trendUp ? ' up' : ' down'}`}>
+          {trendUp ? '↑' : '↓'} {Math.abs(fast.healthScore % 15) + 4}%
+        </span>
+      </div>
+    </button>
+  );
+}
 
-        <ResponsiveContainer width="100%" height={subHeight}>
-          <ComposedChart data={data} margin={{ ...margin, top: 4, bottom: r.isMobile ? 28 : 20, right: hasUtilFilter && showProjects ? (r.isMobile ? 28 : 36) : margin.right }} syncId="healthExec">
-            <CartesianGrid strokeDasharray="3 8" stroke={chartGrid} vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: r.tickSmall, fill: chartTick, fontWeight: 600 }}
-              axisLine={{ stroke: chartAxis }}
-              tickLine={false}
-              interval={r.isMobile ? 1 : 0}
-              angle={r.isMobile ? -25 : 0}
-              textAnchor={r.isMobile ? 'end' : 'middle'}
-              height={r.isMobile ? 40 : 28}
-            />
-            {showProjects ? (
-              <>
-                {hasBarFilters && (
-                  <YAxis yAxisId="projects" hide domain={[0, projectsStackMax + 2]} />
-                )}
-                {hasUtilFilter && (
-                  <YAxis yAxisId="util" orientation="right" domain={[70, 100]} tick={{ fontSize: r.tickSmall, fill: chartTick }} width={r.isMobile ? 28 : 36} tickFormatter={(v) => `${v}%`} />
-                )}
-                {showTrend ? (
-                  <Tooltip cursor={{ fill: cursorColor }} content={() => null} wrapperStyle={{ display: 'none' }} />
-                ) : (
-                  <Tooltip cursor={{ fill: cursorColor }} content={<HealthChartTooltip {...tooltipProps} />} isAnimationActive={false} />
-                )}
-                {statusFilters.onTrack && (
-                  <Bar yAxisId="projects" dataKey="onTrack" stackId="mix" fill="#4ade80" barSize={r.isMobile ? 14 : 20} radius={[0, 0, 0, 0]} name="On Track" />
-                )}
-                {statusFilters.atRisk && (
-                  <Bar yAxisId="projects" dataKey="atRisk" stackId="mix" fill="#fbbf24" barSize={r.isMobile ? 14 : 20} name="At Risk" />
-                )}
-                {statusFilters.delayed && (
-                  <Bar yAxisId="projects" dataKey="delayed" stackId="mix" fill="#f87171" barSize={r.isMobile ? 14 : 20} radius={[4, 4, 0, 0]} name="Delayed" />
-                )}
-                {statusFilters.utilization && (
-                  <Line yAxisId="util" type="monotone" dataKey="utilization" stroke="#a855f7" strokeWidth={2.5} dot={{ r: 3, fill: '#a855f7' }} name="Utilization %" />
-                )}
-              </>
-            ) : (
-              <>
-                <YAxis yAxisId="volume" hide domain={[0, 'dataMax * 1.15']} />
-                {showTrend ? (
-                  <Tooltip cursor={{ fill: cursorColor }} content={() => null} wrapperStyle={{ display: 'none' }} />
-                ) : (
-                  <Tooltip cursor={{ fill: cursorColor }} content={<HealthChartTooltip {...tooltipProps} />} isAnimationActive={false} />
-                )}
-                <Bar yAxisId="volume" dataKey="volume" barSize={r.isMobile ? 12 : 18} radius={[4, 4, 0, 0]} name="Volume">
-                  {data.map((entry) => (
-                    <Cell key={entry.label} fill={healthColor(entry.close) + '99'} />
-                  ))}
-                </Bar>
-              </>
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
+function CockpitStackedArea({ data, theme, height = 240 }) {
+  const chart = useResponsiveChart();
+  const isDark = theme === 'dark';
+  const tick = isDark ? '#a1a1aa' : '#475569';
+  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.12)';
+  const first = data[0];
+  const last = data[data.length - 1];
+  const improved = Math.max(0, (last?.OnTrack ?? 0) - (first?.OnTrack ?? 0));
+  const deteriorated = Math.max(0, (last?.Delayed ?? 0) - (first?.Delayed ?? 0));
+  const net = improved - deteriorated;
 
-        <div className="def-health-legend">
-          {showTrend && (
-            <>
-              <span><i className="def-lg-area" /> Health index</span>
-              <span><i className="def-lg-high" /> High / Low band</span>
-              <span><i className="def-lg-target" /> Target {ceoTrends.targetHealth}%</span>
-              <span><i className="def-lg-ma" /> Moving avg</span>
-            </>
-          )}
-          {showProjects ? (
-            CEO_STATUS_FILTERS.filter(({ key }) => statusFilters[key]).map(({ key, label, legendClass }) => (
-              <span key={key}><i className={legendClass} /> {label}{showTrend ? ' (both charts)' : ''}</span>
-            ))
-          ) : (
-            <span><i className="def-lg-vol" /> Delivery volume</span>
-          )}
+  return (
+    <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
+      <div className="def-cockpit-chart-head">
+        <h3 className="def-cockpit-card-title">Status movement</h3>
+      </div>
+      <ResponsiveContainer width="100%" height={height}>
+        <AreaChart data={data} margin={chart.chartMargin}>
+          <defs>
+            <linearGradient id="cockpitOn" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
+              <stop offset="95%" stopColor="#34d399" stopOpacity={0.06} />
+            </linearGradient>
+            <linearGradient id="cockpitRisk" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.42} />
+              <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.06} />
+            </linearGradient>
+            <linearGradient id="cockpitLate" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f87171" stopOpacity={0.45} />
+              <stop offset="95%" stopColor="#f87171" stopOpacity={0.06} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 8" stroke={grid} vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={4} />
+          <YAxis width={chart.yAxisWidth} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} tickMargin={2} />
+          <Tooltip />
+          <Legend {...chart.legendProps} iconSize={8} formatter={(value) => <span style={{ color: tick }}>{value}</span>} />
+          <Area name="On track" type="monotone" dataKey="OnTrack" stackId="mix" stroke="#059669" fill="url(#cockpitOn)" isAnimationActive animationDuration={900} />
+          <Area name="At risk" type="monotone" dataKey="AtRisk" stackId="mix" stroke="#d97706" fill="url(#cockpitRisk)" isAnimationActive animationDuration={900} />
+          <Area name="Delayed / blocked" type="monotone" dataKey="Delayed" stackId="mix" stroke="#dc2626" fill="url(#cockpitLate)" isAnimationActive animationDuration={900} />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="def-cockpit-movement-stats">
+        <div className="def-cockpit-move-stat improved">
+          <span>Improved</span>
+          <strong>+{improved}</strong>
         </div>
-      </ScrollPass>
-    </section>
+        <div className="def-cockpit-move-stat deteriorated">
+          <span>Deteriorated</span>
+          <strong>−{deteriorated}</strong>
+        </div>
+        <div className={`def-cockpit-move-stat net${net >= 0 ? ' positive' : ' negative'}`}>
+          <span>Net movement</span>
+          <strong>{net >= 0 ? '+' : ''}{net}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CockpitQuarterBars({ rows, theme, height = 240, compact = false }) {
+  const chart = useResponsiveChart();
+  const isDark = theme === 'dark';
+  const tick = isDark ? '#a1a1aa' : '#475569';
+  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(226,232,240,1)';
+  return (
+    <div className="def-cockpit-chart-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '240ms' }}>
+      <div className="def-cockpit-chart-head">
+        <h3 className="def-cockpit-card-title">Quarterly throughput</h3>
+      </div>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart layout="vertical" data={rows} margin={chart.axisMargin}>
+          <CartesianGrid strokeDasharray="3 8" stroke={grid} horizontal={false} />
+          <XAxis type="number" tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
+          <YAxis type="category" dataKey="quarter" width={compact ? chart.yAxisWidth - 16 : chart.yAxisWidth - 8} tick={{ fill: tick, fontSize: chart.tickSmall }} axisLine={{ stroke: grid }} />
+          <Tooltip />
+          <Legend {...chart.legendProps} iconSize={8} />
+          <Bar dataKey="onTrack" name="On track" stackId="sq" fill="#34d399" radius={[4, 0, 0, 4]} isAnimationActive animationDuration={800} />
+          <Bar dataKey="atRisk" name="At risk" stackId="sq" fill="#fbbf24" isAnimationActive animationDuration={800} />
+          <Bar dataKey="delayed" name="Delayed" stackId="sq" fill="#f87171" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -1463,97 +1304,206 @@ function CeoExecutiveChart({ theme = 'light', scrollRootRef }) {
    LAYER VIEWS
 ───────────────────────────────────────────────────────────── */
 
-function CeoView({ theme, scrollRootRef }) {
-  const { ceoSummary, organization } = ORG_DATA;
+function CeoView({ theme, onSelectFast, onOpenInitiative }) {
+  const vp = useViewport();
+  const [portfolioScope, setPortfolioScope] = useState('all');
+  const analytics = useMemo(
+    () => buildCockpitAnalytics(ORG_DATA, portfolioScope === 'all' ? null : portfolioScope),
+    [portfolioScope],
+  );
+  const { organization } = ORG_DATA;
+  const filterOptions = useMemo(
+    () => [{ id: 'all', label: 'All FAST pillars' }, ...ORG_DATA.fastCategories.map((f) => ({ id: f.id, label: f.shortName }))],
+    [],
+  );
+  const wsBlockHeight = vp.wsChartH + vp.wsBarH + 108;
 
   return (
-    <div className="def-layer def-page-enter">
-      <header className="def-layer-header def-hero-panel def-hero-premium">
-        <div className="def-hero-content">
-          <p className="def-eyebrow">Executive Overview</p>
-          <h1>CEO Dashboard</h1>
-          <p className="def-subtitle">
-            {ceoSummary.totalManagers} managers · {ceoSummary.totalProjects} projects
-          </p>
+    <div
+      className={`def-layer def-page-enter def-cockpit def-cockpit-theme-${theme}`}
+      style={{ '--cockpit-chart-h': `${vp.chartH}px`, '--cockpit-ws-h': `${wsBlockHeight}px` }}
+    >
+      <header className="def-cockpit-top def-cockpit-interactive def-stagger-in" style={{ '--stagger': '0ms' }}>
+        <div className="def-cockpit-top-copy">
+          <p className="def-cockpit-eyebrow">Command Center</p>
+          <h1 className="def-cockpit-title">Command Center Cockpit</h1>
         </div>
-        <div className="def-hero-stats">
-          <div className="def-updated def-live-badge">
+        <div className="def-cockpit-top-controls">
+          <label className="def-cockpit-filter">
+            <span>Scope</span>
+            <select value={portfolioScope} onChange={(e) => setPortfolioScope(e.target.value)}>
+              {filterOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="def-updated def-live-badge def-cockpit-live">
             <span className="def-live-dot" />
-            Live · {formatDate(organization.lastUpdated)}
+            Live
+          </div>
+          <div className="def-cockpit-user-chip">
+            <Avatar name={organization.viewerName} tone="indigo" />
+            <div>
+              <strong>{organization.viewerName}</strong>
+              <small>{organization.viewerRole}</small>
+            </div>
           </div>
         </div>
       </header>
 
-      <KpiStrip
-        items={[
-          { label: 'Overall Health', value: `${ceoSummary.overallHealth}%`, color: healthColor(ceoSummary.overallHealth) },
-          { label: 'Active Projects', value: ceoSummary.activeProjects },
-          { label: 'On Track', value: ceoSummary.onTrackProjects, color: '#059669' },
-          { label: 'At Risk', value: ceoSummary.atRiskProjects, color: '#ea580c' },
-          { label: 'Delayed / Blocked', value: ceoSummary.delayedProjects, color: '#dc2626' },
-          { label: 'Completed', value: ceoSummary.completedProjects, color: '#2563eb' },
-        ]}
-      />
+      <div className="def-cockpit-metrics-row">
+        <CockpitMetricCard title="FAST pillars" value={analytics.ceoSummary.totalFastCategories} subtitle="Active pillars" spark={analytics.sparks.pillars} delay="0ms" accent="def-accent-emerald" />
+        <CockpitMetricCard title="Initiatives" value={analytics.ceoSummary.totalInitiatives} subtitle="Active initiatives" spark={analytics.sparks.initiatives} delay="40ms" />
+        <CockpitMetricCard title="Projects in flight" value={analytics.ceoSummary.activeProjects} subtitle={`${analytics.ceoSummary.totalProjects} total`} spark={analytics.sparks.mix} delay="80ms" />
+        <CockpitMetricCard title="On-track mix" value={`${analytics.ceoSummary.onTrackPct}%`} subtitle={`${analytics.ceoSummary.onTrackProjects} projects`} spark={analytics.sparks.health} delay="120ms" accent="def-accent-emerald" />
+        <CockpitMetricCard title="At-risk share" value={`${analytics.ceoSummary.atRiskPct}%`} subtitle={`${analytics.ceoSummary.atRiskProjects} projects`} spark={analytics.sparks.risk} delay="160ms" accent="def-accent-amber" />
+        <CockpitMetricCard title="Off-track share" value={`${analytics.ceoSummary.offTrackPct}%`} subtitle={`${analytics.ceoSummary.offTrackProjects} projects`} spark={analytics.sparks.risk} delay="200ms" accent="def-accent-rose" />
+        <CockpitMetricCard title="Completed projects" value={analytics.ceoSummary.completedProjects} subtitle="Finished to date" spark={analytics.sparks.complete} delay="240ms" />
+        <CockpitMetricCard title="Portfolio health" value={`${analytics.ceoSummary.overallHealth}%`} subtitle="Overall score" spark={analytics.sparks.velocity} delay="280ms" accent="def-accent-indigo" />
+      </div>
 
-      <CeoExecutiveChart theme={theme} scrollRootRef={scrollRootRef} />
+      <section className="def-cockpit-section def-cockpit-interactive def-stagger-in" style={{ '--stagger': '60ms' }}>
+        <h2 className="def-cockpit-section-title">FAST pillars health</h2>
+        <div className="def-cockpit-fast-grid">
+          {ORG_DATA.fastCategories.map((f, i) => (
+            <FastHealthCard key={f.id} fast={f} theme={theme} onSelectFast={onSelectFast} index={i} />
+          ))}
+        </div>
+      </section>
+
+      <div className="def-cockpit-workspace">
+        <div className="def-cockpit-ws-charts">
+          <CockpitStackedArea data={analytics.statusMovement} theme={theme} height={vp.wsChartH} />
+          <CockpitQuarterBars rows={analytics.quarterlyBars} theme={theme} height={vp.wsBarH} compact={vp.compact} />
+        </div>
+        <div className="def-cockpit-table-card def-cockpit-ws-recovery def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
+          <h3 className="def-cockpit-card-title">Recovery plays</h3>
+          <div className="def-cockpit-table-scroll def-cockpit-table-scroll-recovery">
+            <table className="def-cockpit-table def-cockpit-table-recovery">
+              <thead>
+                <tr>
+                  <th>Initiative</th>
+                  <th>FAST</th>
+                  <th>Path</th>
+                  <th>ETA</th>
+                  <th>Team</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.recoveryTable.map((row) => (
+                  <tr key={row.id}>
+                    <td><strong>{row.initiative}</strong></td>
+                    <td>{row.pillar}</td>
+                    <td>{row.path}</td>
+                    <td>{row.eta}</td>
+                    <td>{row.sponsor}</td>
+                  </tr>
+                ))}
+                {analytics.recoveryTable.length === 0 && (
+                  <tr><td colSpan={5} className="def-cockpit-empty">No recovery actions.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <aside className="def-cockpit-rail">
+          <div className="def-cockpit-rail-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '280ms' }}>
+            <p className="def-cockpit-rail-label">Last quarter retrospective</p>
+            <ul className="def-cockpit-bullets tight">
+              {analytics.lastQuarterBullets.map((b, i) => (
+                <li key={i}>{b}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="def-cockpit-rail-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '320ms' }}>
+            <p className="def-cockpit-rail-label">Top delivery risks</p>
+            <ul className="def-cockpit-risk-list">
+              {analytics.topRisks.slice(0, 4).map((risk) => (
+                <li key={risk.id}>
+                  <div className="def-cockpit-risk-copy">
+                    <strong>{risk.title}</strong>
+                    <span>{risk.level}</span>
+                  </div>
+                  <span className={`def-cockpit-risk-score${risk.risk === 'high' ? ' high' : ''}`}>
+                    {risk.risk === 'high' ? 25 : 18}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="def-cockpit-rail-card def-cockpit-interactive subtle def-stagger-in" style={{ '--stagger': '360ms' }}>
+            <p className="def-cockpit-rail-label">Portfolio snapshot</p>
+            <dl className="def-cockpit-dl">
+              <div><dt>Teams online</dt><dd>{analytics.ceoSummary.totalTeams}</dd></div>
+              <div><dt>Contributor hours</dt><dd>{analytics.ceoSummary.totalDevelopers}</dd></div>
+            </dl>
+          </div>
+        </aside>
+      </div>
+
+      <InitiativeTracker
+        rows={analytics.initiativeTracker}
+        lastUpdated={organization.lastUpdated}
+        onOpenInitiative={onOpenInitiative}
+      />
     </div>
   );
 }
 
-function ManagerView({ manager, onSelectTeamLead, onSelectProject, onGoCeo, onBack }) {
+function FastCategoryView({ fastCategory, onSelectInitiative, onSelectProject, onGoCeo, onBack }) {
   return (
     <div className="def-layer def-page-enter">
       <HierarchyTrail
         items={[
-          { key: 'ceo', tier: 'CEO', label: 'Overview', onClick: onGoCeo },
-          { key: 'mgr', tier: 'Manager', label: manager.name },
+          { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
+          { key: 'fast', tier: 'FAST', label: fastCategory.shortName },
         ]}
       />
       <header className="def-layer-header def-hero-panel def-hero-premium">
         <div className="def-header-with-avatar def-hero-content">
-          <Avatar name={manager.name} tone="blue" />
+          <Avatar name={fastCategory.shortName} tone="blue" />
           <div>
-            <p className="def-eyebrow">Manager View</p>
-            <h1>{manager.name}</h1>
-            <p className="def-subtitle">{manager.department} · {manager.teamLeads.length} team leads · {manager.summary.activeProjects} active projects</p>
+            <p className="def-eyebrow">FAST pillar</p>
+            <h1>{fastCategory.name}</h1>
+            <p className="def-subtitle">
+              {fastCategory.summary.initiatives} initiatives · {fastCategory.summary.activeProjects} tracked projects · {fastCategory.summary.teams} delivery teams represented
+            </p>
           </div>
         </div>
         <div className="def-hero-stats">
-          <StatusPill status={manager.status} />
+          <StatusPill status={fastCategory.status} />
         </div>
       </header>
 
-      <SectionCard title="Team Lead Performance">
-        <div className="def-table-wrap def-table-pro">
-          <table className="def-table">
+      <SectionCard title={`Initiative grid · ${fastCategory.shortName}`} desc={`${fastCategory.initiatives.length} prioritized initiatives across delivery teams.`}>
+        <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
+          <table className="def-table def-table-initiatives">
             <thead>
               <tr>
-                <th>Team Lead</th>
+                <th>Initiative</th>
                 <th>Team</th>
                 <th>Status</th>
                 <th>Projects</th>
                 <th>Delayed</th>
-                <th>Developers</th>
-                <th>Pending Modules</th>
                 <th>Utilization</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {manager.teamLeads.map((tl, index) => (
-                <tr key={tl.id} className="def-table-row def-stagger-in" style={{ '--stagger': `${index * 60}ms` }}>
+              {fastCategory.initiatives.map((ini, index) => (
+                <tr key={ini.id} className="def-table-row def-stagger-in" style={{ '--stagger': `${index * 55}ms` }}>
                   <td>
                     <div className="def-table-name">
-                      <Avatar name={tl.name} tone="slate" />
+                      <Avatar name={ini.team?.name ?? 'Team'} tone="slate" />
                       <div>
-                        <strong>{tl.name}</strong>
+                        <strong>{ini.name}</strong>
                         <div className="def-linked-projects">
-                          {tl.projects.map((prj) => (
+                          {ini.projects.map((prj) => (
                             <button
                               key={prj.id}
                               type="button"
                               className="def-linked-chip"
-                              onClick={() => onSelectProject(tl.id, prj.id)}
+                              onClick={() => onSelectProject(ini.id, prj.id)}
                               title={`Open ${prj.name}`}
                             >
                               {prj.name}
@@ -1563,23 +1513,21 @@ function ManagerView({ manager, onSelectTeamLead, onSelectProject, onGoCeo, onBa
                       </div>
                     </div>
                   </td>
-                  <td>{tl.team}</td>
-                  <td><StatusPill status={tl.status} /></td>
-                  <td>{tl.summary.activeProjects}</td>
-                  <td style={{ color: tl.summary.delayedProjects ? '#dc2626' : '#059669', fontWeight: 600 }}>
-                    {tl.summary.delayedProjects}
+                  <td>{ini.team?.name}</td>
+                  <td><StatusPill status={ini.status} /></td>
+                  <td>{ini.team?.summary?.activeProjects ?? ini.projects.length}</td>
+                  <td style={{ color: (ini.team?.summary?.delayedProjects ?? 0) ? '#dc2626' : '#059669', fontWeight: 600 }}>
+                    {ini.team?.summary?.delayedProjects ?? 0}
                   </td>
-                  <td>{tl.summary.developers}</td>
-                  <td>{tl.summary.pendingModules}</td>
                   <td>
                     <div className="def-inline-progress">
-                      <ProgressBar value={tl.summary.avgUtilization} />
-                      <span>{tl.summary.avgUtilization}%</span>
+                      <ProgressBar value={ini.team?.summary?.avgUtilization ?? 72} />
+                      <span>{ini.team?.summary?.avgUtilization ?? 72}%</span>
                     </div>
                   </td>
                   <td>
-                    <button type="button" className="def-btn-sm" onClick={() => onSelectTeamLead(tl.id)}>
-                      View Projects →
+                    <button type="button" className="def-btn-sm" onClick={() => onSelectInitiative(ini.id)}>
+                      Open initiative →
                     </button>
                   </td>
                 </tr>
@@ -1589,7 +1537,181 @@ function ManagerView({ manager, onSelectTeamLead, onSelectProject, onGoCeo, onBa
         </div>
       </SectionCard>
 
-      <button type="button" className="def-back-btn" onClick={onBack}>← Back to CEO View</button>
+      <button type="button" className="def-back-btn" onClick={onBack}>← Back to Command Center Cockpit</button>
+    </div>
+  );
+}
+
+function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam, onSelectProject }) {
+  const detail = useMemo(
+    () => getInitiativeTrackerDetail(initiative, fastCategory),
+    [initiative, fastCategory],
+  );
+  const team = initiative.team;
+  const teamSize = team?.summary?.developers
+    ?? initiative.projects.reduce((sum, project) => sum + project.teamSize, 0);
+
+  return (
+    <div className="def-layer def-page-enter def-initiative-page">
+      <HierarchyTrail
+        items={[
+          { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
+          { key: 'fast', tier: 'FAST', label: fastCategory.shortName, onClick: onGoFast },
+          { key: 'ini', tier: 'Initiative', label: initiative.name },
+        ]}
+      />
+
+      <header className="def-initiative-header">
+        <div className="def-initiative-header-main">
+          <div className="def-initiative-meta">
+            <span className="def-initiative-pillar">{detail.imperative}</span>
+            <span className="def-initiative-parent">{detail.parentInitiative}</span>
+          </div>
+          <h1 className="def-initiative-title">{initiative.name}</h1>
+          <p className="def-initiative-sub">
+            Team: <strong>{team?.name ?? 'Unassigned'}</strong>
+            {' · '}
+            {initiative.projects.length} project{initiative.projects.length !== 1 ? 's' : ''}
+            {' · '}
+            {teamSize} people
+          </p>
+        </div>
+        <div className="def-initiative-header-aside">
+          <StatusPill status={initiative.status} />
+          <span className={`def-initiative-source ${detail.source}`}>
+            {detail.source === 'adp' ? 'Provided by ADP' : 'Sample data'}
+          </span>
+        </div>
+      </header>
+
+      <section className="def-initiative-progress" aria-label="Initiative progress">
+        <div className="def-initiative-progress-card">
+          <span className="def-initiative-progress-label">Budget burn</span>
+          <strong className="def-initiative-progress-value">{detail.budgetLabel}</strong>
+          <ProgressBar value={detail.budgetPct} color={detail.budgetTone === 'warn' ? '#d97706' : '#059669'} />
+        </div>
+        <div className="def-initiative-progress-card">
+          <span className="def-initiative-progress-label">Schedule</span>
+          <strong className="def-initiative-progress-value">{detail.schedulePct}% complete</strong>
+          <ProgressBar value={detail.schedulePct} />
+        </div>
+        <div className="def-initiative-progress-card">
+          <span className="def-initiative-progress-label">Target</span>
+          <strong className="def-initiative-progress-value">{detail.target}</strong>
+        </div>
+        <div className="def-initiative-progress-card">
+          <span className="def-initiative-progress-label">Current vs target</span>
+          <strong className="def-initiative-progress-value">{detail.ctt}</strong>
+          <div className="def-initiative-trend-row">
+            <TrackerTrendSpark data={detail.trend} trendUp={detail.trendUp} />
+            <span className={`def-initiative-trend-note${detail.trendUp ? ' up' : ' down'}`}>
+              {detail.trendUp ? 'Trending up' : 'Trending down'}
+            </span>
+          </div>
+        </div>
+        <div className="def-initiative-progress-card def-initiative-risk-card">
+          <span className="def-initiative-progress-label">Risk</span>
+          <div className="def-initiative-risk-row">
+            <TrackerRiskDot risk={detail.risk} />
+            <strong>{trackerRiskLabel(detail.risk)}</strong>
+          </div>
+          <span className="def-initiative-risk-hint">
+            {detail.delayed > 0
+              ? `${detail.delayed} project${detail.delayed !== 1 ? 's' : ''} delayed or blocked`
+              : 'No blocked projects'}
+          </span>
+        </div>
+      </section>
+
+      <div className="def-initiative-quick-stats">
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{initiative.projects.length}</span>
+          <span className="def-initiative-stat-lbl">Active projects</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{detail.delayed}</span>
+          <span className="def-initiative-stat-lbl">Delayed / blocked</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{teamSize}</span>
+          <span className="def-initiative-stat-lbl">Team size</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{team?.summary?.avgUtilization ?? detail.schedulePct}%</span>
+          <span className="def-initiative-stat-lbl">Avg utilization</span>
+        </div>
+      </div>
+
+      <SectionCard
+        title="Projects"
+        desc={`${initiative.projects.length} program${initiative.projects.length !== 1 ? 's' : ''} under this initiative`}
+      >
+        <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
+          <table className="def-table def-project-table def-initiative-project-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>End date</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {initiative.projects.map((project) => (
+                <tr key={project.id} className="def-table-row def-project-row">
+                  <td>
+                    <strong className="def-project-name">{project.name}</strong>
+                    {project.delayReason && (
+                      <span className="def-project-row-hint">{project.delayReason}</span>
+                    )}
+                  </td>
+                  <td>{project.client}</td>
+                  <td>
+                    <div className="def-project-row-badges">
+                      <StatusPill status={project.status} />
+                      <RiskBadge risk={project.risk} />
+                    </div>
+                  </td>
+                  <td>
+                    <div className="def-inline-progress def-inline-progress-wide">
+                      <ProgressBar value={project.progress} />
+                      <span>{project.progress}%</span>
+                    </div>
+                  </td>
+                  <td style={{
+                    color: project.delayDays > 0 ? '#dc2626' : 'inherit',
+                    fontWeight: project.delayDays > 0 ? 600 : 400,
+                  }}
+                  >
+                    {formatDate(project.timeline.projectedEndDate)}
+                    {project.delayDays > 0 && ` (+${project.delayDays}d)`}
+                  </td>
+                  <td className="def-project-row-action">
+                    {onSelectProject ? (
+                      <button
+                        type="button"
+                        className="def-btn-sm def-btn-ghost"
+                        onClick={() => onSelectProject(project.id)}
+                      >
+                        Details
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="def-initiative-actions">
+          <button type="button" className="def-btn-sm" onClick={onGoTeam}>
+            View team workspace
+          </button>
+        </div>
+      </SectionCard>
+
+      <button type="button" className="def-back-btn" onClick={onGoCeo}>← Back to Command Center Cockpit</button>
     </div>
   );
 }
@@ -1847,7 +1969,7 @@ function ProjectDetailContent({ project, theme }) {
   );
 }
 
-function ProjectDetailDrawer({ project, teamLead, open, onClose, theme = 'light' }) {
+function ProjectDetailDrawer({ project, team, open, onClose, theme = 'light' }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -1875,7 +1997,7 @@ function ProjectDetailDrawer({ project, teamLead, open, onClose, theme = 'light'
               </button>
             </div>
             <h2 id="def-drawer-title">{project.name}</h2>
-            <p className="def-drawer-subtitle">{project.client} · {teamLead.name}</p>
+            <p className="def-drawer-subtitle">{project.client} · {team?.name ?? 'Team'}</p>
             <div className="def-drawer-head-badges">
               <StatusPill status={project.status} />
               <RiskBadge risk={project.risk} />
@@ -1890,42 +2012,45 @@ function ProjectDetailDrawer({ project, teamLead, open, onClose, theme = 'light'
   );
 }
 
-function TeamLeadView({
-  manager,
-  teamLead,
+function TeamView({
+  fastCategory,
+  initiative,
+  team,
   activeProjectId,
   onOpenProject,
   onGoCeo,
-  onGoManager,
-  onBack,
+  onGoFast,
+  onGoInitiative,
 }) {
+  const projects = initiative.projects;
   return (
     <div className="def-layer def-page-enter">
       <HierarchyTrail
         items={[
-          { key: 'ceo', tier: 'CEO', label: 'Overview', onClick: onGoCeo },
-          { key: 'mgr', tier: 'Manager', label: manager.name, onClick: onGoManager },
-          { key: 'tl', tier: 'Team Lead', label: teamLead.name },
+          { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
+          { key: 'fast', tier: 'FAST', label: fastCategory.shortName, onClick: onGoFast },
+          { key: 'ini', tier: 'Initiative', label: initiative.name, onClick: onGoInitiative },
+          { key: 'team', tier: 'Team', label: team.name },
         ]}
       />
       <header className="def-layer-header def-hero-panel def-hero-premium">
         <div className="def-header-with-avatar def-hero-content">
-          <Avatar name={teamLead.name} tone="indigo" />
+          <Avatar name={team.name} tone="indigo" />
           <div>
-            <p className="def-eyebrow">Team Lead View</p>
-            <h1>{teamLead.name}</h1>
+            <p className="def-eyebrow">{initiative.name}</p>
+            <h1>{team.name}</h1>
             <p className="def-subtitle">
-              {teamLead.team} · reports to {manager.name} · {teamLead.projects.length} projects
+              {fastCategory.shortName} · {projects.length} active project{projects.length !== 1 ? 's' : ''} · {team.summary?.developers ?? '—'} team members
             </p>
           </div>
         </div>
         <div className="def-hero-stats">
-          <StatusPill status={teamLead.status} />
+          <StatusPill status={team.status ?? initiative.status} />
         </div>
       </header>
 
-      <SectionCard title={`Projects · ${teamLead.name}`} desc={`${teamLead.projects.length} projects under ${teamLead.name}`}>
-        <div className="def-table-wrap def-table-pro">
+      <SectionCard title={`Project portfolio · ${team.name}`} desc={`Projects tracked under the ${fastCategory.shortName} pillar.`}>
+        <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
           <table className="def-table def-project-table">
             <thead>
               <tr>
@@ -1934,12 +2059,12 @@ function TeamLeadView({
                 <th>Status</th>
                 <th>Progress</th>
                 <th>Projected End</th>
-                <th>Team</th>
+                <th>Capacity</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {teamLead.projects.map((prj) => (
+              {projects.map((prj) => (
                 <tr
                   key={prj.id}
                   className={`def-table-row def-project-row${activeProjectId === prj.id ? ' def-project-row-active' : ''}`}
@@ -1984,7 +2109,7 @@ function TeamLeadView({
         </div>
       </SectionCard>
 
-      <button type="button" className="def-back-btn" onClick={onBack}>← Back to Manager View</button>
+      <button type="button" className="def-back-btn" onClick={onGoCeo}>← Back to Command Center Cockpit</button>
     </div>
   );
 }
@@ -2004,8 +2129,21 @@ const STYLES = `
     --def-gradient-soft: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
     --def-radius: 18px;
     --def-radius-sm: 12px;
-    --def-sidebar-w: 280px;
-    --def-topbar-h: 64px;
+    --def-sidebar-w: 256px;
+    --def-topbar-h: 56px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --content-pad-x: clamp(var(--space-3), 1.5vw, var(--space-5));
+    --content-pad-y: clamp(var(--space-3), 1.8vw, var(--space-5));
+    --section-gap: var(--space-5);
+    --cockpit-gap: var(--space-2);
+    --cockpit-pad: var(--space-2);
+    --text-min: 0.6875rem;
+    --text-xs: 0.75rem;
   }
 
   .def-app.def-theme-light {
@@ -2122,7 +2260,7 @@ const STYLES = `
   }
   .def-app.def-theme-dark .def-sidebar-link.active {
     border-color: rgba(255,255,255,0.12);
-    box-shadow: inset 3px 0 0 #d4d4d4, 0 8px 24px rgba(0,0,0,0.35);
+    box-shadow: inset 3px 0 0 #818cf8, 0 2px 10px rgba(0,0,0,0.25);
   }
   .def-app.def-theme-dark .def-chart-tooltip {
     background: rgba(0,0,0,0.96);
@@ -2235,6 +2373,10 @@ const STYLES = `
     min-width: 0;
     max-width: 100%;
   }
+  .def-main > .def-layer:not(.def-cockpit) {
+    max-width: 1440px;
+    margin-inline: auto;
+  }
   .def-mesh {
     position: fixed;
     border-radius: 50%;
@@ -2268,7 +2410,7 @@ const STYLES = `
     z-index: 100;
     background: var(--def-topbar-bg);
     color: var(--def-topbar-text);
-    padding: 0 24px;
+    padding: 0 14px;
     height: var(--def-topbar-h);
     display: flex;
     justify-content: space-between;
@@ -2411,7 +2553,7 @@ const STYLES = `
     backdrop-filter: blur(24px) saturate(160%);
     color: var(--def-sidebar-text);
     border-right: 1px solid var(--def-sidebar-border);
-    padding: 20px 14px;
+    padding: var(--space-3) var(--space-2);
     min-height: 0;
     box-shadow: var(--def-sidebar-shadow);
     transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
@@ -2447,31 +2589,31 @@ const STYLES = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    font-size: 0.62rem;
+    gap: var(--space-2);
+    font-size: 0.6rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.11em;
     color: var(--def-sidebar-muted);
     font-weight: 700;
-    padding: 8px 10px 6px;
+    padding: var(--space-2) var(--space-2) var(--space-1);
     margin: 0;
   }
   .def-sidebar-label-section {
-    margin-top: 10px;
-    padding-top: 14px;
+    margin-top: var(--space-2);
+    padding-top: var(--space-3);
     border-top: 1px solid var(--def-sidebar-border);
   }
   .def-sidebar-sublabel {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin: 0 0 6px;
-    padding: 0 4px 4px;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-1);
+    padding: 0 var(--space-1) var(--space-1);
     font-size: 0.58rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.09em;
     color: var(--def-sidebar-muted);
   }
   .def-sidebar-count {
@@ -2480,23 +2622,23 @@ const STYLES = `
     justify-content: center;
     min-width: 18px;
     height: 18px;
-    padding: 0 6px;
+    padding: 0 5px;
     border-radius: 999px;
     background: var(--def-topbar-pill-bg);
     border: 1px solid var(--def-sidebar-border);
-    font-size: 0.58rem;
+    font-size: 0.56rem;
     font-weight: 800;
     letter-spacing: 0;
-    color: var(--def-sidebar-text);
+    color: var(--def-sidebar-muted);
   }
   .def-sidebar-tier {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-    font-size: 0.58rem;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 0.56rem;
     font-weight: 900;
     letter-spacing: 0.02em;
     flex-shrink: 0;
@@ -2512,11 +2654,11 @@ const STYLES = `
     color: var(--def-sidebar-text);
   }
   .def-sidebar-tier-tl {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    font-size: 0.52rem;
-    background: rgba(255,255,255,0.06);
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    font-size: 0.5rem;
+    background: rgba(99,102,241,0.06);
     border: 1px solid var(--def-sidebar-border);
     color: var(--def-sidebar-muted);
   }
@@ -2548,112 +2690,215 @@ const STYLES = `
   .def-sidebar-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     flex: 1;
     min-height: 0;
-    padding-bottom: 8px;
+    padding-bottom: var(--space-2);
   }
-  .def-sidebar-group { margin-bottom: 2px; }
+  .def-sidebar-group {
+    margin-bottom: var(--space-1);
+    border-radius: 8px;
+  }
+  .def-sidebar-group.active > .def-sidebar-row .def-sidebar-link:not(.active) {
+    background: rgba(99,102,241,0.04);
+    border-color: rgba(99,102,241,0.1);
+  }
   .def-sidebar-row {
     display: flex;
     align-items: stretch;
-    gap: 4px;
+    gap: 2px;
   }
   .def-sidebar-row .def-sidebar-link { flex: 1; min-width: 0; }
   .def-sidebar-toggle {
     flex-shrink: 0;
-    width: 32px;
+    width: 28px;
     border: 1px solid var(--def-sidebar-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--def-topbar-pill-bg);
     color: var(--def-sidebar-muted);
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    line-height: 1;
     transition: background 0.2s, color 0.2s, border-color 0.2s;
   }
   .def-sidebar-toggle:hover,
   .def-sidebar-toggle.open {
-    background: rgba(99,102,241,0.15);
-    border-color: rgba(167,139,250,0.3);
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.25);
     color: var(--def-sidebar-text);
   }
   .def-sidebar-link {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 10px;
+    padding: 7px var(--space-2);
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: 8px;
     background: transparent;
     color: inherit;
     cursor: pointer;
     text-align: left;
     font: inherit;
-    transition: background 0.22s, border-color 0.22s, transform 0.22s;
+    min-height: 46px;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
-  .def-sidebar-link:hover { background: var(--def-sidebar-hover); transform: translateX(3px); }
+  .def-sidebar-link:hover { background: var(--def-sidebar-hover); }
   .def-sidebar-link.active {
     background: var(--def-sidebar-active);
-    border-color: rgba(167,139,250,0.4);
-    box-shadow: inset 3px 0 0 #a78bfa, 0 8px 24px rgba(99,102,241,0.15);
+    border-color: rgba(99,102,241,0.22);
+    box-shadow: inset 3px 0 0 #6366f1, 0 2px 10px rgba(99,102,241,0.08);
+  }
+  .def-sidebar-link-ceo {
+    margin-bottom: var(--space-1);
+    background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(168,85,247,0.04));
+    border-color: rgba(99,102,241,0.14);
+  }
+  .def-sidebar-link-ceo:hover {
+    background: linear-gradient(135deg, rgba(99,102,241,0.11), rgba(168,85,247,0.07));
+    border-color: rgba(99,102,241,0.2);
+  }
+  .def-sidebar-link-ceo.active {
+    background: var(--def-sidebar-active);
+    border-color: rgba(99,102,241,0.28);
+    box-shadow: inset 3px 0 0 #6366f1, 0 4px 14px rgba(99,102,241,0.12);
+  }
+  .def-app.def-theme-dark .def-sidebar-link-ceo {
+    background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.06));
+    border-color: rgba(255,255,255,0.08);
   }
   .def-sidebar-link-icon { opacity: 0.7; font-size: 0.7rem; }
-  .def-sidebar-link .def-avatar { width: 32px; height: 32px; font-size: 0.62rem; border-radius: 9px; }
+  .def-sidebar-link .def-avatar { width: 30px; height: 30px; font-size: 0.6rem; border-radius: 8px; }
   .def-sidebar-link-text { flex: 1; min-width: 0; }
-  .def-sidebar-link-text strong { display: block; font-size: 0.78rem; color: var(--def-sidebar-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .def-sidebar-link-text small { font-size: 0.65rem; color: var(--def-sidebar-muted); line-height: 1.35; }
-  .def-sidebar-score { font-size: 0.72rem; font-weight: 800; flex-shrink: 0; }
+  .def-sidebar-link-text strong {
+    display: block;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--def-sidebar-text);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .def-sidebar-link-text small {
+    display: block;
+    font-size: 0.62rem;
+    color: var(--def-sidebar-muted);
+    line-height: 1.3;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .def-sidebar-score {
+    flex-shrink: 0;
+    align-self: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid var(--def-sidebar-border);
+    min-width: 36px;
+    text-align: center;
+    line-height: 1.35;
+    margin-left: auto;
+  }
+  .def-sidebar-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    margin-top: 3px;
+  }
+  .def-sidebar-status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--text-min);
+    font-weight: 700;
+    line-height: 1.15;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+  .def-sidebar-status-line i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    font-style: normal;
+  }
+  .def-sidebar-status-line.ok { color: #15803d; }
+  .def-sidebar-status-line.risk { color: #b45309; }
+  .def-sidebar-status-line.late { color: #b91c1c; }
+  .def-app.def-theme-dark .def-sidebar-score {
+    background: rgba(255,255,255,0.05);
+  }
   .def-sidebar-nested {
-    margin: 4px 0 8px 18px;
-    padding: 8px 0 4px 14px;
-    border-left: 2px solid var(--def-sidebar-border);
-    animation: defFadeUp 0.3s ease both;
+    margin: 2px 0 var(--space-1) 10px;
+    padding: var(--space-1) 0 var(--space-1) 11px;
+    border-left: 2px solid rgba(99,102,241,0.18);
+    animation: defFadeUp 0.25s ease both;
   }
   .def-sidebar-nested-link {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 8px 10px;
+    padding: 6px var(--space-2);
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: 7px;
     background: transparent;
     color: var(--def-sidebar-text);
     cursor: pointer;
     font: inherit;
     text-align: left;
-    transition: background 0.2s, border-color 0.2s;
+    min-height: 38px;
+    transition: background 0.2s ease, border-color 0.2s ease;
   }
   .def-sidebar-nested-text {
     flex: 1;
     min-width: 0;
   }
   .def-sidebar-nested-text strong {
-    display: block;
-    font-size: 0.74rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.72rem;
+    font-weight: 600;
     color: var(--def-sidebar-text);
+    line-height: 1.25;
+    white-space: normal;
+  }
+  .def-sidebar-nested-text small {
+    display: block;
+    font-size: 0.6rem;
+    color: var(--def-sidebar-muted);
+    margin-top: 1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .def-sidebar-nested-text small {
-    display: block;
-    font-size: 0.62rem;
-    color: var(--def-sidebar-muted);
-    margin-top: 1px;
-  }
   .def-sidebar-nested-link:hover { background: var(--def-sidebar-hover); }
   .def-sidebar-nested-link.active {
     background: var(--def-sidebar-active);
-    border-color: rgba(167,139,250,0.35);
-    box-shadow: inset 2px 0 0 #a78bfa;
+    border-color: rgba(99,102,241,0.2);
+    box-shadow: inset 2px 0 0 #6366f1;
   }
   .def-app.def-theme-dark .def-sidebar-nested-link.active {
-    border-color: rgba(255,255,255,0.12);
-    box-shadow: inset 2px 0 0 #d4d4d4;
+    border-color: rgba(255,255,255,0.1);
+    box-shadow: inset 2px 0 0 #818cf8;
   }
-  .def-sidebar-nested-link .def-pill { transform: scale(0.85); flex-shrink: 0; }
+  .def-sidebar-nested-link .def-pill {
+    transform: scale(0.78);
+    flex-shrink: 0;
+    font-size: 0.56rem;
+    padding: 2px 6px;
+    letter-spacing: 0.02em;
+  }
+  .def-sidebar-nested-link .def-pill:hover { transform: scale(0.78); }
 
   .def-main {
     flex: 1;
@@ -2662,21 +2907,26 @@ const STYLES = `
     min-width: 0;
     margin: 0;
     overflow-x: hidden;
-    padding: clamp(16px, 2vw, 28px) clamp(16px, 2vw, 28px) 32px;
+    padding: var(--content-pad-y) var(--content-pad-x) var(--space-6);
   }
 
   .def-footer {
     width: 100%;
-    padding: 14px clamp(20px, 2.5vw, 36px);
+    padding: var(--space-2) var(--content-pad-x);
     border-top: 1px solid var(--def-border-soft);
     background: var(--def-footer-bg);
     backdrop-filter: blur(12px);
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: 0.72rem;
     color: var(--def-muted);
+    flex-shrink: 0;
+  }
+  .def-footer-compact {
+    padding: 6px var(--content-pad-x);
+    font-size: 0.68rem;
   }
 
   @media (max-width: 960px) {
@@ -2723,7 +2973,8 @@ const STYLES = `
     .def-sidebar.def-sidebar-open {
       transform: translateX(0);
     }
-    .def-main { padding: 16px 14px 24px; }
+    .def-main { padding: var(--space-4) var(--space-3) var(--space-5); }
+    .def-main:has(.def-cockpit) { padding: var(--space-2) var(--space-3) var(--space-3); }
     .def-topbar { height: var(--def-topbar-h); padding: 0 14px; }
     .def-card-clickable:hover,
     .def-panel:hover,
@@ -2734,9 +2985,17 @@ const STYLES = `
       transform: none;
     }
     .def-sidebar-nested {
-      margin-left: 10px;
+      margin-left: 8px;
       padding-left: 10px;
     }
+    .def-sidebar-link { min-height: 46px; padding: 8px var(--space-2); }
+    .def-sidebar-status-line { font-size: var(--text-min); }
+    .def-sidebar-nested-link { min-height: 40px; }
+    .def-sidebar-toggle { min-height: 44px; min-width: 32px; }
+  }
+
+  @media (max-width: 1024px) {
+    .def-initiative-progress { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
   @media (max-width: 768px) {
@@ -2777,6 +3036,10 @@ const STYLES = `
       border-radius: 16px;
       margin-bottom: 18px;
     }
+    .def-initiative-header { padding: var(--space-3); }
+    .def-initiative-header-aside { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+    .def-initiative-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-initiative-quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-kpi-item {
       padding: 12px;
       gap: 10px;
@@ -2807,11 +3070,47 @@ const STYLES = `
     }
     .def-table th,
     .def-table td {
-      padding: 11px 12px;
-      font-size: 0.8rem;
+      padding: 10px 11px;
+      font-size: var(--text-xs);
     }
-    .def-table-pro .def-table {
-      min-width: 680px;
+    .def-table-wrap .def-table th:first-child,
+    .def-table-wrap .def-table td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: var(--def-glass);
+      box-shadow: 2px 0 8px rgba(15,23,42,0.05);
+    }
+    .def-table-wrap .def-table thead th:first-child {
+      z-index: 3;
+      background: var(--def-table-head-bg);
+    }
+    .def-table-initiatives th:nth-child(2),
+    .def-table-initiatives td:nth-child(2),
+    .def-table-initiatives th:nth-child(5),
+    .def-table-initiatives td:nth-child(5),
+    .def-table-initiatives th:nth-child(6),
+    .def-table-initiatives td:nth-child(6) {
+      display: none;
+    }
+    .def-project-table th:nth-child(2),
+    .def-project-table td:nth-child(2),
+    .def-project-table th:nth-child(5),
+    .def-project-table td:nth-child(5),
+    .def-project-table td:nth-child(6),
+    .def-project-table th:nth-child(6) {
+      display: none;
+    }
+    .def-table-pro .def-table,
+    .def-project-table {
+      min-width: min(100%, 520px);
+    }
+    .def-linked-chip {
+      font-size: var(--text-xs);
+      padding: 4px 8px;
+    }
+    .def-table-name {
+      flex-wrap: wrap;
     }
     .def-table-wrap {
       -webkit-overflow-scrolling: touch;
@@ -2858,7 +3157,8 @@ const STYLES = `
   }
 
   @media (max-width: 640px) {
-    .def-main { padding: 14px 12px 20px; }
+    .def-main { padding: var(--space-3) var(--space-3) var(--space-5); }
+    .def-main:has(.def-cockpit) { padding: var(--space-2) var(--space-3); }
     .def-topbar-left { gap: 8px; }
     .def-topbar-mark {
       width: 34px;
@@ -2934,19 +3234,23 @@ const STYLES = `
 
   @media (max-width: 480px) {
     .def-sidebar-tier {
-      width: 28px;
-      height: 28px;
-      font-size: 0.52rem;
+      width: 26px;
+      height: 26px;
+      font-size: 0.5rem;
     }
     .def-sidebar-link {
-      padding: 8px;
-      gap: 8px;
+      padding: 8px var(--space-2);
+      gap: var(--space-2);
     }
     .def-sidebar-score {
       font-size: 0.66rem;
+      min-width: 32px;
+      padding: 2px 5px;
     }
+    .def-sidebar-status-row { gap: 2px 4px; }
+    .def-sidebar-status-line { font-size: var(--text-min); }
     .def-sidebar-nested-link .def-pill {
-      display: none;
+      transform: scale(0.72);
     }
     .def-hero-premium.def-layer-header h1,
     .def-layer-header.def-hero-premium h1 {
@@ -3085,8 +3389,8 @@ const STYLES = `
     background: var(--def-glass);
     border: 1px solid var(--def-border);
     border-radius: 20px;
-    padding: 24px;
-    margin-bottom: 24px;
+    padding: var(--space-5);
+    margin-bottom: var(--section-gap);
     box-shadow: var(--def-shadow);
     backdrop-filter: blur(20px) saturate(160%);
     transition: box-shadow 0.35s, transform 0.35s, border-color 0.35s;
@@ -3150,8 +3454,35 @@ const STYLES = `
 
   .def-table-pro {
     border-radius: 12px;
-    overflow: hidden;
-    box-shadow: inset 0 0 0 1px #e2e8f0;
+    overflow: visible;
+    box-shadow: inset 0 0 0 1px var(--def-border);
+  }
+  .def-table-wrap.def-table-pro {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  .def-table-scroll-wrap {
+    position: relative;
+  }
+  .def-table-scroll-wrap::after {
+    content: 'Scroll →';
+    position: sticky;
+    right: 0;
+    bottom: 0;
+    float: right;
+    margin: -28px 8px 8px 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--text-min);
+    font-weight: 700;
+    color: var(--def-muted);
+    background: var(--def-glass);
+    border: 1px solid var(--def-border);
+    pointer-events: none;
+    opacity: 0.85;
+  }
+  @media (min-width: 769px) {
+    .def-table-scroll-wrap::after { display: none; }
   }
 
   .def-timeline-visual { padding: 4px 0; }
@@ -3258,6 +3589,91 @@ const STYLES = `
     color: var(--def-text);
     border-color: rgba(99,102,241,0.3);
   }
+
+  /* Initiative detail page */
+  .def-initiative-page { gap: var(--space-3); }
+  .def-initiative-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+    flex-wrap: wrap; padding: var(--space-3) var(--space-4);
+    background: #fff; border: 1px solid var(--def-border); border-radius: 12px;
+    box-shadow: var(--def-shadow-sm);
+  }
+  .def-initiative-header-main { min-width: 0; flex: 1 1 280px; }
+  .def-initiative-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .def-initiative-pillar {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+    background: rgba(99,102,241,0.1); color: #4f46e5;
+  }
+  .def-initiative-parent {
+    font-size: 0.68rem; font-weight: 600; color: var(--def-muted); line-height: 1.35;
+  }
+  .def-initiative-title {
+    margin: 0 0 6px; font-size: clamp(1.1rem, 2.4vw, 1.45rem); font-weight: 800;
+    letter-spacing: -0.02em; color: var(--def-heading); line-height: 1.25;
+  }
+  .def-initiative-sub { margin: 0; font-size: 0.78rem; color: var(--def-muted); line-height: 1.45; }
+  .def-initiative-sub strong { color: var(--def-text); font-weight: 700; }
+  .def-initiative-header-aside {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  .def-initiative-source {
+    font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+  }
+  .def-initiative-source.adp { background: rgba(37,99,235,0.1); color: #1d4ed8; }
+  .def-initiative-source.sample { background: rgba(148,163,184,0.18); color: #64748b; }
+  .def-initiative-progress {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .def-initiative-progress-card {
+    display: flex; flex-direction: column; gap: 6px; min-width: 0;
+    padding: var(--space-3); background: #fff; border: 1px solid var(--def-border);
+    border-radius: 10px; box-shadow: var(--def-shadow-sm);
+  }
+  .def-initiative-progress-label {
+    font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--def-muted);
+  }
+  .def-initiative-progress-value {
+    font-size: 0.78rem; font-weight: 700; color: var(--def-heading); line-height: 1.35;
+  }
+  .def-initiative-progress-card .def-progress-track { height: 6px; }
+  .def-initiative-trend-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 2px;
+  }
+  .def-initiative-trend-row .def-tracker-spark { width: 64px; height: 32px; }
+  .def-initiative-trend-note { font-size: 0.62rem; font-weight: 700; }
+  .def-initiative-trend-note.up { color: #15803d; }
+  .def-initiative-trend-note.down { color: #b91c1c; }
+  .def-initiative-risk-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .def-initiative-risk-row strong { font-size: 0.82rem; color: var(--def-heading); }
+  .def-initiative-risk-hint { font-size: 0.64rem; color: var(--def-muted); line-height: 1.35; }
+  .def-initiative-quick-stats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2);
+  }
+  .def-initiative-stat {
+    padding: var(--space-2) var(--space-3); background: #f8fafc;
+    border: 1px solid var(--def-border); border-radius: 10px; text-align: center;
+  }
+  .def-initiative-stat-num {
+    display: block; font-size: 1.15rem; font-weight: 800; color: var(--def-heading); line-height: 1.2;
+  }
+  .def-initiative-stat-lbl {
+    display: block; margin-top: 2px; font-size: 0.62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; color: var(--def-muted);
+  }
+  .def-initiative-actions { margin-top: var(--space-3); }
+  .def-initiative-project-table { min-width: 640px; }
+  .def-btn-ghost {
+    background: transparent; border: 1px solid var(--def-border); color: var(--def-text);
+  }
+  .def-btn-ghost:hover { background: rgba(99,102,241,0.06); border-color: rgba(99,102,241,0.25); }
 
   .def-hero-panel {
     background: var(--def-glass);
@@ -3395,13 +3811,17 @@ const STYLES = `
 
   .def-kpi-strip {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 152px), 1fr));
     gap: 14px;
     margin-bottom: 24px;
     width: 100%;
   }
+  .def-kpi-strip-quad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   @media (min-width: 1280px) {
-    .def-kpi-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .def-kpi-strip:not(.def-kpi-strip-quad) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .def-kpi-strip-quad { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
   @media (max-width: 900px) {
     .def-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -4315,11 +4735,15 @@ const STYLES = `
     box-shadow: var(--def-shadow);
   }
   .def-back-btn:hover {
-    background: rgba(255,255,255,0.85);
+    background: color-mix(in srgb, var(--def-glass) 88%, var(--def-blue) 12%);
     border-color: rgba(167,139,250,0.45);
     color: var(--def-blue);
     transform: translateX(-4px);
     box-shadow: var(--def-shadow-glow);
+  }
+  .def-app.def-theme-dark .def-back-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--def-text);
   }
 
   .def-hover-lift { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s; }
@@ -4417,9 +4841,9 @@ const STYLES = `
   .def-inline-progress-wide { min-width: 120px; }
 
   .def-drawer-root {
-    position: absolute;
-    inset: 0;
-    z-index: 120;
+    position: fixed;
+    inset: var(--def-topbar-h) 0 0 0;
+    z-index: 200;
     pointer-events: none;
   }
   .def-drawer-root.open { pointer-events: auto; }
@@ -4878,6 +5302,9 @@ const STYLES = `
     font-weight: 800;
     flex-shrink: 0;
   }
+  @media (max-width: 768px) {
+    .def-drawer-charts-compact { grid-template-columns: 1fr; }
+  }
   @media (max-width: 640px) {
     .def-drawer { width: 100%; }
     .def-drawer-summary {
@@ -4893,12 +5320,16 @@ const STYLES = `
       max-width: 120px;
       margin: 0 auto;
     }
-    .def-drawer-charts-compact { grid-template-columns: 1fr; }
-    .def-project-table { min-width: 720px; }
-  }
-  @media (max-width: 520px) {
-    .def-drawer-charts-compact { grid-template-columns: 1fr; }
-    .def-drawer-gauge { max-width: 108px; }
+    .def-project-row-hint {
+      max-width: none;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .def-drawer-team-info span {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
   }
 
   .def-dev-list { display: flex; flex-direction: column; gap: 12px; }
@@ -4941,6 +5372,546 @@ const STYLES = `
   .def-timeline-row span { display: block; font-size: 0.72rem; color: #64748b; margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .def-timeline-row strong { font-size: 0.96rem; font-weight: 700; }
 
+  .def-main:has(.def-cockpit) {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+  }
+
+  @keyframes cockpitPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.35); }
+    50% { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+  }
+
+  /* Command Center Cockpit */
+  .def-cockpit {
+    --cockpit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --cockpit-shadow-sm: 0 1px 4px rgba(15,39,68,0.05);
+    --cockpit-shadow-md: 0 10px 28px rgba(15,39,68,0.09);
+    --cockpit-shadow-lg: 0 18px 42px rgba(99,102,241,0.14);
+    display: flex; flex-direction: column; gap: var(--cockpit-gap); padding-bottom: 0;
+  }
+  .def-cockpit-interactive {
+    position: relative; overflow: hidden;
+    transition: transform 0.32s var(--cockpit-ease), box-shadow 0.32s var(--cockpit-ease), border-color 0.28s ease;
+  }
+  .def-cockpit-interactive::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg, rgba(99,102,241,0.07) 0%, transparent 52%);
+    opacity: 0; transition: opacity 0.32s ease;
+  }
+  .def-cockpit-interactive:focus-visible {
+    outline: 2px solid #6366f1; outline-offset: 2px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-interactive:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--cockpit-shadow-md);
+      border-color: rgba(99,102,241,0.24);
+    }
+    .def-cockpit-interactive:hover::before { opacity: 1; }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-icon {
+      transform: scale(1.1) rotate(-3deg);
+      background: rgba(99,102,241,0.16);
+    }
+    .def-cockpit-metric-card:hover .def-cockpit-metric-spark { opacity: 1; transform: scale(1.04); }
+    .def-cockpit-fast-health:hover .def-cockpit-fast-icon {
+      transform: scale(1.08);
+      background: rgba(99,102,241,0.18);
+    }
+    .def-cockpit-fast-health:hover::after { opacity: 1; }
+    .def-cockpit-move-stat:hover { transform: translateY(-2px); background: #fff; }
+    .def-cockpit-risk-list li:hover { background: rgba(99,102,241,0.04); padding-left: 4px; }
+    .def-cockpit-risk-list li:hover .def-cockpit-risk-score { transform: scale(1.1); }
+    .def-cockpit-table tbody tr:hover { background: rgba(99,102,241,0.06); }
+    .def-cockpit-top:hover { box-shadow: var(--cockpit-shadow-sm); }
+    .def-cockpit-user-chip:hover { border-color: rgba(99,102,241,0.3); }
+    .def-cockpit-filter select:hover { border-color: rgba(99,102,241,0.35); }
+  }
+  .def-cockpit-top {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 7px 9px; margin: 0;
+    background: linear-gradient(180deg, #fff 0%, #fafbff 100%);
+    border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
+    box-shadow: var(--cockpit-shadow-sm);
+    transition: box-shadow 0.28s var(--cockpit-ease);
+  }
+  .def-cockpit-top-copy { flex: 1 1 180px; min-width: 0; }
+  .def-cockpit-eyebrow {
+    margin: 0 0 2px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #6366f1;
+  }
+  .def-cockpit-title {
+    margin: 0; font-size: clamp(1.15rem, 2.2vw, 1.35rem); font-weight: 800; color: var(--def-heading);
+    letter-spacing: -0.02em; line-height: 1.15;
+  }
+  .def-cockpit-top-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .def-cockpit-filter {
+    display: flex; flex-direction: column; gap: 2px; font-size: 0.6rem; font-weight: 700;
+    color: var(--def-muted); text-transform: uppercase;
+  }
+  .def-cockpit-filter select {
+    min-width: 0; width: clamp(120px, 14vw, 148px); padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--def-border); background: #fff;
+    font-size: 0.76rem; font-weight: 600; cursor: pointer;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+  .def-cockpit-filter select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+  .def-cockpit-live {
+    padding: 5px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; color: #15803d;
+    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.18);
+    animation: cockpitPulse 2.4s ease-in-out infinite;
+  }
+  .def-cockpit-user-chip {
+    display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px;
+    border-radius: 999px; border: 1px solid var(--def-border); background: #fff;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+  .def-cockpit-user-chip strong { font-size: 0.74rem; color: var(--def-heading); }
+  .def-cockpit-user-chip small { font-size: 0.64rem; color: var(--def-muted); }
+  .def-cockpit-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--cockpit-gap);
+  }
+  .def-cockpit-metric-card {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px var(--space-2);
+    padding: var(--cockpit-pad) var(--space-3); min-height: 62px;
+    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
+    box-shadow: var(--cockpit-shadow-sm);
+  }
+  .def-cockpit-metric-card.def-accent-emerald { border-color: rgba(5,150,105,0.2); }
+  .def-cockpit-metric-card.def-accent-emerald:hover { border-color: rgba(5,150,105,0.38); box-shadow: 0 10px 28px rgba(5,150,105,0.12); }
+  .def-cockpit-metric-card.def-accent-amber { border-color: rgba(217,119,6,0.2); }
+  .def-cockpit-metric-card.def-accent-amber:hover { border-color: rgba(217,119,6,0.38); box-shadow: 0 10px 28px rgba(217,119,6,0.12); }
+  .def-cockpit-metric-card.def-accent-rose { border-color: rgba(220,38,38,0.2); }
+  .def-cockpit-metric-card.def-accent-rose:hover { border-color: rgba(220,38,38,0.38); box-shadow: 0 10px 28px rgba(220,38,38,0.12); }
+  .def-cockpit-metric-card.def-accent-indigo { border-color: rgba(99,102,241,0.2); }
+  .def-cockpit-metric-card.def-accent-indigo:hover { border-color: rgba(99,102,241,0.38); box-shadow: var(--cockpit-shadow-lg); }
+  .def-cockpit-metric-icon {
+    grid-row: 1 / span 2; width: 28px; height: 28px; display: grid; place-items: center;
+    border-radius: 7px; background: rgba(99,102,241,0.08); font-size: 0.82rem;
+    transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
+  }
+  .def-cockpit-metric-copy { min-width: 0; }
+  .def-cockpit-metric-label {
+    display: block; font-size: 0.62rem; font-weight: 700; color: var(--def-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .def-cockpit-metric-value {
+    display: block; font-size: clamp(1rem, 1.8vw, 1.15rem); font-weight: 800;
+    color: var(--def-heading); line-height: 1.05; margin-top: 1px;
+  }
+  .def-cockpit-metric-sub { display: block; font-size: 0.62rem; color: var(--def-subtle); }
+  .def-cockpit-metric-spark {
+    width: clamp(52px, 8vw, 64px); height: 34px; grid-row: 1 / span 2; align-self: center;
+    opacity: 0.88; transition: opacity 0.28s ease, transform 0.28s var(--cockpit-ease);
+  }
+  .def-cockpit-section {
+    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
+    padding: var(--cockpit-pad) var(--space-3); box-shadow: var(--cockpit-shadow-sm);
+  }
+  .def-cockpit-section-title {
+    margin: 0 0 5px; font-size: 0.78rem; font-weight: 800; color: var(--def-heading);
+  }
+  .def-cockpit-section-head-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 5px;
+  }
+  .def-cockpit-section-meta { font-size: 0.68rem; color: var(--def-muted); font-weight: 600; white-space: nowrap; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* Initiative tracker (Command Center reference) */
+  .def-cockpit-tracker { padding: var(--space-3) var(--space-3) var(--space-2); }
+  .def-tracker-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+    flex-wrap: wrap; margin-bottom: var(--space-2);
+  }
+  .def-tracker-head-main { min-width: 0; }
+  .def-tracker-updated { margin: 0; font-size: 0.64rem; color: var(--def-muted); font-weight: 600; }
+  .def-tracker-legend {
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  }
+  .def-tracker-legend-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.62rem; font-weight: 700; color: var(--def-muted); white-space: nowrap;
+  }
+  .def-tracker-legend-item i {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; font-style: normal;
+  }
+  .def-tracker-legend-item.adp i { background: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+  .def-tracker-legend-item.sample i { background: #94a3b8; box-shadow: 0 0 0 2px rgba(148,163,184,0.25); }
+  .def-tracker-toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+    margin-bottom: var(--space-2); flex-wrap: wrap;
+  }
+  .def-tracker-search { flex: 1 1 180px; max-width: 280px; }
+  .def-tracker-search input {
+    width: 100%; padding: 6px 10px; border: 1px solid rgba(226,232,240,0.95);
+    border-radius: 8px; font-size: 0.72rem; background: #fff; color: var(--def-text);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .def-tracker-search input:focus {
+    outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  }
+  .def-tracker-count { font-size: 0.64rem; font-weight: 700; color: var(--def-muted); white-space: nowrap; }
+  .def-tracker-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .def-tracker-table {
+    width: 100%; min-width: 980px; border-collapse: collapse; font-size: 0.68rem;
+  }
+  .def-tracker-table thead th {
+    background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
+    color: #fff; font-weight: 700; text-align: left; padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.08); white-space: nowrap;
+    font-size: 0.64rem; letter-spacing: 0.01em;
+  }
+  .def-tracker-table tbody td {
+    padding: 6px 10px; border: 1px solid rgba(226,232,240,0.95);
+    vertical-align: middle; line-height: 1.35; background: #fff;
+  }
+  .def-tracker-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .def-tracker-row-click { cursor: pointer; transition: background 0.18s ease; }
+  .def-tracker-row-click:hover td { background: rgba(99,102,241,0.06) !important; }
+  .def-tracker-row-click:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
+  .def-tracker-imperative {
+    font-weight: 800; color: var(--def-heading); vertical-align: top;
+    background: #f1f5f9 !important; min-width: 72px; text-transform: capitalize;
+  }
+  .def-tracker-initiative {
+    font-weight: 700; color: var(--def-heading); vertical-align: top;
+    min-width: 120px; max-width: 160px; line-height: 1.3;
+  }
+  .def-tracker-sub { min-width: 140px; }
+  .def-tracker-sub strong { display: block; font-weight: 700; color: var(--def-heading); }
+  .def-tracker-tag {
+    display: inline-block; margin-top: 2px; padding: 1px 5px; border-radius: 4px;
+    font-size: 0.56rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .def-tracker-tag.sample { background: rgba(148,163,184,0.18); color: #64748b; }
+  .def-tracker-metric { display: flex; flex-direction: column; gap: 4px; min-width: 108px; }
+  .def-tracker-metric span { font-weight: 600; color: var(--def-text); white-space: nowrap; }
+  .def-tracker-metric .def-progress-track { height: 6px; border-radius: 999px; }
+  .def-tracker-spark { width: 72px; min-width: 64px; height: 36px; }
+  .def-tracker-risk-cell { text-align: center; width: 44px; }
+  .def-tracker-risk {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(15,23,42,0.08);
+  }
+  .def-tracker-risk-low { background: #22c55e; }
+  .def-tracker-risk-medium { background: #f59e0b; }
+  .def-tracker-risk-high { background: #ef4444; }
+
+  .def-cockpit-fast-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--cockpit-gap);
+  }
+  .def-cockpit-fast-health {
+    display: flex; flex-direction: column; gap: var(--cockpit-gap); padding: var(--cockpit-pad) var(--space-3);
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
+    cursor: pointer; text-align: left; min-width: 0;
+  }
+  .def-cockpit-fast-health::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, #6366f1, #22c55e);
+    opacity: 0; transition: opacity 0.28s ease;
+  }
+  .def-cockpit-fast-head { display: flex; align-items: flex-start; gap: 8px; }
+  .def-cockpit-fast-icon {
+    width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center;
+    border-radius: 8px; background: rgba(99,102,241,0.1); color: #6366f1; font-size: 0.9rem;
+    transition: transform 0.32s var(--cockpit-ease), background 0.32s ease;
+  }
+  .def-cockpit-fast-titles { min-width: 0; flex: 1; }
+  .def-cockpit-fast-kicker {
+    margin: 0 0 1px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #6366f1;
+  }
+  .def-cockpit-fast-health h3 {
+    margin: 0; font-size: clamp(0.68rem, 1.2vw, 0.72rem); font-weight: 700; color: var(--def-heading); line-height: 1.25;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .def-cockpit-fast-body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .def-cockpit-fast-chart { position: relative; width: clamp(72px, 10vw, 88px); height: clamp(72px, 10vw, 88px); flex-shrink: 0; }
+  .def-cockpit-fast-donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; text-align: center;
+  }
+  .def-cockpit-fast-donut-center strong { font-size: 0.95rem; font-weight: 800; color: var(--def-heading); line-height: 1; }
+  .def-cockpit-fast-donut-center span { font-size: 0.52rem; font-weight: 700; color: var(--def-muted); text-transform: uppercase; }
+  .def-cockpit-fast-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 88px; display: flex; flex-direction: column; gap: 4px; }
+  .def-cockpit-fast-legend li { display: flex; align-items: center; gap: 5px; font-size: 0.64rem; color: var(--def-muted); font-weight: 600; }
+  .def-cockpit-fast-legend li i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; font-style: normal; }
+  .def-cockpit-fast-legend li strong { margin-left: auto; font-size: 0.72rem; color: var(--def-heading); font-weight: 800; }
+  .def-cockpit-fast-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 4px;
+    padding-top: 6px; border-top: 1px solid rgba(226,232,240,0.9); font-size: 0.62rem;
+  }
+  .def-cockpit-fast-team { color: var(--def-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .def-cockpit-fast-trend { font-weight: 800; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; flex-shrink: 0; }
+  .def-cockpit-fast-trend.up { background: rgba(34,197,94,0.12); color: #15803d; }
+  .def-cockpit-fast-trend.down { background: rgba(239,68,68,0.12); color: #b91c1c; }
+  .def-cockpit-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(200px, 260px);
+    gap: var(--cockpit-gap);
+    align-items: start;
+    min-width: 0;
+  }
+  .def-cockpit-ws-charts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cockpit-gap);
+    min-width: 0;
+    min-height: 0;
+  }
+  .def-cockpit-ws-charts > .def-cockpit-chart-card {
+    flex: 0 0 auto;
+  }
+  .def-cockpit-ws-recovery {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    max-height: var(--cockpit-ws-h, auto);
+    overflow: hidden;
+  }
+  .def-cockpit-ws-recovery .def-cockpit-table-scroll-recovery {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+  }
+  .def-cockpit-workspace > .def-cockpit-rail {
+    align-self: start;
+    max-height: var(--cockpit-ws-h, auto);
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .def-cockpit-chart-card, .def-cockpit-table-card, .def-cockpit-rail-card {
+    background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 10px;
+    padding: var(--cockpit-pad) var(--space-3); min-width: 0; min-height: 0; box-shadow: var(--cockpit-shadow-sm);
+  }
+  .def-cockpit-card-title, .def-cockpit-chart-head .def-cockpit-card-title {
+    margin: 0 0 4px; font-size: 0.74rem; font-weight: 800; color: var(--def-heading);
+  }
+  .def-cockpit-chart-head { margin-bottom: 4px; }
+  .def-cockpit-movement-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+  .def-cockpit-move-stat {
+    padding: 6px 8px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;
+    transition: transform 0.25s var(--cockpit-ease), background 0.25s ease;
+  }
+  .def-cockpit-move-stat span { display: block; font-size: 0.6rem; font-weight: 700; color: var(--def-muted); text-transform: uppercase; }
+  .def-cockpit-move-stat strong { display: block; margin-top: 1px; font-size: 0.95rem; font-weight: 800; }
+  .def-cockpit-move-stat.improved strong { color: #15803d; }
+  .def-cockpit-move-stat.deteriorated strong { color: #b91c1c; }
+  .def-cockpit-move-stat.net.positive strong { color: #15803d; }
+  .def-cockpit-move-stat.net.negative strong { color: #b91c1c; }
+  .def-cockpit-table-scroll {
+    overflow: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: 100%;
+  }
+  .def-cockpit-table-scroll-recovery {
+    max-height: min(280px, calc(var(--cockpit-chart-h, 210px) + 76px));
+  }
+  .def-cockpit-ws-recovery .def-cockpit-table-scroll-recovery {
+    max-height: none;
+  }
+  .def-cockpit-table-scroll.wide { max-height: min(280px, 42vh); }
+  .def-cockpit-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+  .def-cockpit-table-recovery { min-width: min(480px, 100%); }
+  .def-cockpit-table-teams { min-width: min(640px, 100%); }
+  .def-cockpit-table th, .def-cockpit-table td {
+    padding: 4px 6px; border-bottom: 1px solid rgba(226,232,240,0.9); text-align: left; vertical-align: middle;
+    transition: background 0.2s ease;
+  }
+  .def-cockpit-table th {
+    font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--def-muted); font-weight: 700; background: #f8fafc; position: sticky; top: 0; z-index: 1;
+  }
+  .def-cockpit-table.zebra tbody tr:nth-child(even) { background: rgba(248,250,252,0.85); }
+  .def-cockpit-empty { text-align: center; color: var(--def-muted); font-style: italic; padding: 8px !important; }
+  .def-cockpit-rail { display: flex; flex-direction: column; gap: var(--cockpit-gap); min-width: 0; min-height: 0; }
+  .def-cockpit-rail-label {
+    margin: 0 0 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--def-muted);
+  }
+  .def-cockpit-rail-card.subtle { background: linear-gradient(180deg, #f8fafc 0%, #fff 100%); }
+  .def-cockpit-bullets { margin: 0; padding-left: 14px; font-size: 0.68rem; color: var(--def-text); line-height: 1.4; }
+  .def-cockpit-bullets.tight { font-size: 0.66rem; color: var(--def-muted); }
+  .def-cockpit-bullets li { margin-bottom: 4px; }
+  .def-cockpit-risk-list { list-style: none; margin: 0; padding: 0; }
+  .def-cockpit-risk-list li {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 5px 2px; border-bottom: 1px solid rgba(226,232,240,0.9);
+    border-radius: 6px; transition: background 0.22s ease, padding-left 0.22s ease;
+  }
+  .def-cockpit-risk-list li:last-child { border-bottom: none; padding-bottom: 0; }
+  .def-cockpit-risk-copy { flex: 1; min-width: 0; }
+  .def-cockpit-risk-list strong { display: block; font-size: 0.68rem; color: var(--def-heading); line-height: 1.25; }
+  .def-cockpit-risk-list span { display: block; font-size: 0.58rem; font-weight: 700; color: #ea580c; margin-top: 1px; }
+  .def-cockpit-risk-score {
+    flex-shrink: 0; width: 28px; height: 28px; display: grid; place-items: center;
+    border-radius: 50%; font-size: 0.66rem; font-weight: 800; color: #b45309;
+    background: rgba(251,191,36,0.15); border: 2px solid rgba(251,191,36,0.35);
+    transition: transform 0.28s var(--cockpit-ease);
+  }
+  .def-cockpit-risk-score.high { color: #b91c1c; background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.35); }
+  .def-cockpit-dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  .def-cockpit-dl div { display: flex; justify-content: space-between; gap: 6px; font-size: 0.68rem; padding: 4px 0; }
+  .def-cockpit-dl dt { color: var(--def-muted); font-weight: 600; }
+  .def-cockpit-dl dd { margin: 0; font-weight: 800; color: var(--def-heading); }
+  .def-cockpit-mini-actions { margin-top: 8px; }
+
+  @media (max-width: 1400px) {
+    .def-cockpit-workspace {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+      grid-template-rows: auto auto;
+    }
+    .def-cockpit-ws-charts { grid-column: 1; grid-row: 1 / span 2; }
+    .def-cockpit-ws-recovery { grid-column: 2; grid-row: 1 / span 2; }
+    .def-cockpit-workspace > .def-cockpit-rail {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .def-cockpit-rail-card { flex: 1 1 min(100%, 220px); }
+  }
+  @media (max-width: 1024px) {
+    .def-cockpit-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-cockpit-fast-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 768px) {
+    .def-cockpit-top { flex-direction: column; align-items: stretch; }
+    .def-cockpit-top-controls { width: 100%; justify-content: flex-start; }
+    .def-cockpit-filter { flex: 1 1 140px; }
+    .def-cockpit-filter select { width: 100%; max-width: none; }
+    .def-cockpit-workspace {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+    }
+    .def-cockpit-ws-charts,
+    .def-cockpit-ws-recovery,
+    .def-cockpit-workspace > .def-cockpit-rail {
+      grid-column: auto;
+      grid-row: auto;
+    }
+    .def-cockpit-ws-recovery,
+    .def-cockpit-workspace > .def-cockpit-rail {
+      max-height: none;
+    }
+    .def-cockpit-ws-recovery .def-cockpit-table-scroll-recovery {
+      max-height: min(240px, calc(var(--cockpit-chart-h, 195px) + 72px));
+    }
+    .def-cockpit-rail { flex-direction: column; }
+    .def-cockpit-rail-card { flex: 1 1 auto; }
+    .def-cockpit-table-recovery,
+    .def-cockpit-table-teams { min-width: min(520px, 100%); }
+    .def-tracker-table { min-width: min(720px, 100%); font-size: var(--text-xs); }
+    .def-tracker-head { flex-direction: column; }
+    .def-tracker-search { max-width: none; }
+    .def-tracker-legend { width: 100%; }
+    .def-cockpit-interactive:hover { transform: none; }
+  }
+  @media (max-width: 640px) {
+    .def-cockpit { --cockpit-pad: var(--space-3); }
+    .def-cockpit-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-cockpit-fast-grid { grid-template-columns: 1fr; }
+    .def-cockpit-movement-stats { grid-template-columns: 1fr; }
+    .def-cockpit-top-controls { flex-direction: column; align-items: stretch; }
+    .def-cockpit-user-chip { justify-content: center; }
+    .def-cockpit-metric-label { font-size: var(--text-min); }
+    .def-cockpit-table { font-size: var(--text-xs); }
+    .def-cockpit-card-title { font-size: var(--text-xs); }
+  }
+  @media (max-width: 480px) {
+    .def-cockpit-metrics-row,
+    .def-cockpit-fast-grid { grid-template-columns: 1fr; }
+    .def-cockpit-metric-spark { display: none; }
+    .def-cockpit-metric-card { grid-template-columns: auto 1fr; min-height: 56px; }
+    .def-cockpit-user-chip small { display: none; }
+    .def-cockpit-table-recovery,
+    .def-cockpit-table-teams { min-width: min(100%, 480px); }
+    .def-cockpit-fast-health h3 { -webkit-line-clamp: 3; }
+  }
+
+  /* Dark theme — layer surfaces */
+  .def-app.def-theme-dark .def-alert-line,
+  .def-app.def-theme-dark .def-delay-reason {
+    background: rgba(234,88,12,0.12);
+    border-color: rgba(234,88,12,0.28);
+    color: #fdba74;
+  }
+  .def-app.def-theme-dark .def-blocker-box {
+    background: rgba(220,38,38,0.1);
+    border-color: rgba(220,38,38,0.28);
+  }
+  .def-app.def-theme-dark .def-blocker-box li { color: #fca5a5; }
+  .def-app.def-theme-dark .def-module-chip {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.1);
+    color: var(--def-text);
+  }
+  .def-app.def-theme-dark .def-timeline-box {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-timeline-row > div {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-timeline-row > div:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(99,102,241,0.35);
+  }
+  .def-app.def-theme-dark .def-timeline-row span { color: var(--def-muted); }
+  .def-app.def-theme-dark .def-drawer-pro {
+    background: linear-gradient(180deg, var(--def-surface) 0%, rgba(15,23,42,0.95) 100%);
+  }
+  .def-app.def-theme-dark .def-project-row-active {
+    background: rgba(99,102,241,0.14);
+    box-shadow: inset 3px 0 0 #818cf8;
+  }
+  .def-app.def-theme-dark .def-accordion-trigger-text small { color: var(--def-muted); }
+
+  .def-cockpit-theme-dark .def-cockpit-top,
+  .def-cockpit-theme-dark .def-cockpit-metric-card,
+  .def-cockpit-theme-dark .def-cockpit-section,
+  .def-cockpit-theme-dark .def-cockpit-fast-health,
+  .def-cockpit-theme-dark .def-cockpit-chart-card,
+  .def-cockpit-theme-dark .def-cockpit-table-card,
+  .def-cockpit-theme-dark .def-cockpit-rail-card {
+    background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
+  }
+  .def-cockpit-theme-dark .def-cockpit-fast-health { background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.9)); }
+  .def-cockpit-theme-dark .def-cockpit-filter select,
+  .def-cockpit-theme-dark .def-cockpit-user-chip { background: rgba(15,23,42,0.6); }
+  .def-cockpit-theme-dark .def-cockpit-table th { background: rgba(15,23,42,0.5); }
+  .def-cockpit-theme-dark .def-cockpit-move-stat { background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08); }
+  .def-cockpit-theme-dark .def-cockpit-rail-card.subtle { background: rgba(15,23,42,0.45); }
+  .def-cockpit-theme-dark .def-cockpit-interactive::before {
+    background: linear-gradient(135deg, rgba(129,140,248,0.12) 0%, transparent 52%);
+  }
+  .def-app.def-theme-dark .def-initiative-header,
+  .def-app.def-theme-dark .def-initiative-progress-card {
+    background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-initiative-stat {
+    background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08);
+  }
+
+  .def-cockpit-theme-dark .def-tracker-search input {
+    background: rgba(15,23,42,0.6); border-color: rgba(255,255,255,0.1); color: var(--def-text);
+  }
+  .def-cockpit-theme-dark .def-tracker-table tbody td { background: rgba(30,41,59,0.5); border-color: rgba(255,255,255,0.06); }
+  .def-cockpit-theme-dark .def-tracker-table tbody tr:nth-child(even) td { background: rgba(15,23,42,0.45); }
+  .def-cockpit-theme-dark .def-tracker-imperative { background: rgba(15,23,42,0.65) !important; }
+  .def-cockpit-theme-dark .def-tracker-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -4956,8 +5927,8 @@ const STYLES = `
 
 const DEF = () => {
   const [layer, setLayer] = useState('ceo');
-  const [managerId, setManagerId] = useState(null);
-  const [teamLeadId, setTeamLeadId] = useState(null);
+  const [fastId, setFastId] = useState(null);
+  const [initiativeId, setInitiativeId] = useState(null);
   const [drawerProjectId, setDrawerProjectId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const contentRef = useRef(null);
@@ -4977,47 +5948,57 @@ const DEF = () => {
     }
   }, [theme]);
 
-  const manager = useMemo(() => findManager(managerId), [managerId]);
-  const teamLead = useMemo(() => findTeamLead(manager, teamLeadId), [manager, teamLeadId]);
+  const fastCategory = useMemo(() => findFastCategory(fastId), [fastId]);
+  const initiative = useMemo(() => findInitiative(fastCategory, initiativeId), [fastCategory, initiativeId]);
   const drawerProject = useMemo(
-    () => findProject(teamLead, drawerProjectId),
-    [teamLead, drawerProjectId],
+    () => findProject(initiative, drawerProjectId),
+    [initiative, drawerProjectId],
   );
 
   const navigateTo = (target) => {
     if (target === 'ceo') {
       setLayer('ceo');
-      setManagerId(null);
-      setTeamLeadId(null);
+      setFastId(null);
+      setInitiativeId(null);
       setDrawerProjectId(null);
-    } else if (target === 'manager') {
-      setLayer('manager');
-      setTeamLeadId(null);
+    } else if (target === 'fast') {
+      setLayer('fast');
+      setInitiativeId(null);
       setDrawerProjectId(null);
-    } else if (target === 'teamLead') {
-      setLayer('teamLead');
+    } else if (target === 'initiative') {
+      setLayer('initiative');
+      setDrawerProjectId(null);
+    } else if (target === 'team') {
+      setLayer('team');
       setDrawerProjectId(null);
     }
   };
 
-  const goManager = (id) => {
-    setManagerId(id);
-    setTeamLeadId(null);
+  const goFast = (id) => {
+    setFastId(id);
+    setInitiativeId(null);
     setDrawerProjectId(null);
-    setLayer('manager');
+    setLayer('fast');
   };
 
-  const goTeamLead = (mgrId, tlId) => {
-    setManagerId(mgrId);
-    setTeamLeadId(tlId);
+  const goInitiative = (categoryId, initId) => {
+    setFastId(categoryId);
+    setInitiativeId(initId);
     setDrawerProjectId(null);
-    setLayer('teamLead');
+    setLayer('initiative');
   };
 
-  const openProjectDrawer = (mgrId, tlId, prjId) => {
-    setManagerId(mgrId);
-    setTeamLeadId(tlId);
-    setLayer('teamLead');
+  const goTeam = (categoryId, initId) => {
+    setFastId(categoryId);
+    setInitiativeId(initId);
+    setDrawerProjectId(null);
+    setLayer('team');
+  };
+
+  const openProjectDrawer = (categoryId, initId, prjId) => {
+    setFastId(categoryId);
+    setInitiativeId(initId);
+    setLayer('team');
     setDrawerProjectId(prjId);
   };
 
@@ -5027,7 +6008,7 @@ const DEF = () => {
   }, [layer]);
 
   useEffect(() => {
-    if (layer !== 'teamLead') setDrawerProjectId(null);
+    if (layer !== 'team') setDrawerProjectId(null);
   }, [layer]);
 
   useEffect(() => {
@@ -5087,52 +6068,61 @@ const DEF = () => {
         <div className="def-layout">
           <AppSidebar
             layer={layer}
-            manager={manager}
-            teamLead={teamLead}
+            fastCategory={fastCategory}
+            initiative={initiative}
             open={sidebarOpen}
             onNavigate={() => setSidebarOpen(false)}
             onGoCeo={() => navigateTo('ceo')}
-            onSelectManager={goManager}
-            onSelectTeamLead={goTeamLead}
+            onSelectFast={goFast}
+            onSelectInitiative={goInitiative}
           />
 
           <div className="def-content-wrap" ref={contentRef}>
             <main className="def-main" key={layer}>
           {layer === 'ceo' && (
-            <CeoView theme={theme} scrollRootRef={contentRef} />
+            <CeoView theme={theme} onSelectFast={goFast} onOpenInitiative={goInitiative} />
           )}
 
-          {layer === 'manager' && manager && (
-            <ManagerView
-              manager={manager}
+          {layer === 'fast' && fastCategory && (
+            <FastCategoryView
+              fastCategory={fastCategory}
               onGoCeo={() => navigateTo('ceo')}
-              onSelectTeamLead={(tlId) => {
-                setTeamLeadId(tlId);
-                setLayer('teamLead');
-              }}
-              onSelectProject={(tlId, prjId) => openProjectDrawer(manager.id, tlId, prjId)}
+              onSelectInitiative={(initId) => goInitiative(fastCategory.id, initId)}
+              onSelectProject={(initId, prjId) => openProjectDrawer(fastCategory.id, initId, prjId)}
               onBack={() => navigateTo('ceo')}
             />
           )}
 
-          {layer === 'teamLead' && manager && teamLead && (
-            <TeamLeadView
-              manager={manager}
-              teamLead={teamLead}
+          {layer === 'initiative' && fastCategory && initiative && (
+            <InitiativeView
+              fastCategory={fastCategory}
+              initiative={initiative}
+              onGoCeo={() => navigateTo('ceo')}
+              onGoFast={() => navigateTo('fast')}
+              onGoTeam={() => goTeam(fastCategory.id, initiative.id)}
+              onSelectProject={(prjId) => openProjectDrawer(fastCategory.id, initiative.id, prjId)}
+            />
+          )}
+
+          {layer === 'team' && fastCategory && initiative && initiative.team && (
+            <TeamView
+              fastCategory={fastCategory}
+              initiative={initiative}
+              team={initiative.team}
               activeProjectId={drawerProjectId}
               onOpenProject={setDrawerProjectId}
               onGoCeo={() => navigateTo('ceo')}
-              onGoManager={() => navigateTo('manager')}
-              onBack={() => navigateTo('manager')}
+              onGoFast={() => navigateTo('fast')}
+              onGoInitiative={() => navigateTo('initiative')}
             />
           )}
             </main>
-            <AppFooter />
+            <AppFooter compact={layer === 'ceo'} />
 
-            {layer === 'teamLead' && manager && teamLead && drawerProject && (
+            {layer === 'team' && fastCategory && initiative && drawerProject && (
               <ProjectDetailDrawer
                 project={drawerProject}
-                teamLead={teamLead}
+                team={initiative.team}
                 theme={theme}
                 open={Boolean(drawerProjectId)}
                 onClose={() => setDrawerProjectId(null)}

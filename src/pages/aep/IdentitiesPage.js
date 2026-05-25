@@ -9,6 +9,7 @@ import ChartContainer from '../../components/aep/ChartContainer';
 import AnalyticsWidget from '../../components/aep/AnalyticsWidget';
 import { SettingsIcon, MoreIcon } from '../../components/aep/icons';
 import useResponsiveChart from '../../hooks/useResponsiveChart';
+import { formatAppNumber } from '../../utils/locale';
 import { identityNamespaces, COLORS, identityGraphSamples, identityGraphTrend } from '../../data/platformData';
 import DataTable from '../../components/aep/DataTable';
 import KpiGrid from '../../components/aep/KpiGrid';
@@ -233,9 +234,9 @@ const IdentitiesPage = () => {
               <button type="button" className="aep-btn aep-btn-primary">Run simulation</button>
             </div>
             <KpiGrid variant="mini" items={[
-              { label: 'Estimated overlap', value: simulation.overlap.toLocaleString() },
+              { label: 'Estimated overlap', value: formatAppNumber(simulation.overlap) },
               { label: 'Overlap rate', value: simulation.overlapRate },
-              { label: 'Unique profiles', value: simulation.uniqueProfiles.toLocaleString() },
+              { label: 'Unique profiles', value: formatAppNumber(simulation.uniqueProfiles) },
               { label: 'Confidence', value: simulation.confidence },
             ]} className="aep-data-transition" key={`${simNsA}-${simNsB}`} />
           </div>
