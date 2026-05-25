@@ -696,37 +696,13 @@ function applyGroupRowSpans(rows, groups) {
   return withSpans;
 }
 
-const LOL_SPAN_GROUPS = [{ key: 'fastLabel', span: 'fastSpan', show: 'showFast' }];
 const TRACKER_SPAN_GROUPS = [
   { key: 'imperative', span: 'imperativeSpan', show: 'showImperative' },
   { key: 'initiative', span: 'initiativeSpan', show: 'showInitiative' },
 ];
 
-function applyFastRowSpans(rows) {
-  return applyGroupRowSpans(rows, LOL_SPAN_GROUPS);
-}
-
 function applyTrackerRowSpans(rows) {
   return applyGroupRowSpans(rows, TRACKER_SPAN_GROUPS);
-}
-
-function buildLayOfLandDisplayRows(fastCategories) {
-  const rows = [];
-  fastCategories.forEach((fast) => {
-    fast.initiatives.forEach((ini) => {
-      rows.push({
-        id: `${fast.id}-${ini.id}`,
-        fastId: fast.id,
-        initiativeId: ini.id,
-        fastLabel: fast.name,
-        fastShort: fast.shortName,
-        initiative: ini.name,
-        owner: ini.owner ?? '—',
-        team: ini.team?.name ?? '—',
-      });
-    });
-  });
-  return applyFastRowSpans(rows);
 }
 
 function CockpitCollapsibleSection({
@@ -767,86 +743,6 @@ function CockpitCollapsibleSection({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function LayOfLandTable({ rows, onOpenInitiative }) {
-  const [query, setQuery] = useState('');
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = !q
-      ? rows
-      : rows.filter(
-        (row) =>
-          row.fastLabel.toLowerCase().includes(q)
-          || row.initiative.toLowerCase().includes(q)
-          || row.owner.toLowerCase().includes(q)
-          || row.team.toLowerCase().includes(q),
-      );
-    return applyFastRowSpans(base);
-  }, [rows, query]);
-
-  return (
-    <CockpitCollapsibleSection
-      id="lay-of-land"
-      title="Lay of land"
-      description="Strategic portfolio map — FAST pillars, initiative owners, and delivery teams"
-      badge={`${filtered.length} initiatives`}
-      defaultOpen={false}
-      className="def-lol-section def-cockpit-interactive def-stagger-in"
-      stagger="360ms"
-    >
-      <div className="def-lol-toolbar">
-        <label className="def-lol-search">
-          <span className="sr-only">Search lay of land</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search owner, team, initiative…"
-          />
-        </label>
-      </div>
-      <div className="def-lol-table-scroll def-table-scroll-wrap">
-        <table className="def-lol-table">
-          <thead>
-            <tr>
-              <th>FAST / Other</th>
-              <th>Strat plan initiative</th>
-              <th>Owner</th>
-              <th>Team</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr
-                key={row.id}
-                className={onOpenInitiative ? 'def-lol-row def-lol-row-click' : 'def-lol-row'}
-                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
-                onKeyDown={onOpenInitiative ? (event) => { if (event.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
-                tabIndex={onOpenInitiative ? 0 : undefined}
-                role={onOpenInitiative ? 'button' : undefined}
-              >
-                {row.showFast ? (
-                  <td className="def-lol-fast" rowSpan={row.fastSpan}>
-                    <span className="def-lol-fast-kicker">{row.fastShort}</span>
-                    <span className="def-lol-fast-name">{row.fastLabel}</span>
-                  </td>
-                ) : null}
-                <td className="def-lol-initiative">
-                  <strong>{row.initiative}</strong>
-                </td>
-                <td className="def-lol-owner"><OwnerBadge owner={row.owner} /></td>
-                <td className="def-lol-team"><TeamBadge team={row.team} /></td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={4} className="def-cockpit-empty">No initiatives match your search.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </CockpitCollapsibleSection>
   );
 }
 
@@ -1023,12 +919,12 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
   return (
     <CockpitCollapsibleSection
       id="initiative-tracker"
-      title="Initiative tracker"
-      description={`Last updated: ${updatedLabel}`}
+      title="Lay of land — initiative tracker"
+      description={`Portfolio scorecard across FAST pillars, owners, teams, and KPI targets · Last updated: ${updatedLabel}`}
       badge={`${filtered.length} initiatives`}
       defaultOpen={false}
       className="def-cockpit-tracker def-cockpit-interactive def-stagger-in"
-      stagger="400ms"
+      stagger="360ms"
     >
       <div className="def-tracker-legend">
         <span className="def-tracker-legend-item adp"><i aria-hidden="true" /> Source: ADP / Provided by ADP</span>
@@ -1734,7 +1630,6 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   }));
 
   const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
-  const layOfLandRows = buildLayOfLandDisplayRows(pillarFasts);
 
   const topRisks = [...initiatives.flatMap((i) => i.projects)]
     .filter((p) => p.risk === 'high' || CRITICAL_STATUS.has(p.status) || (p.progress ?? 0) < 80)
@@ -1779,7 +1674,6 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     quarterlyStats,
     recoveryTimeTable: buildRecoveryTimeTable(),
     initiativeTracker,
-    layOfLandRows,
     ownershipOverview: buildOwnershipOverview(pillarFasts),
     upcomingMilestones: buildUpcomingMilestones(pillarFasts),
     executiveTopRisks: buildExecutiveTopRisks(pillarFasts),
@@ -2540,11 +2434,6 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           highlights={analytics.keyHighlights}
         />
       </div>
-
-      <LayOfLandTable
-        rows={analytics.layOfLandRows}
-        onOpenInitiative={onOpenInitiative}
-      />
 
       <InitiativeTracker
         rows={analytics.initiativeTracker}
@@ -7847,8 +7736,7 @@ const STYLES = `
     font-weight: 600;
     line-height: 1.4;
   }
-  .def-cockpit-collapse-badge,
-  .def-lol-count {
+  .def-cockpit-collapse-badge {
     flex: 0 0 auto;
     font-size: 0.64rem;
     font-weight: 800;
@@ -7899,98 +7787,6 @@ const STYLES = `
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
 
-  /* Lay of land (Owner + Team portfolio map) */
-  .def-lol-section {
-    padding: var(--space-3) var(--space-3) var(--space-2);
-    background:
-      linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.65) 100%);
-    border-color: rgba(99,102,241,0.12);
-  }
-  .def-lol-toolbar { margin-bottom: 10px; }
-  .def-lol-search { display: block; max-width: 320px; }
-  .def-lol-search input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid rgba(226,232,240,0.95);
-    border-radius: 10px;
-    font-size: 0.72rem;
-    background: #fff;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  .def-lol-search input:focus {
-    outline: none;
-    border-color: rgba(99,102,241,0.45);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
-  }
-  .def-lol-table-scroll { overflow-x: auto; }
-  .def-lol-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 0.72rem;
-    min-width: min(720px, 100%);
-  }
-  .def-lol-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding: 10px 12px;
-    text-align: left;
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: #64748b;
-    background: #f8fafc;
-    border-bottom: 1px solid rgba(226,232,240,0.95);
-  }
-  .def-lol-table tbody td {
-    padding: 10px 12px;
-    vertical-align: top;
-    border-bottom: 1px solid rgba(226,232,240,0.75);
-    background: #fff;
-  }
-  .def-lol-table tbody tr:nth-child(even) td:not(.def-lol-fast) { background: #fafbfd; }
-  .def-lol-row-click { cursor: pointer; transition: background 0.18s ease; }
-  .def-lol-row-click:hover td { background: rgba(99,102,241,0.05) !important; }
-  .def-lol-row-click:focus-visible { outline: 2px solid #6366f1; outline-offset: -2px; }
-  .def-lol-fast {
-    min-width: 168px;
-    max-width: 220px;
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
-    border-right: 1px solid rgba(226,232,240,0.9);
-    vertical-align: top;
-  }
-  .def-lol-fast-kicker {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 7px;
-    margin-bottom: 6px;
-    border-radius: 999px;
-    font-size: 0.58rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #6366f1;
-    background: rgba(99,102,241,0.1);
-    border: 1px solid rgba(99,102,241,0.16);
-  }
-  .def-lol-fast-name {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: var(--def-heading);
-    line-height: 1.45;
-  }
-  .def-lol-initiative { min-width: 180px; }
-  .def-lol-initiative strong {
-    display: block;
-    font-weight: 700;
-    color: var(--def-heading);
-    line-height: 1.4;
-  }
-  .def-lol-owner { min-width: 120px; }
-  .def-lol-team { min-width: 120px; }
   .def-owner-badge {
     display: inline-flex;
     align-items: center;
