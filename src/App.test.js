@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import App from './App';
+import DEF from './DEF';
 
-describe('App', () => {
-  it('renders Codex Copilot branding', () => {
-    render(<App />);
-    expect(screen.getAllByText(/Codex Copilot/i).length).toBeGreaterThan(0);
+describe('DEF dashboard', () => {
+  it('renders Command Center Cockpit', () => {
+    render(<DEF />);
+    expect(screen.getAllByText(/Command Center Cockpit/i).length).toBeGreaterThan(0);
   });
 });
