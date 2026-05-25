@@ -201,23 +201,216 @@ const INITIATIVE_TRACKER_REF = {
   },
 };
 
+const SCORECARD_STATUS_META = {
+  'on-track': { label: 'On Track', tone: 'track' },
+  'on-watch': { label: 'On Watch', tone: 'watch' },
+  'at-risk': { label: 'At Risk', tone: 'risk' },
+};
+
+/** Executive initiative scorecard KPI rows (reference screenshots). */
+const INITIATIVE_SCORECARD_REF = {
+  'deliver against medium term guidance': {
+    strategicTargets: [
+      { label: 'Product Rollout', value: 'Lyric : 6 / 10' },
+      { label: 'Migration Readiness', value: 'Customer Base : 72%' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 30 / 50 / 20' },
+    ],
+    kpis: [
+      { kpi: 'Cost Savings Realized', status: 'on-watch', current: '$8.7M', target2029: '$18M', targetYearOne: '$12M', comments: '—' },
+      { kpi: 'Migration Readiness', status: 'on-track', current: '70:30', target2029: '80:20', targetYearOne: '75:25', comments: '—' },
+      { kpi: 'Milestone Achievement', status: 'on-track', current: '78%', target2029: '>85%', targetYearOne: '80%', comments: '—' },
+      { kpi: 'Product Rollout Velocity', status: 'on-watch', current: '6 products', target2029: '10 products', targetYearOne: '8 products', comments: '—' },
+      { kpi: 'Risk & Compliance Score', status: 'at-risk', current: 'Medium', target2029: 'Low', targetYearOne: 'Low-Medium', comments: '—' },
+    ],
+  },
+  'ai productivity benefit (cumulative %)': {
+    strategicTargets: [
+      { label: 'Agents in Pipeline', value: 'Client Persona : 18' },
+      { label: 'Agents Rolled Out', value: 'Client Persona : 6' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 25 / 50 / 25' },
+    ],
+    kpis: [
+      { kpi: 'Agents in Pipeline', status: 'on-track', current: '18', target2029: '25', targetYearOne: '20', comments: '—' },
+      { kpi: 'Agents Rolled Out', status: 'on-watch', current: '6', target2029: '15', targetYearOne: '10', comments: '—' },
+      { kpi: 'Persona Coverage', status: 'on-track', current: '64%', target2029: '90%', targetYearOne: '75%', comments: '—' },
+      { kpi: 'User Satisfaction', status: 'on-track', current: '82', target2029: '90', targetYearOne: '85', comments: '—' },
+      { kpi: 'Model Reliability', status: 'on-watch', current: '89%', target2029: '95%', targetYearOne: '92%', comments: '—' },
+    ],
+  },
+  'investment and revenue gains from ventures': {
+    strategicTargets: [
+      { label: 'Targets in Pipeline', value: 'M&A : 9' },
+      { label: 'Deals Closed', value: 'M&A : 3' },
+      { label: 'Risk Mix', value: 'Low / Med / High : 22 / 48 / 30' },
+    ],
+    kpis: [
+      { kpi: 'Targets in Pipeline', status: 'on-track', current: '9', target2029: '12', targetYearOne: '10', comments: '—' },
+      { kpi: 'Deals Closed', status: 'on-track', current: '3', target2029: '5', targetYearOne: '4', comments: '—' },
+      { kpi: 'Due Diligence Completion', status: 'on-watch', current: '67%', target2029: '90%', targetYearOne: '78%', comments: '—' },
+      { kpi: 'Revenue from New Ventures', status: 'on-watch', current: '$15M', target2029: '$25M', targetYearOne: '$18M', comments: '—' },
+      { kpi: 'Integration Risk', status: 'on-watch', current: 'Moderate-High', target2029: 'Low', targetYearOne: 'Medium', comments: '—' },
+    ],
+  },
+};
+
+function deriveScorecardStatus(initiativeStatus, risk) {
+  if (initiativeStatus === 'delayed' || initiativeStatus === 'blocked' || risk === 'high') return 'at-risk';
+  if (initiativeStatus === 'at-risk' || risk === 'medium') return 'on-watch';
+  return 'on-track';
+}
+
+function buildFallbackScorecard(initiative) {
+  const progress = Math.round(
+    initiative.projects.reduce((sum, project) => sum + project.progress, 0)
+      / Math.max(initiative.projects.length, 1),
+  );
+  const risk = initiative.status === 'on-track' ? 'low' : initiative.status === 'at-risk' ? 'medium' : 'high';
+  const headlineStatus = deriveScorecardStatus(initiative.status, risk);
+  return {
+    strategicTargets: [
+      { label: 'Milestone Progress', value: `${progress}% complete` },
+      { label: 'Active Projects', value: String(initiative.projects.length) },
+      { label: 'Risk Mix', value: headlineStatus === 'on-track' ? 'Low / Med / High : 40 / 45 / 15' : 'Low / Med / High : 25 / 45 / 30' },
+    ],
+    kpis: [
+      {
+        kpi: 'Milestone Achievement',
+        status: deriveScorecardStatus(initiative.status, risk),
+        current: `${progress}%`,
+        target2029: '>85%',
+        targetYearOne: '70%',
+        comments: '—',
+      },
+      {
+        kpi: 'Schedule Adherence',
+        status: progress >= 70 ? 'on-track' : progress >= 50 ? 'on-watch' : 'at-risk',
+        current: `${progress}%`,
+        target2029: '90%',
+        targetYearOne: '75%',
+        comments: '—',
+      },
+      {
+        kpi: 'Delivery Risk',
+        status: headlineStatus,
+        current: risk === 'high' ? 'High' : risk === 'medium' ? 'Medium' : 'Low',
+        target2029: 'Low',
+        targetYearOne: 'Low-Medium',
+        comments: '—',
+      },
+    ],
+  };
+}
+
+function buildInitiativeScorecard(initiative) {
+  return INITIATIVE_SCORECARD_REF[initiative.name.toLowerCase()] ?? buildFallbackScorecard(initiative);
+}
+
+function buildInitiativeScorecardSummary(ini) {
+  const ref = INITIATIVE_TRACKER_REF[ini.name.toLowerCase()];
+  const scorecard = buildInitiativeScorecard(ini);
+  const firstKpi = scorecard.kpis[0];
+  const progress = ini.projects[0]?.progress ?? 55;
+  const risk = ref?.risk ?? (ini.status === 'on-track' ? 'low' : ini.status === 'at-risk' ? 'medium' : 'high');
+  return {
+    scorecardStatus: firstKpi?.status ?? deriveScorecardStatus(ini.status, risk),
+    current: firstKpi?.current ?? ref?.ctt ?? `${progress}%`,
+    target2029: firstKpi?.target2029 ?? ref?.target ?? `${Math.min(100, progress + 15)}%`,
+    targetYearOne: firstKpi?.targetYearOne ?? `${Math.min(100, progress + 8)}%`,
+    comments: firstKpi?.comments ?? '—',
+  };
+}
+
+function ScorecardStatusCell({ status }) {
+  const meta = SCORECARD_STATUS_META[status] || SCORECARD_STATUS_META['on-watch'];
+  return (
+    <span className="def-scorecard-status">
+      <i className={`def-scorecard-dot def-scorecard-dot-${meta.tone}`} aria-hidden="true" />
+      {meta.label}
+    </span>
+  );
+}
+
+function StrategicTargetCards({ targets }) {
+  if (!targets?.length) return null;
+  return (
+    <div className="def-scorecard-targets">
+      <p className="def-scorecard-targets-label">Strategic targets — 2029</p>
+      <div className="def-scorecard-targets-row">
+        {targets.map((target) => (
+          <div key={target.label} className="def-scorecard-target-card">
+            <span>{target.label}</span>
+            <strong>{target.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InitiativeKpiTable({
+  rows,
+  showImperativeColumn = false,
+  onRowClick,
+  emptyMessage = 'No KPI rows to display.',
+}) {
+  const colSpan = showImperativeColumn ? 7 : 6;
+  return (
+    <div className="def-scorecard-table-scroll def-table-scroll-wrap">
+      <table className="def-scorecard-table">
+        <thead>
+          <tr>
+            {showImperativeColumn ? <th>Strategic imperative</th> : null}
+            <th>KPI</th>
+            <th>Status</th>
+            <th>Current</th>
+            <th>2029 Target</th>
+            <th>Year One Target</th>
+            <th>Comments</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              className={onRowClick ? 'def-scorecard-row-click' : undefined}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter') onRowClick(row); } : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? 'button' : undefined}
+            >
+              {showImperativeColumn && row.showImperative ? (
+                <td className="def-scorecard-imperative" rowSpan={row.imperativeSpan}>{row.imperative}</td>
+              ) : null}
+              <td className="def-scorecard-kpi"><strong>{row.kpi}</strong></td>
+              <td><ScorecardStatusCell status={row.scorecardStatus} /></td>
+              <td>{row.current}</td>
+              <td>{row.target2029}</td>
+              <td>{row.targetYearOne}</td>
+              <td>{row.comments}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={colSpan} className="def-cockpit-empty">{emptyMessage}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function formatBudgetM(totalM, spentM, pct) {
   return `${pct}% of $${totalM}M ($${spentM}M spent)`;
 }
 
 function applyTrackerRowSpans(rows) {
   const normalized = rows.map((row) => {
-    const {
-      imperativeSpan, initiativeSpan, showImperative, showInitiative, ...rest
-    } = row;
+    const { imperativeSpan, showImperative, ...rest } = row;
     return rest;
   });
   const withSpans = normalized.map((row) => ({
     ...row,
     imperativeSpan: 0,
-    initiativeSpan: 0,
     showImperative: false,
-    showInitiative: false,
   }));
   let i = 0;
   while (i < withSpans.length) {
@@ -226,15 +419,6 @@ function applyTrackerRowSpans(rows) {
     while (impEnd < withSpans.length && withSpans[impEnd].imperative === imp) impEnd += 1;
     withSpans[i].showImperative = true;
     withSpans[i].imperativeSpan = impEnd - i;
-    let j = i;
-    while (j < impEnd) {
-      const iniName = withSpans[j].initiative;
-      let iniEnd = j;
-      while (iniEnd < impEnd && withSpans[iniEnd].initiative === iniName) iniEnd += 1;
-      withSpans[j].showInitiative = true;
-      withSpans[j].initiativeSpan = iniEnd - j;
-      j = iniEnd;
-    }
     i = impEnd;
   }
   return withSpans;
@@ -266,12 +450,22 @@ function buildInitiativeTrackerRows(fastCategories) {
       ];
       const trendUp = ref?.trendUp ?? trend[trend.length - 1] >= trend[0];
 
+      const scorecardStatus = deriveScorecardStatus(ini.status, risk);
+      const scorecardSummary = buildInitiativeScorecardSummary(ini);
+
       rows.push({
         id: `${fast.id}-${ini.id}`,
         fastId: fast.id,
         initiativeId: ini.id,
         imperative,
         initiative: ref?.initiative ?? defaultInitiative,
+        kpi: ini.name,
+        scorecardStatus,
+        current: scorecardSummary.current,
+        target2029: scorecardSummary.target2029,
+        targetYearOne: scorecardSummary.targetYearOne,
+        comments: scorecardSummary.comments,
+        source: ref?.source ?? 'sample',
         subInitiative: ini.name,
         budgetPct,
         budgetLabel: formatBudgetM(budgetTotalM, budgetSpentM, budgetPct),
@@ -281,7 +475,6 @@ function buildInitiativeTrackerRows(fastCategories) {
         trend,
         trendUp,
         risk,
-        source: ref?.source ?? 'sample',
         notes: '—',
         budgetTone: budgetPct >= 80 ? 'warn' : 'ok',
       });
@@ -291,8 +484,8 @@ function buildInitiativeTrackerRows(fastCategories) {
   rows.sort(
     (a, b) =>
       (imperativeOrder[a.imperative] ?? 9) - (imperativeOrder[b.imperative] ?? 9)
-      || a.initiative.localeCompare(b.initiative)
-      || a.subInitiative.localeCompare(b.subInitiative),
+      || a.imperative.localeCompare(b.imperative)
+      || a.kpi.localeCompare(b.kpi),
   );
 
   return applyTrackerRowSpans(rows);
@@ -336,42 +529,6 @@ function getInitiativeTrackerDetail(initiative, fastCategory) {
   };
 }
 
-function trackerRiskLabel(risk) {
-  if (risk === 'high') return 'High';
-  if (risk === 'medium') return 'Medium';
-  return 'Low';
-}
-
-function TrackerRiskDot({ risk }) {
-  const tone = risk === 'high' ? 'high' : risk === 'medium' ? 'medium' : 'low';
-  return <span className={`def-tracker-risk def-tracker-risk-${tone}`} title={`${tone} risk`} aria-label={`${tone} risk`} />;
-}
-
-function TrackerTrendSpark({ data, trendUp }) {
-  const stroke = trendUp ? '#16a34a' : '#dc2626';
-  const fill = trendUp ? 'url(#trackerTrendUp)' : 'url(#trackerTrendDown)';
-  const chartData = data.map((v, ix) => ({ ix, v }));
-  return (
-    <div className="def-tracker-spark">
-      <ResponsiveContainer width="100%" height={36}>
-        <AreaChart data={chartData} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
-          <defs>
-            <linearGradient id="trackerTrendUp" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#16a34a" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="#16a34a" stopOpacity={0.02} />
-            </linearGradient>
-            <linearGradient id="trackerTrendDown" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#dc2626" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="#dc2626" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey="v" stroke={stroke} fill={fill} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => {
@@ -381,8 +538,8 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
       : rows.filter(
         (r) =>
           r.imperative.toLowerCase().includes(q)
-          || r.initiative.toLowerCase().includes(q)
-          || r.subInitiative.toLowerCase().includes(q),
+          || r.kpi.toLowerCase().includes(q)
+          || r.initiative?.toLowerCase().includes(q),
       );
     return applyTrackerRowSpans(base);
   }, [rows, query]);
@@ -393,7 +550,7 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
     <section className="def-cockpit-section def-cockpit-tracker def-cockpit-interactive def-stagger-in" style={{ '--stagger': '400ms' }}>
       <div className="def-tracker-head">
         <div className="def-tracker-head-main">
-          <h2 className="def-cockpit-section-title">Initiative tracker</h2>
+          <h2 className="def-cockpit-section-title">Initiative scorecard</h2>
           <p className="def-tracker-updated">Last updated: {updatedLabel}</p>
         </div>
         <div className="def-tracker-legend">
@@ -413,67 +570,12 @@ function InitiativeTracker({ rows, lastUpdated, onOpenInitiative }) {
         </label>
         <span className="def-tracker-count">{filtered.length} initiatives</span>
       </div>
-      <div className="def-tracker-table-scroll def-table-scroll-wrap">
-        <table className="def-tracker-table">
-          <thead>
-            <tr>
-              <th>Strategic imperative</th>
-              <th>Initiative</th>
-              <th>Sub initiative</th>
-              <th>Budget burn progress</th>
-              <th>Schedule progress</th>
-              <th>Target</th>
-              <th>Current to target</th>
-              <th>MoM CTT trend</th>
-              <th>Risk</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr
-                key={row.id}
-                className={`def-tracker-row def-tracker-source-${row.source}${onOpenInitiative ? ' def-tracker-row-click' : ''}`}
-                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
-                onKeyDown={onOpenInitiative ? (e) => { if (e.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
-                tabIndex={onOpenInitiative ? 0 : undefined}
-                role={onOpenInitiative ? 'button' : undefined}
-              >
-                {row.showImperative ? (
-                  <td className="def-tracker-imperative" rowSpan={row.imperativeSpan}>{row.imperative}</td>
-                ) : null}
-                {row.showInitiative ? (
-                  <td className="def-tracker-initiative" rowSpan={row.initiativeSpan}>{row.initiative}</td>
-                ) : null}
-                <td className="def-tracker-sub">
-                  <strong>{row.subInitiative}</strong>
-                  {row.source === 'sample' ? <span className="def-tracker-tag sample">Sample</span> : null}
-                </td>
-                <td>
-                  <div className="def-tracker-metric">
-                    <span>{row.budgetLabel}</span>
-                    <ProgressBar value={row.budgetPct} color={row.budgetTone === 'warn' ? '#d97706' : '#059669'} />
-                  </div>
-                </td>
-                <td>
-                  <div className="def-tracker-metric">
-                    <span>{row.schedulePct}% complete</span>
-                    <ProgressBar value={row.schedulePct} />
-                  </div>
-                </td>
-                <td>{row.target}</td>
-                <td>{row.ctt}</td>
-                <td><TrackerTrendSpark data={row.trend} trendUp={row.trendUp} /></td>
-                <td className="def-tracker-risk-cell"><TrackerRiskDot risk={row.risk} /></td>
-                <td>{row.notes}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={10} className="def-cockpit-empty">No initiatives match your search.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <InitiativeKpiTable
+        rows={filtered}
+        showImperativeColumn
+        onRowClick={onOpenInitiative ? (row) => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
+        emptyMessage="No initiatives match your search."
+      />
     </section>
   );
 }
@@ -1451,90 +1553,61 @@ function CeoView({ theme, onSelectFast, onOpenInitiative }) {
 }
 
 function FastCategoryView({ fastCategory, onSelectInitiative, onSelectProject, onGoCeo, onBack }) {
+  const scorecardRows = useMemo(
+    () => fastCategory.initiatives.map((ini) => {
+      const summary = buildInitiativeScorecardSummary(ini);
+      return {
+        id: ini.id,
+        initiativeId: ini.id,
+        kpi: ini.name,
+        scorecardStatus: summary.scorecardStatus,
+        current: summary.current,
+        target2029: summary.target2029,
+        targetYearOne: summary.targetYearOne,
+        comments: summary.comments,
+      };
+    }),
+    [fastCategory],
+  );
+  const imperative = IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName;
+
   return (
-    <div className="def-layer def-page-enter">
+    <div className="def-layer def-page-enter def-initiative-page">
       <HierarchyTrail
         items={[
           { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
           { key: 'fast', tier: 'FAST', label: fastCategory.shortName },
         ]}
       />
-      <header className="def-layer-header def-hero-panel def-hero-premium">
-        <div className="def-header-with-avatar def-hero-content">
-          <Avatar name={fastCategory.shortName} tone="blue" />
-          <div>
-            <p className="def-eyebrow">FAST pillar</p>
-            <h1>{fastCategory.name}</h1>
-            <p className="def-subtitle">
-              {fastCategory.summary.initiatives} initiatives · {fastCategory.summary.activeProjects} tracked projects · {fastCategory.summary.teams} delivery teams represented
-            </p>
+
+      <header className="def-initiative-header">
+        <div className="def-initiative-header-main">
+          <div className="def-initiative-meta">
+            <span className="def-initiative-pillar">{imperative}</span>
+            <span className="def-initiative-parent">{fastCategory.name}</span>
           </div>
+          <h1 className="def-initiative-title">{fastCategory.shortName} pillar</h1>
+          <p className="def-initiative-sub">
+            {fastCategory.summary.initiatives} initiatives
+            {' · '}
+            {fastCategory.summary.activeProjects} projects
+            {' · '}
+            {fastCategory.summary.teams} teams
+          </p>
         </div>
-        <div className="def-hero-stats">
+        <div className="def-initiative-header-aside">
           <StatusPill status={fastCategory.status} />
         </div>
       </header>
 
-      <SectionCard title={`Initiative grid · ${fastCategory.shortName}`} desc={`${fastCategory.initiatives.length} prioritized initiatives across delivery teams.`}>
-        <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
-          <table className="def-table def-table-initiatives">
-            <thead>
-              <tr>
-                <th>Initiative</th>
-                <th>Team</th>
-                <th>Status</th>
-                <th>Projects</th>
-                <th>Delayed</th>
-                <th>Utilization</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {fastCategory.initiatives.map((ini, index) => (
-                <tr key={ini.id} className="def-table-row def-stagger-in" style={{ '--stagger': `${index * 55}ms` }}>
-                  <td>
-                    <div className="def-table-name">
-                      <Avatar name={ini.team?.name ?? 'Team'} tone="slate" />
-                      <div>
-                        <strong>{ini.name}</strong>
-                        <div className="def-linked-projects">
-                          {ini.projects.map((prj) => (
-                            <button
-                              key={prj.id}
-                              type="button"
-                              className="def-linked-chip"
-                              onClick={() => onSelectProject(ini.id, prj.id)}
-                              title={`Open ${prj.name}`}
-                            >
-                              {prj.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{ini.team?.name}</td>
-                  <td><StatusPill status={ini.status} /></td>
-                  <td>{ini.team?.summary?.activeProjects ?? ini.projects.length}</td>
-                  <td style={{ color: (ini.team?.summary?.delayedProjects ?? 0) ? '#dc2626' : '#059669', fontWeight: 600 }}>
-                    {ini.team?.summary?.delayedProjects ?? 0}
-                  </td>
-                  <td>
-                    <div className="def-inline-progress">
-                      <ProgressBar value={ini.team?.summary?.avgUtilization ?? 72} />
-                      <span>{ini.team?.summary?.avgUtilization ?? 72}%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <button type="button" className="def-btn-sm" onClick={() => onSelectInitiative(ini.id)}>
-                      Open initiative →
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <SectionCard
+        title="Initiative KPIs"
+        desc={`Executive initiative scorecard — ${fastCategory.initiatives.length} initiatives under ${imperative}`}
+      >
+        <InitiativeKpiTable
+          rows={scorecardRows}
+          onRowClick={(row) => onSelectInitiative(row.initiativeId)}
+        />
       </SectionCard>
 
       <button type="button" className="def-back-btn" onClick={onBack}>← Back to Command Center Cockpit</button>
@@ -1546,6 +1619,14 @@ function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam,
   const detail = useMemo(
     () => getInitiativeTrackerDetail(initiative, fastCategory),
     [initiative, fastCategory],
+  );
+  const scorecard = useMemo(() => buildInitiativeScorecard(initiative), [initiative]);
+  const kpiRows = useMemo(
+    () => scorecard.kpis.map((row, index) => ({
+      id: `${initiative.id}-kpi-${index}`,
+      ...row,
+    })),
+    [initiative.id, scorecard.kpis],
   );
   const team = initiative.team;
   const teamSize = team?.summary?.developers
@@ -1569,11 +1650,9 @@ function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam,
           </div>
           <h1 className="def-initiative-title">{initiative.name}</h1>
           <p className="def-initiative-sub">
+            Executive initiative scorecard — Q2 2026
+            {' · '}
             Team: <strong>{team?.name ?? 'Unassigned'}</strong>
-            {' · '}
-            {initiative.projects.length} project{initiative.projects.length !== 1 ? 's' : ''}
-            {' · '}
-            {teamSize} people
           </p>
         </div>
         <div className="def-initiative-header-aside">
@@ -1584,44 +1663,11 @@ function InitiativeView({ fastCategory, initiative, onGoCeo, onGoFast, onGoTeam,
         </div>
       </header>
 
-      <section className="def-initiative-progress" aria-label="Initiative progress">
-        <div className="def-initiative-progress-card">
-          <span className="def-initiative-progress-label">Budget burn</span>
-          <strong className="def-initiative-progress-value">{detail.budgetLabel}</strong>
-          <ProgressBar value={detail.budgetPct} color={detail.budgetTone === 'warn' ? '#d97706' : '#059669'} />
-        </div>
-        <div className="def-initiative-progress-card">
-          <span className="def-initiative-progress-label">Schedule</span>
-          <strong className="def-initiative-progress-value">{detail.schedulePct}% complete</strong>
-          <ProgressBar value={detail.schedulePct} />
-        </div>
-        <div className="def-initiative-progress-card">
-          <span className="def-initiative-progress-label">Target</span>
-          <strong className="def-initiative-progress-value">{detail.target}</strong>
-        </div>
-        <div className="def-initiative-progress-card">
-          <span className="def-initiative-progress-label">Current vs target</span>
-          <strong className="def-initiative-progress-value">{detail.ctt}</strong>
-          <div className="def-initiative-trend-row">
-            <TrackerTrendSpark data={detail.trend} trendUp={detail.trendUp} />
-            <span className={`def-initiative-trend-note${detail.trendUp ? ' up' : ' down'}`}>
-              {detail.trendUp ? 'Trending up' : 'Trending down'}
-            </span>
-          </div>
-        </div>
-        <div className="def-initiative-progress-card def-initiative-risk-card">
-          <span className="def-initiative-progress-label">Risk</span>
-          <div className="def-initiative-risk-row">
-            <TrackerRiskDot risk={detail.risk} />
-            <strong>{trackerRiskLabel(detail.risk)}</strong>
-          </div>
-          <span className="def-initiative-risk-hint">
-            {detail.delayed > 0
-              ? `${detail.delayed} project${detail.delayed !== 1 ? 's' : ''} delayed or blocked`
-              : 'No blocked projects'}
-          </span>
-        </div>
-      </section>
+      <StrategicTargetCards targets={scorecard.strategicTargets} />
+
+      <SectionCard title="Initiative KPIs" desc="Key metrics tracked against 2029 and year-one targets">
+        <InitiativeKpiTable rows={kpiRows} />
+      </SectionCard>
 
       <div className="def-initiative-quick-stats">
         <div className="def-initiative-stat">
@@ -1863,8 +1909,17 @@ function ProjectDetailCharts({ project, theme }) {
               </defs>
               <CartesianGrid strokeDasharray="3 6" stroke={grid} vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tick={{ fontSize: 10, fill: tick }}
+                axisLine={false}
+                tickLine={false}
+                width={42}
+                tickFormatter={(value) => `${value}%`}
+              />
               <Tooltip content={<DrawerChartTooltip />} />
+              <Legend verticalAlign="top" align="right" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingBottom: '4px' }} />
               <Line type="monotone" dataKey="planned" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Planned" />
               <Area type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} fill="url(#defDrawerArea)" name="Actual" connectNulls />
             </ComposedChart>
@@ -1920,7 +1975,8 @@ function ProjectDetailContent({ project, theme }) {
 
       <div className="def-drawer-block def-drawer-block-compact">
         <div className="def-drawer-block-head">
-          <h3>Work Breakdown</h3>
+          <h3>Task list</h3>
+          <span>{project.modules.length} modules</span>
         </div>
         <div className="def-drawer-module-list">
           {project.modules.map((mod) => {
@@ -1945,7 +2001,8 @@ function ProjectDetailContent({ project, theme }) {
 
       <div className="def-drawer-block def-drawer-block-compact">
         <div className="def-drawer-block-head">
-          <h3>Team · {project.developers.length}</h3>
+          <h3>Team members</h3>
+          <span>{project.developers.length} people</span>
         </div>
         <div className="def-drawer-team-list">
           {project.developers.map((dev) => (
@@ -1981,27 +2038,31 @@ function ProjectDetailDrawer({ project, team, open, onClose, theme = 'light' }) 
 
   if (!open || !project) return null;
 
-  const statusMeta = STATUS_META[project.status] || STATUS_META['on-track'];
+  const onSchedule = project.delayDays <= 0;
 
   return (
     <div className="def-drawer-root open" role="presentation">
       <button type="button" className="def-drawer-backdrop" aria-label="Close project details" onClick={onClose} />
       <aside className="def-drawer def-drawer-pro" role="dialog" aria-modal="true" aria-labelledby="def-drawer-title">
-        <header className="def-drawer-head def-drawer-head-pro">
-          <div className="def-drawer-head-accent" style={{ background: `linear-gradient(135deg, ${statusMeta.color}22, transparent)` }} />
-          <div className="def-drawer-head-inner">
-            <div className="def-drawer-head-row">
-              <span className="def-drawer-tier">Project Detail</span>
-              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-                ✕
-              </button>
-            </div>
-            <h2 id="def-drawer-title">{project.name}</h2>
-            <p className="def-drawer-subtitle">{project.client} · {team?.name ?? 'Team'}</p>
-            <div className="def-drawer-head-badges">
-              <StatusPill status={project.status} />
-              <RiskBadge risk={project.risk} />
-            </div>
+        <header className="def-drawer-head def-drawer-head-clean">
+          <div className="def-drawer-head-row">
+            <span className="def-drawer-tier">Project details</span>
+            <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+              ✕
+            </button>
+          </div>
+          <h2 id="def-drawer-title">{project.name}</h2>
+          <p className="def-drawer-subtitle">
+            Client: <strong>{project.client}</strong>
+            {' · '}
+            Team: <strong>{team?.name ?? 'Unassigned'}</strong>
+          </p>
+          <div className="def-drawer-head-badges">
+            <StatusPill status={project.status} />
+            <RiskBadge risk={project.risk} />
+            <span className={`def-drawer-schedule-chip${onSchedule ? ' ok' : ' late'}`}>
+              {onSchedule ? 'On schedule' : `${project.delayDays} days behind`}
+            </span>
           </div>
         </header>
         <div className="def-drawer-body def-drawer-body-pro">
@@ -2023,8 +2084,17 @@ function TeamView({
   onGoInitiative,
 }) {
   const projects = initiative.projects;
+  const delayedCount = projects.filter(
+    (project) => project.status === 'delayed' || project.status === 'blocked',
+  ).length;
+  const avgProgress = Math.round(
+    projects.reduce((sum, project) => sum + project.progress, 0) / Math.max(projects.length, 1),
+  );
+  const teamSize = team.summary?.developers
+    ?? projects.reduce((sum, project) => sum + project.teamSize, 0);
+
   return (
-    <div className="def-layer def-page-enter">
+    <div className="def-layer def-page-enter def-initiative-page">
       <HierarchyTrail
         items={[
           { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
@@ -2033,73 +2103,104 @@ function TeamView({
           { key: 'team', tier: 'Team', label: team.name },
         ]}
       />
-      <header className="def-layer-header def-hero-panel def-hero-premium">
-        <div className="def-header-with-avatar def-hero-content">
-          <Avatar name={team.name} tone="indigo" />
-          <div>
-            <p className="def-eyebrow">{initiative.name}</p>
-            <h1>{team.name}</h1>
-            <p className="def-subtitle">
-              {fastCategory.shortName} · {projects.length} active project{projects.length !== 1 ? 's' : ''} · {team.summary?.developers ?? '—'} team members
-            </p>
+
+      <header className="def-initiative-header">
+        <div className="def-initiative-header-main">
+          <div className="def-initiative-meta">
+            <span className="def-initiative-pillar">{fastCategory.shortName}</span>
+            <span className="def-initiative-parent">{initiative.name}</span>
           </div>
+          <h1 className="def-initiative-title">{team.name}</h1>
+          <p className="def-initiative-sub">
+            {projects.length} project{projects.length !== 1 ? 's' : ''}
+            {' · '}
+            {teamSize} team members
+            {' · '}
+            {fastCategory.shortName} pillar
+          </p>
         </div>
-        <div className="def-hero-stats">
+        <div className="def-initiative-header-aside">
           <StatusPill status={team.status ?? initiative.status} />
         </div>
       </header>
 
-      <SectionCard title={`Project portfolio · ${team.name}`} desc={`Projects tracked under the ${fastCategory.shortName} pillar.`}>
+      <div className="def-initiative-quick-stats">
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{projects.length}</span>
+          <span className="def-initiative-stat-lbl">Active projects</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{delayedCount}</span>
+          <span className="def-initiative-stat-lbl">Delayed / blocked</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{avgProgress}%</span>
+          <span className="def-initiative-stat-lbl">Average progress</span>
+        </div>
+        <div className="def-initiative-stat">
+          <span className="def-initiative-stat-num">{team.summary?.avgUtilization ?? avgProgress}%</span>
+          <span className="def-initiative-stat-lbl">Avg utilization</span>
+        </div>
+      </div>
+
+      <SectionCard
+        title="Projects"
+        desc={`${projects.length} project${projects.length !== 1 ? 's' : ''} owned by ${team.name}`}
+      >
         <div className="def-table-wrap def-table-pro def-table-scroll-wrap">
-          <table className="def-table def-project-table">
+          <table className="def-table def-project-table def-initiative-project-table">
             <thead>
               <tr>
                 <th>Project</th>
                 <th>Client</th>
                 <th>Status</th>
                 <th>Progress</th>
-                <th>Projected End</th>
-                <th>Capacity</th>
+                <th>End date</th>
+                <th>Team size</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {projects.map((prj) => (
+              {projects.map((project) => (
                 <tr
-                  key={prj.id}
-                  className={`def-table-row def-project-row${activeProjectId === prj.id ? ' def-project-row-active' : ''}`}
+                  key={project.id}
+                  className={`def-table-row def-project-row${activeProjectId === project.id ? ' def-project-row-active' : ''}`}
                 >
                   <td>
-                    <strong className="def-project-name">{prj.name}</strong>
-                    {prj.delayReason && (
-                      <span className="def-project-row-hint">{prj.delayReason}</span>
+                    <strong className="def-project-name">{project.name}</strong>
+                    {project.delayReason && (
+                      <span className="def-project-row-hint">{project.delayReason}</span>
                     )}
                   </td>
-                  <td>{prj.client}</td>
+                  <td>{project.client}</td>
                   <td>
                     <div className="def-project-row-badges">
-                      <StatusPill status={prj.status} />
-                      <RiskBadge risk={prj.risk} />
+                      <StatusPill status={project.status} />
+                      <RiskBadge risk={project.risk} />
                     </div>
                   </td>
                   <td>
                     <div className="def-inline-progress def-inline-progress-wide">
-                      <ProgressBar value={prj.progress} />
-                      <span>{prj.progress}%</span>
+                      <ProgressBar value={project.progress} />
+                      <span>{project.progress}%</span>
                     </div>
                   </td>
-                  <td style={{ color: prj.delayDays > 0 ? '#dc2626' : 'inherit', fontWeight: prj.delayDays > 0 ? 600 : 400 }}>
-                    {formatDate(prj.timeline.projectedEndDate)}
-                    {prj.delayDays > 0 && ` (+${prj.delayDays}d)`}
+                  <td style={{
+                    color: project.delayDays > 0 ? '#dc2626' : 'inherit',
+                    fontWeight: project.delayDays > 0 ? 600 : 400,
+                  }}
+                  >
+                    {formatDate(project.timeline.projectedEndDate)}
+                    {project.delayDays > 0 && ` (+${project.delayDays}d)`}
                   </td>
-                  <td>{prj.teamSize}</td>
+                  <td>{project.teamSize}</td>
                   <td className="def-project-row-action">
                     <button
                       type="button"
-                      className="def-btn-sm"
-                      onClick={() => onOpenProject(prj.id)}
+                      className="def-btn-sm def-btn-ghost"
+                      onClick={() => onOpenProject(project.id)}
                     >
-                      View Project →
+                      Details
                     </button>
                   </td>
                 </tr>
@@ -3040,6 +3141,8 @@ const STYLES = `
     .def-initiative-header-aside { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
     .def-initiative-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-initiative-quick-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .def-scorecard-targets-row { grid-template-columns: 1fr; }
+    .def-scorecard-table { min-width: min(640px, 100%); font-size: var(--text-xs); }
     .def-kpi-item {
       padding: 12px;
       gap: 10px;
@@ -3674,6 +3777,57 @@ const STYLES = `
     background: transparent; border: 1px solid var(--def-border); color: var(--def-text);
   }
   .def-btn-ghost:hover { background: rgba(99,102,241,0.06); border-color: rgba(99,102,241,0.25); }
+
+  /* Executive scorecard tables (Focus / Accelerate / Scale / Transform) */
+  .def-scorecard-targets { margin-bottom: var(--space-3); }
+  .def-scorecard-targets-label {
+    margin: 0 0 8px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--def-muted);
+  }
+  .def-scorecard-targets-row {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2);
+  }
+  .def-scorecard-target-card {
+    padding: var(--space-3); border: 1px solid rgba(37,99,235,0.22); border-radius: 10px;
+    background: #fff; box-shadow: var(--def-shadow-sm); min-width: 0;
+  }
+  .def-scorecard-target-card span {
+    display: block; font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #1d4ed8; margin-bottom: 4px;
+  }
+  .def-scorecard-target-card strong {
+    display: block; font-size: 0.82rem; font-weight: 700; color: var(--def-heading); line-height: 1.35;
+  }
+  .def-scorecard-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .def-scorecard-table {
+    width: 100%; min-width: 720px; border-collapse: collapse; font-size: 0.72rem;
+  }
+  .def-scorecard-table thead th {
+    background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
+    color: #fff; font-weight: 700; text-align: left; padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.08); white-space: nowrap; font-size: 0.66rem;
+  }
+  .def-scorecard-table tbody td {
+    padding: 8px 10px; border: 1px solid rgba(226,232,240,0.95);
+    vertical-align: middle; line-height: 1.35; background: #fff;
+  }
+  .def-scorecard-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .def-scorecard-row-click { cursor: pointer; transition: background 0.18s ease; }
+  .def-scorecard-row-click:hover td { background: rgba(99,102,241,0.06) !important; }
+  .def-scorecard-imperative {
+    font-weight: 800; color: var(--def-heading); vertical-align: top;
+    background: #f1f5f9 !important; text-transform: capitalize; min-width: 88px;
+  }
+  .def-scorecard-kpi strong { font-weight: 700; color: var(--def-heading); }
+  .def-scorecard-status {
+    display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap;
+  }
+  .def-scorecard-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; font-style: normal;
+  }
+  .def-scorecard-dot-track { background: #22c55e; }
+  .def-scorecard-dot-watch { background: #f59e0b; }
+  .def-scorecard-dot-risk { background: #ef4444; }
 
   .def-hero-panel {
     background: var(--def-glass);
@@ -4896,6 +5050,49 @@ const STYLES = `
     backdrop-filter: blur(20px) saturate(160%);
     overflow: hidden;
   }
+  .def-drawer-head-clean {
+    flex-shrink: 0;
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--def-border);
+    background: #fff;
+  }
+  .def-drawer-head-clean h2 {
+    margin: 0 0 6px;
+    font-size: clamp(1.05rem, 2.2vw, 1.28rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--def-heading);
+    line-height: 1.25;
+    word-break: break-word;
+  }
+  .def-drawer-head-clean .def-drawer-subtitle {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+  .def-drawer-head-clean .def-drawer-subtitle strong {
+    color: var(--def-text);
+    font-weight: 700;
+  }
+  .def-drawer-schedule-chip {
+    font-size: 0.64rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--def-border);
+    background: #f8fafc;
+    color: var(--def-muted);
+  }
+  .def-drawer-schedule-chip.ok {
+    background: rgba(34,197,94,0.1);
+    border-color: rgba(34,197,94,0.25);
+    color: #15803d;
+  }
+  .def-drawer-schedule-chip.late {
+    background: rgba(239,68,68,0.08);
+    border-color: rgba(239,68,68,0.22);
+    color: #b91c1c;
+  }
   .def-drawer-head-accent {
     position: absolute;
     inset: 0 0 auto 0;
@@ -5869,6 +6066,14 @@ const STYLES = `
     border-color: rgba(99,102,241,0.35);
   }
   .def-app.def-theme-dark .def-timeline-row span { color: var(--def-muted); }
+  .def-app.def-theme-dark .def-drawer-head-clean {
+    background: rgba(30,41,59,0.95);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-drawer-schedule-chip {
+    background: rgba(15,23,42,0.5);
+    border-color: rgba(255,255,255,0.08);
+  }
   .def-app.def-theme-dark .def-drawer-pro {
     background: linear-gradient(180deg, var(--def-surface) 0%, rgba(15,23,42,0.95) 100%);
   }
@@ -5903,6 +6108,15 @@ const STYLES = `
   .def-app.def-theme-dark .def-initiative-stat {
     background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08);
   }
+  .def-app.def-theme-dark .def-scorecard-target-card,
+  .def-app.def-theme-dark .def-scorecard-table tbody td {
+    background: rgba(30,41,59,0.88); border-color: rgba(255,255,255,0.08);
+  }
+  .def-app.def-theme-dark .def-scorecard-table tbody tr:nth-child(even) td {
+    background: rgba(15,23,42,0.45);
+  }
+  .def-app.def-theme-dark .def-scorecard-imperative { background: rgba(15,23,42,0.65) !important; }
+  .def-app.def-theme-dark .def-scorecard-row-click:hover td { background: rgba(99,102,241,0.14) !important; }
 
   .def-cockpit-theme-dark .def-tracker-search input {
     background: rgba(15,23,42,0.6); border-color: rgba(255,255,255,0.1); color: var(--def-text);
