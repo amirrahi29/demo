@@ -913,7 +913,6 @@ function AppSidebar({
   open,
   onNavigate,
 }) {
-  const { organization } = ORG_DATA;
   const [expandedMgr, setExpandedMgr] = useState(manager?.id ?? null);
 
   useEffect(() => {
@@ -942,11 +941,6 @@ function AppSidebar({
 
   return (
     <aside className={`def-sidebar${open ? ' def-sidebar-open' : ''}`}>
-      <div className="def-sidebar-brand def-sidebar-brand-compact">
-        <span className="def-sidebar-period">{organization.reportingPeriod}</span>
-        <span className="def-sidebar-period-hint">Reporting period</span>
-      </div>
-
       <nav className="def-sidebar-nav">
         <p className="def-sidebar-label">Organization</p>
         <button
@@ -1662,14 +1656,14 @@ function ProjectProgressGauge({ progress, theme }) {
 
   return (
     <div className="def-drawer-gauge">
-      <ResponsiveContainer width="100%" height={108}>
-        <PieChart>
+      <ResponsiveContainer width="100%" aspect={1} minWidth={0}>
+        <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
           <Pie
             data={ringData}
             cx="50%"
             cy="50%"
-            innerRadius={44}
-            outerRadius={58}
+            innerRadius="68%"
+            outerRadius="88%"
             startAngle={90}
             endAngle={-270}
             dataKey="value"
@@ -1700,25 +1694,27 @@ function ProjectDetailCharts({ project, theme }) {
           <h3>Modules</h3>
           <span>{project.modules.length} total</span>
         </div>
-        <ResponsiveContainer width="100%" height={140}>
-          <PieChart>
-            <Pie
-              data={moduleData}
-              cx="50%"
-              cy="50%"
-              innerRadius={38}
-              outerRadius={58}
-              paddingAngle={3}
-              dataKey="value"
-              stroke="none"
-            >
-              {moduleData.map((entry) => (
-                <Cell key={entry.status} fill={entry.fill} />
-              ))}
-            </Pie>
-            <Tooltip content={<DrawerChartTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
+        <div className="def-drawer-chart-wrap">
+          <ResponsiveContainer width="100%" height={150} minWidth={0}>
+            <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <Pie
+                data={moduleData}
+                cx="50%"
+                cy="50%"
+                innerRadius="58%"
+                outerRadius="82%"
+                paddingAngle={3}
+                dataKey="value"
+                stroke="none"
+              >
+                {moduleData.map((entry) => (
+                  <Cell key={entry.status} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip content={<DrawerChartTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
         <div className="def-drawer-donut-legend def-drawer-donut-legend-inline">
           {moduleData.map((item) => (
             <span key={item.status}>
@@ -1734,22 +1730,24 @@ function ProjectDetailCharts({ project, theme }) {
           <h3>Delivery</h3>
           <span>Planned vs actual</span>
         </div>
-        <ResponsiveContainer width="100%" height={140}>
-          <ComposedChart data={burndownData} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="defDrawerArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 6" stroke={grid} vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} width={26} tickFormatter={(v) => `${v}%`} />
-            <Tooltip content={<DrawerChartTooltip />} />
-            <Line type="monotone" dataKey="planned" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Planned" />
-            <Area type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} fill="url(#defDrawerArea)" name="Actual" connectNulls />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <div className="def-drawer-chart-wrap">
+          <ResponsiveContainer width="100%" height={150} minWidth={0}>
+            <ComposedChart data={burndownData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+              <defs>
+                <linearGradient id="defDrawerArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 6" stroke={grid} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: tick }} axisLine={false} tickLine={false} width={30} tickFormatter={(v) => `${v}%`} />
+              <Tooltip content={<DrawerChartTooltip />} />
+              <Line type="monotone" dataKey="planned" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Planned" />
+              <Area type="monotone" dataKey="actual" stroke="#6366f1" strokeWidth={2} fill="url(#defDrawerArea)" name="Actual" connectNulls />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -4557,7 +4555,7 @@ const STYLES = `
   }
   .def-drawer-summary {
     display: grid;
-    grid-template-columns: 108px 1fr;
+    grid-template-columns: minmax(96px, 112px) minmax(0, 1fr);
     gap: 14px;
     align-items: center;
     padding: 14px 16px;
@@ -4565,11 +4563,19 @@ const STYLES = `
     border-radius: 16px;
     background: var(--def-glass);
     border: 1px solid var(--def-border);
+    min-width: 0;
   }
   .def-drawer-gauge {
     position: relative;
-    width: 108px;
-    height: 108px;
+    width: 100%;
+    max-width: 112px;
+    aspect-ratio: 1;
+    min-height: 96px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+  .def-drawer-gauge .recharts-responsive-container {
+    min-width: 0 !important;
   }
   .def-drawer-gauge-center {
     position: absolute;
@@ -4599,6 +4605,7 @@ const STYLES = `
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
   }
   .def-drawer-summary-stat span {
     display: block;
@@ -4664,13 +4671,23 @@ const STYLES = `
     display: grid;
   }
   .def-drawer-charts-compact {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     margin-bottom: 14px;
   }
   .def-drawer-charts-compact .def-drawer-chart-card {
     padding: 12px;
     border-radius: 14px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .def-drawer-chart-wrap {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .def-drawer-chart-wrap .recharts-responsive-container {
+    min-width: 0 !important;
   }
   .def-drawer-donut-legend-inline {
     display: flex;
@@ -4863,10 +4880,25 @@ const STYLES = `
   }
   @media (max-width: 640px) {
     .def-drawer { width: 100%; }
-    .def-drawer-summary { grid-template-columns: 1fr; text-align: center; }
-    .def-drawer-gauge { margin: 0 auto; }
+    .def-drawer-summary {
+      grid-template-columns: 1fr;
+      text-align: center;
+      justify-items: center;
+    }
+    .def-drawer-summary-stats {
+      width: 100%;
+      text-align: left;
+    }
+    .def-drawer-gauge {
+      max-width: 120px;
+      margin: 0 auto;
+    }
     .def-drawer-charts-compact { grid-template-columns: 1fr; }
     .def-project-table { min-width: 720px; }
+  }
+  @media (max-width: 520px) {
+    .def-drawer-charts-compact { grid-template-columns: 1fr; }
+    .def-drawer-gauge { max-width: 108px; }
   }
 
   .def-dev-list { display: flex; flex-direction: column; gap: 12px; }
