@@ -1942,23 +1942,35 @@ function useViewport() {
     compact: false,
     isMobile: false,
     isTablet: false,
+    isSmallLaptop: false,
+    isCompactLaptop: false,
     chartH: 210,
     panelChartH: 168,
     panelMinH: 320,
     bottomMinH: 300,
+    fastChartH: 108,
+    healthDotSize: 44,
+    healthDotCore: 38,
   }));
 
   useEffect(() => {
     const sync = () => {
       const width = window.innerWidth;
+      const isSmallLaptop = width < 1280;
+      const isCompactLaptop = width < 1366;
       setVp({
         compact: width < 640,
         isMobile: width < 480,
         isTablet: width < 768,
-        chartH: width < 480 ? 160 : width < 640 ? 180 : width < 768 ? 195 : width < 1024 ? 205 : 220,
-        panelChartH: width < 480 ? 136 : width < 640 ? 148 : width < 768 ? 156 : width < 1024 ? 164 : 172,
-        panelMinH: width < 768 ? 0 : width < 1024 ? 300 : 320,
-        bottomMinH: width < 768 ? 0 : width < 1024 ? 280 : 300,
+        isSmallLaptop,
+        isCompactLaptop,
+        chartH: width < 480 ? 160 : width < 640 ? 180 : width < 768 ? 195 : width < 1024 ? 205 : width < 1280 ? 212 : width < 1536 ? 218 : 220,
+        panelChartH: width < 480 ? 136 : width < 640 ? 148 : width < 768 ? 156 : width < 1024 ? 160 : width < 1280 ? 164 : width < 1536 ? 168 : 172,
+        panelMinH: width < 768 ? 0 : width < 1024 ? 280 : width < 1280 ? 292 : width < 1536 ? 308 : 320,
+        bottomMinH: width < 768 ? 0 : width < 1024 ? 260 : width < 1280 ? 272 : width < 1536 ? 286 : 300,
+        fastChartH: width < 1180 ? 80 : width < 1280 ? 84 : width < 1366 ? 92 : width < 1536 ? 100 : 108,
+        healthDotSize: width < 1180 ? 32 : width < 1280 ? 36 : width < 1366 ? 40 : 44,
+        healthDotCore: width < 1180 ? 28 : width < 1280 ? 32 : width < 1366 ? 34 : 38,
       });
     };
     sync();
@@ -2095,7 +2107,6 @@ function CockpitOverallHealthCard({ score, delay = '0ms' }) {
       aria-label={`Overall health score ${score}`}
     >
       <span className="def-cockpit-metric-stripe" aria-hidden="true" />
-      <span className="def-cockpit-overall-health-ambient" aria-hidden="true" />
       <div className="def-cockpit-overall-health-head">
         <div className="def-cockpit-metric-icon" aria-hidden="true">◆</div>
         <span className="def-cockpit-metric-label">Overall health</span>
@@ -2109,11 +2120,11 @@ function CockpitOverallHealthCard({ score, delay = '0ms' }) {
             </li>
           ))}
         </ul>
-      </div>
-      <div className="def-cockpit-overall-health-dot-wrap" aria-hidden="true">
-        <span className="def-cockpit-overall-health-dot">
-          <span className="def-cockpit-overall-health-dot-core" />
-        </span>
+        <div className="def-cockpit-overall-health-dot-wrap" aria-hidden="true">
+          <span className="def-cockpit-overall-health-dot">
+            <span className="def-cockpit-overall-health-dot-core" />
+          </span>
+        </div>
       </div>
     </article>
   );
@@ -2337,6 +2348,7 @@ function CockpitMetricCard({
 }
 
 function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
+  const vp = useViewport();
   const projects = fast.initiatives.flatMap((ini) => ini.projects);
   const { onTrack: onCount, atRisk: atCount, offTrack: lateCount } = countProjectsByProgressBand(projects);
   const total = Math.max(projects.length, 1);
@@ -2377,7 +2389,7 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
       </div>
       <div className="def-cockpit-fast-body">
         <div className="def-cockpit-fast-chart">
-          <ResponsiveContainer width="100%" height={108}>
+          <ResponsiveContainer width="100%" height={vp.fastChartH}>
             <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <Pie
                 data={data.length ? data : [{ name: 'Empty', value: 1, fill: isDark ? '#334155' : '#e2e8f0' }]}
@@ -2817,6 +2829,10 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
       className={`def-layer def-page-enter def-cockpit def-cockpit-theme-${theme}`}
       style={{
         '--cockpit-bottom-min-h': vp.bottomMinH ? `${vp.bottomMinH}px` : '0px',
+        '--cockpit-panel-min-h': vp.panelMinH ? `${vp.panelMinH}px` : '0px',
+        '--cockpit-fast-chart': `${vp.fastChartH}px`,
+        '--health-dot-size': `${vp.healthDotSize}px`,
+        '--health-dot-core-size': `${vp.healthDotCore}px`,
       }}
     >
       <header className="def-cockpit-top def-cockpit-interactive def-stagger-in" style={{ '--stagger': '0ms' }}>
@@ -8206,7 +8222,7 @@ const STYLES = `
   .def-timeline-row strong { font-size: 0.96rem; font-weight: 700; }
 
   .def-main:has(.def-cockpit) {
-    padding: var(--space-2) var(--space-3) var(--space-3);
+    padding: clamp(var(--space-2), 1.2vw, var(--space-3)) clamp(var(--space-2), 1.4vw, var(--space-3)) var(--space-3);
   }
 
   @keyframes cockpitPulse {
@@ -8232,6 +8248,14 @@ const STYLES = `
     --cockpit-shadow-lg: 0 20px 48px rgba(99,102,241,0.16), 0 6px 16px rgba(15,39,68,0.08);
     --cockpit-hover-lift: -6px;
     --cockpit-hover-scale: 1.012;
+    --cockpit-gap: clamp(8px, 0.9vw, 12px);
+    --cockpit-metric-min-h: clamp(94px, 9vw, 106px);
+    --cockpit-metric-pad-x: clamp(8px, 1vw, 12px);
+    --cockpit-metric-pad-y: clamp(8px, 0.9vw, 10px);
+    --cockpit-fast-chart: 108px;
+    --cockpit-fast-min-h: clamp(168px, 15vw, 200px);
+    --health-dot-size: 44px;
+    --health-dot-core-size: 38px;
     display: flex; flex-direction: column; gap: var(--cockpit-gap); padding-bottom: 0;
   }
   .def-cockpit-interactive {
@@ -8616,14 +8640,15 @@ const STYLES = `
   .def-cockpit-metrics-row {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--cockpit-gap);
     align-items: stretch;
+    min-width: 0;
   }
   .def-cockpit-metrics-row > .def-cockpit-metric-card,
   .def-cockpit-metrics-row > .def-cockpit-metric-card-overlay {
     width: 100%;
     height: 100%;
-    min-height: 106px;
+    min-height: var(--cockpit-metric-min-h);
     min-width: 0;
   }
   .def-cockpit-metric-card-overlay {
@@ -8638,8 +8663,8 @@ const STYLES = `
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 12px 9px;
+    gap: clamp(4px, 0.6vw, 6px);
+    padding: var(--cockpit-metric-pad-y) var(--cockpit-metric-pad-x) calc(var(--cockpit-metric-pad-y) - 1px);
     min-height: 0;
     min-width: 0;
     overflow: hidden;
@@ -8762,7 +8787,7 @@ const STYLES = `
   }
   .def-cockpit-overall-health {
     position: relative;
-    gap: 5px;
+    gap: clamp(3px, 0.5vw, 4px);
     overflow: hidden;
     isolation: isolate;
     background:
@@ -8771,27 +8796,23 @@ const STYLES = `
       0 1px 2px rgba(15,23,42,0.04),
       0 8px 24px rgba(15,23,42,0.06);
   }
-  .def-cockpit-overall-health-ambient {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 76px;
-    height: 76px;
+  .def-cockpit-overall-health-dot {
+    display: grid;
+    place-items: center;
+    width: var(--health-dot-size);
+    height: var(--health-dot-size);
     border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 14%, transparent) 0%,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 4%, transparent) 42%,
-      transparent 58%
-    );
-    pointer-events: none;
-    z-index: 0;
+    background: transparent;
+    box-shadow: none;
   }
-  .def-cockpit-overall-health-head,
-  .def-cockpit-overall-health-body {
-    position: relative;
-    z-index: 1;
+  .def-cockpit-overall-health-dot-core {
+    display: block;
+    width: var(--health-dot-core-size);
+    height: var(--health-dot-core-size);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 95%, #fff);
+    border: 1px solid color-mix(in srgb, var(--health-dot-color, #22c55e) 88%, #000);
+    box-shadow: none;
   }
   .def-cockpit-overall-health.tone-green {
     border-color: rgba(34, 197, 94, 0.28);
@@ -8799,7 +8820,7 @@ const STYLES = `
       linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(240,253,244,0.92) 48%, rgba(255,255,255,0.98) 100%);
     box-shadow:
       0 1px 2px rgba(15,23,42,0.04),
-      0 10px 28px rgba(34,197,94,0.12),
+      0 6px 18px rgba(34,197,94,0.08),
       inset 0 1px 0 rgba(255,255,255,0.85);
   }
   .def-cockpit-overall-health.tone-yellow {
@@ -8808,7 +8829,7 @@ const STYLES = `
       linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(254,252,232,0.92) 48%, rgba(255,255,255,0.98) 100%);
     box-shadow:
       0 1px 2px rgba(15,23,42,0.04),
-      0 10px 28px rgba(234,179,8,0.12),
+      0 6px 18px rgba(234,179,8,0.08),
       inset 0 1px 0 rgba(255,255,255,0.85);
   }
   .def-cockpit-overall-health.tone-red {
@@ -8817,7 +8838,7 @@ const STYLES = `
       linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(254,242,242,0.92) 48%, rgba(255,255,255,0.98) 100%);
     box-shadow:
       0 1px 2px rgba(15,23,42,0.04),
-      0 10px 28px rgba(239,68,68,0.12),
+      0 6px 18px rgba(239,68,68,0.08),
       inset 0 1px 0 rgba(255,255,255,0.85);
   }
   .def-cockpit-overall-health-head {
@@ -8836,43 +8857,27 @@ const STYLES = `
     color: var(--health-dot-color, #22c55e);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
   }
-  .def-cockpit-overall-health-dot {
-    display: grid;
-    place-items: center;
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 93%, #000);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--health-dot-color, #22c55e) 22%, transparent);
-    transition: box-shadow 0.35s ease;
-  }
-  .def-cockpit-overall-health-dot-core {
-    display: block;
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 95%, #fff);
+  .def-cockpit-overall-health-head,
+  .def-cockpit-overall-health-body {
+    position: relative;
+    z-index: 1;
   }
   .def-cockpit-overall-health-body {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
+    gap: 6px;
     flex: 1;
     min-height: 0;
     padding-top: 0;
-    padding-right: 80px;
     overflow: hidden;
   }
   .def-cockpit-overall-health-dot-wrap {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
     display: grid;
     place-items: center;
-    width: 72px;
-    height: 72px;
+    width: var(--health-dot-size);
+    height: var(--health-dot-size);
     flex-shrink: 0;
     margin: 0;
     z-index: 2;
@@ -8929,15 +8934,6 @@ const STYLES = `
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
   }
-  .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 10px color-mix(in srgb, #22c55e 24%, transparent);
-  }
-  .def-cockpit-overall-health.tone-yellow .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 9px color-mix(in srgb, #eab308 20%, transparent);
-  }
-  .def-cockpit-overall-health.tone-red .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 9px color-mix(in srgb, #ef4444 20%, transparent);
-  }
   .def-cockpit-overall-health.tone-green .def-cockpit-metric-stripe {
     background: linear-gradient(90deg, #22c55e, #059669);
   }
@@ -8952,14 +8948,11 @@ const STYLES = `
       border-color: color-mix(in srgb, var(--health-dot-color, #22c55e) 42%, transparent);
       box-shadow:
         0 1px 2px rgba(15,23,42,0.04),
-        0 14px 34px color-mix(in srgb, var(--health-dot-color, #22c55e) 18%, transparent),
+        0 8px 22px color-mix(in srgb, var(--health-dot-color, #22c55e) 12%, transparent),
         inset 0 1px 0 rgba(255,255,255,0.85);
     }
     .def-cockpit-overall-health:hover .def-cockpit-overall-health-dot-wrap {
-      transform: translateY(-50%) scale(1.06);
-    }
-    .def-cockpit-overall-health.tone-green:hover .def-cockpit-overall-health-dot {
-      box-shadow: 0 0 12px color-mix(in srgb, #22c55e 28%, transparent);
+      transform: scale(1.04);
     }
   }
   @media (hover: hover) and (pointer: fine) {
@@ -9266,7 +9259,7 @@ const STYLES = `
   .def-cockpit-metric-label {
     flex: 1;
     min-width: 0;
-    font-size: 0.58rem;
+    font-size: clamp(0.5rem, 0.85vw, 0.58rem);
     font-weight: var(--font-extrabold);
     color: var(--def-muted);
     text-transform: uppercase;
@@ -9584,17 +9577,18 @@ const STYLES = `
   .def-cockpit-fast-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--cockpit-gap);
     align-items: stretch;
+    min-width: 0;
   }
   .def-cockpit-fast-health {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 16px 12px;
+    gap: clamp(8px, 1vw, 12px);
+    padding: clamp(10px, 1.1vw, 14px) clamp(12px, 1.3vw, 16px) clamp(10px, 1vw, 12px);
     height: 100%;
-    min-height: 200px;
+    min-height: var(--cockpit-fast-min-h);
     background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
     border: 1px solid rgba(226,232,240,0.95);
     border-radius: 14px;
@@ -9631,8 +9625,8 @@ const STYLES = `
   }
   .def-cockpit-fast-chart {
     position: relative;
-    width: 108px;
-    height: 108px;
+    width: var(--cockpit-fast-chart);
+    height: var(--cockpit-fast-chart);
     flex-shrink: 0;
     transition: transform 0.42s var(--cockpit-ease-spring);
   }
@@ -9717,9 +9711,9 @@ const STYLES = `
   }
   .def-cockpit-fast-body {
     display: grid;
-    grid-template-columns: 108px minmax(0, 1fr);
+    grid-template-columns: var(--cockpit-fast-chart) minmax(0, 1fr);
     align-items: center;
-    gap: 16px;
+    gap: clamp(8px, 1.1vw, 16px);
     flex: 1;
     min-width: 0;
     padding: 2px 0;
@@ -10686,6 +10680,15 @@ const STYLES = `
   .def-cockpit-dl dd { margin: 0; font-weight: 800; color: var(--def-heading); }
   .def-cockpit-mini-actions { margin-top: 8px; }
 
+  @media (max-width: 1536px) {
+    :root { --def-sidebar-w: 296px; }
+    .def-cockpit {
+      --cockpit-fast-min-h: 188px;
+    }
+    .def-cockpit-bottom-row {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(240px, 0.85fr);
+    }
+  }
   @media (max-width: 1400px) {
     .def-cockpit-workspace-analytics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10702,26 +10705,64 @@ const STYLES = `
       min-height: 0;
     }
   }
-  @media (max-width: 1280px) {
-    .def-cockpit-metrics-row {
-      display: flex;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scroll-snap-type: x mandatory;
-      scroll-padding-inline: 4px;
-      scrollbar-width: thin;
-      gap: 10px;
-      padding: 4px 2px 8px;
-      -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
-      mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  @media (max-width: 1366px) {
+    :root { --def-sidebar-w: 280px; }
+    .def-cockpit {
+      --cockpit-metric-min-h: 96px;
+      --cockpit-fast-min-h: 176px;
     }
-    .def-cockpit-metric-card {
-      flex: 0 0 clamp(148px, 18vw, 168px);
-      scroll-snap-align: start;
+    .def-cockpit-overall-health-head .def-cockpit-metric-label {
+      font-size: clamp(0.48rem, 0.8vw, 0.54rem);
+    }
+    .def-cockpit-overall-health-legend li {
+      font-size: clamp(0.42rem, 0.75vw, 0.48rem);
+      padding: 2px 5px 2px 4px;
+    }
+    .def-cockpit-metric-scope-name {
+      font-size: clamp(0.44rem, 0.7vw, 0.5rem);
+    }
+    .def-cockpit-fast-health h3 {
+      font-size: clamp(0.66rem, 1vw, 0.72rem);
+    }
+  }
+  @media (max-width: 1280px) {
+    :root { --def-sidebar-w: 268px; }
+    .def-cockpit {
+      --cockpit-metric-min-h: 92px;
+      --cockpit-fast-min-h: 168px;
+    }
+    .def-cockpit-metrics-row {
+      gap: 8px;
+    }
+    .def-cockpit-metric-icon {
+      width: 22px;
+      height: 22px;
+      font-size: 0.66rem;
+    }
+    .def-cockpit-metric-scope-value {
+      font-size: clamp(0.84rem, 1.2vw, 0.98rem);
+    }
+  }
+  @media (max-width: 1180px) {
+    :root { --def-sidebar-w: 252px; }
+    .def-cockpit-metrics-row {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .def-cockpit-metrics-row > :nth-child(1) { grid-column: 1 / span 2; }
+    .def-cockpit-metrics-row > :nth-child(2) { grid-column: 3; }
+    .def-cockpit-metrics-row > :nth-child(3) { grid-column: 4; }
+    .def-cockpit-metrics-row > :nth-child(4) { grid-column: 1 / span 2; }
+    .def-cockpit-metrics-row > :nth-child(5) { grid-column: 3 / span 2; }
+    .def-cockpit-overall-health-body {
+      gap: 4px;
+    }
+    .def-cockpit-fast-legend li {
+      padding: 4px 6px;
+      font-size: clamp(0.56rem, 0.9vw, 0.62rem);
     }
   }
   @media (max-width: 1024px) {
+    :root { --def-sidebar-w: 240px; }
     .def-cockpit-fast-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .def-cockpit-bottom-row {
       grid-template-columns: 1fr;
@@ -10799,7 +10840,25 @@ const STYLES = `
       right: 0;
       left: auto;
     }
-    .def-cockpit-metric-card { flex: 0 0 124px; }
+    .def-cockpit-metrics-row {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: 4px;
+      scrollbar-width: thin;
+      gap: 8px;
+      padding: 2px 2px 6px;
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+    }
+    .def-cockpit-metrics-row > .def-cockpit-metric-card,
+    .def-cockpit-metrics-row > .def-cockpit-metric-card-overlay {
+      flex: 0 0 clamp(124px, 42vw, 148px);
+      scroll-snap-align: start;
+      min-height: var(--cockpit-metric-min-h);
+    }
     .def-cockpit-fast-grid { grid-template-columns: 1fr; }
     .def-cockpit-movement-stats { grid-template-columns: 1fr; }
     .def-cockpit-metric-label { font-size: var(--text-min); }
@@ -10811,7 +10870,11 @@ const STYLES = `
   @media (max-width: 480px) {
     .def-cockpit-metrics-row,
     .def-cockpit-fast-grid { grid-template-columns: unset; }
-    .def-cockpit-metric-card { flex: 0 0 118px; min-height: 0; }
+    .def-cockpit-metrics-row > .def-cockpit-metric-card,
+    .def-cockpit-metrics-row > .def-cockpit-metric-card-overlay {
+      flex: 0 0 clamp(118px, 44vw, 132px);
+      min-height: 0;
+    }
     .def-cockpit-table-recovery,
     .def-cockpit-table-teams { min-width: min(100%, 480px); }
     .def-cockpit-fast-health h3 { line-clamp: 3; }
