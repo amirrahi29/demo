@@ -1223,12 +1223,20 @@ function buildQuarterlyComparisonStats(rows) {
   };
 }
 
-function buildLastQuarterSummary(quarterlyBars) {
+function buildLastQuarterSummary(quarterlyBars, ceoSummary, milestoneCount = 8) {
   const row = quarterlyBars.length >= 2
     ? quarterlyBars[quarterlyBars.length - 2]
     : quarterlyBars[quarterlyBars.length - 1];
   if (!row) {
-    return { label: 'Q1 2026', onTrackPct: 61, atRiskPct: 23, offTrackPct: 16 };
+    return {
+      label: 'Q1 2026',
+      onTrackPct: 61,
+      atRiskPct: 23,
+      offTrackPct: 16,
+      totalInitiatives: ceoSummary?.totalInitiatives ?? 26,
+      healthScore: ceoSummary?.overallHealth ?? 81,
+      milestoneCount,
+    };
   }
   const total = row.onTrack + row.atRisk + row.delayed || 1;
   return {
@@ -1236,13 +1244,19 @@ function buildLastQuarterSummary(quarterlyBars) {
     onTrackPct: Math.round((row.onTrack / total) * 100),
     atRiskPct: Math.round((row.atRisk / total) * 100),
     offTrackPct: Math.round((row.delayed / total) * 100),
+    totalInitiatives: ceoSummary?.totalInitiatives ?? 26,
+    healthScore: ceoSummary?.overallHealth ?? 81,
+    milestoneCount,
   };
 }
 
-function buildKeyHighlights(quarterlyStats, ceoSummary) {
-  const onTrackDelta = Math.max(quarterlyStats.onTrackDelta, 0) || 7;
-  const atRiskReduced = Math.max(-quarterlyStats.atRiskDelta, 0) || 2;
+function buildKeyHighlights(quarterlyStats, ceoSummary, executiveMetrics, milestoneCount = 8) {
+  const onTrackDelta = Math.max(quarterlyStats.onTrackDelta, 0) || 27;
+  const atRiskReduced = Math.max(-quarterlyStats.atRiskDelta, 0) || 4;
   const completed = Math.max(ceoSummary.completedProjects, 26);
+  const healthScore = executiveMetrics?.healthScore ?? ceoSummary.overallHealth ?? 81;
+  const subInitiatives = executiveMetrics?.subInitiatives ?? 84;
+  const onTrackCount = executiveMetrics?.onTrackCount ?? ceoSummary.onTrackProjects ?? 17;
 
   return [
     {
@@ -1263,6 +1277,24 @@ function buildKeyHighlights(quarterlyStats, ceoSummary) {
       icon: '✓',
       text: `${completed} initiatives completed this quarter`,
     },
+    {
+      id: 'health',
+      tone: 'complete',
+      icon: '◆',
+      text: `Portfolio health reached ${healthScore}% overall`,
+    },
+    {
+      id: 'milestones',
+      tone: 'on-track',
+      icon: '◎',
+      text: `${milestoneCount} upcoming milestones on schedule this quarter`,
+    },
+    {
+      id: 'coverage',
+      tone: 'complete',
+      icon: '▣',
+      text: `${subInitiatives} sub-initiatives tracked across ${onTrackCount} active programs`,
+    },
   ];
 }
 
@@ -1275,6 +1307,33 @@ const RISK_PARENT_LABELS = {
   'AI Accelerated CXP Revenue': 'Customer Experience Growth',
   'GPT Operations & Engagement': 'Workforce Modernization',
 };
+
+const COCKPIT_TOP_RISKS_SUPPLEMENT = [
+  {
+    id: 'data-platform-modernization',
+    title: 'Data Platform Modernization',
+    score: 19,
+    atRiskCount: 2,
+    tone: 'medium',
+    status: 'delayed',
+  },
+  {
+    id: 'marketplace-expansion',
+    title: 'Marketplace Expansion',
+    score: 17,
+    atRiskCount: 1,
+    tone: 'medium',
+    status: 'delayed',
+  },
+  {
+    id: 'cloud-infrastructure',
+    title: 'Cloud Infrastructure',
+    score: 16,
+    atRiskCount: 1,
+    tone: 'low',
+    status: 'on-track',
+  },
+];
 
 function buildTopRisks(pillarFasts) {
   const clusters = new Map();
@@ -1305,7 +1364,7 @@ function buildTopRisks(pillarFasts) {
     });
   });
 
-  return Array.from(clusters.values())
+  const computed = Array.from(clusters.values())
     .map((cluster) => {
       const score = Math.round(
         cluster.scores.reduce((sum, value) => sum + value, 0) / Math.max(cluster.scores.length, 1),
@@ -1319,8 +1378,15 @@ function buildTopRisks(pillarFasts) {
         tone,
         status: tone === 'high' ? 'at-risk' : tone === 'medium' ? 'delayed' : 'on-track',
       };
-    })
-    .sort((a, b) => b.score - a.score);
+    });
+
+  const computedIds = new Set(computed.map((row) => row.id));
+  const computedTitles = new Set(computed.map((row) => row.title));
+  const supplement = COCKPIT_TOP_RISKS_SUPPLEMENT.filter(
+    (row) => !computedIds.has(row.id) && !computedTitles.has(row.title),
+  );
+
+  return [...computed, ...supplement].sort((a, b) => b.score - a.score);
 }
 
 const RISK_GAUGE_COLORS = {
@@ -1456,14 +1522,19 @@ function TopRisksDrawer({ open, onClose, rows }) {
   );
 }
 
-function TopRisksPanel({ rows }) {
+function TopRisksPanel({ rows, stagger = '200ms' }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <>
-      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
+      <div
+        className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-cockpit-top-risks-panel def-stagger-in"
+        style={{ '--stagger': stagger }}
+      >
         <CockpitPanelHeader title="Top Risks" onViewAll={() => setDrawerOpen(true)} />
-        <TopRisksList rows={rows} compact />
+        <div className="def-cockpit-table-scroll def-cockpit-panel-body def-cockpit-top-risks-scroll">
+          <TopRisksList rows={rows} compact />
+        </div>
       </div>
       <TopRisksDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} rows={rows} />
     </>
@@ -1842,6 +1913,7 @@ function buildCockpitAnalytics(orgData, filterFastId) {
   }));
 
   const initiativeTracker = buildInitiativeTrackerRows(pillarFasts);
+  const upcomingMilestones = buildUpcomingMilestones(pillarFasts);
 
   const lastQuarterBullets = [
     `Average team utilization was ${weekly[weekly.length - 1]?.utilization ?? 85}%. Portfolio health ended near ${weekly[weekly.length - 1]?.close ?? ceoSummary.overallHealth}%.`,
@@ -1869,9 +1941,14 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     quarterlyStats,
     initiativeTracker,
     ownershipOverview: buildOwnershipOverview(pillarFasts),
-    upcomingMilestones: buildUpcomingMilestones(pillarFasts),
-    lastQuarterSummary: buildLastQuarterSummary(quarterlyBars),
-    keyHighlights: buildKeyHighlights(quarterlyStats, ceoSummary),
+    upcomingMilestones,
+    lastQuarterSummary: buildLastQuarterSummary(quarterlyBars, ceoSummary, upcomingMilestones.length),
+    keyHighlights: buildKeyHighlights(
+      quarterlyStats,
+      ceoSummary,
+      executiveMetrics,
+      upcomingMilestones.length,
+    ),
     topRisks: buildTopRisks(pillarFasts),
     lastQuarterBullets,
     sparks,
@@ -1931,7 +2008,7 @@ const FAST_PILLAR_ICONS = {
 
 const TOWER_LEAD_ICONS = {
   ET: '🏢',
-  BV: '🚀',
+  BV: '◈',
   PD: '⚙',
   OT: '◫',
 };
@@ -2494,7 +2571,7 @@ function TowerLeadHealthCard({ lead, theme, index = 0 }) {
 
 const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 8;
 const COCKPIT_MILESTONES_PREVIEW_LIMIT = 9;
-const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 2;
+const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 6;
 
 function ModalProTableShell({ children, className = '' }) {
   return (
@@ -2828,7 +2905,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
 
   return (
     <>
-      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
         <CockpitPanelHeader title="Upcoming Milestone" onViewAll={() => setDrawerOpen(true)} />
         <div className="def-cockpit-table-scroll wide def-cockpit-panel-body def-cockpit-table-preview">
           <UpcomingMilestonesTableBody rows={previewRows} onOpenInitiative={onOpenInitiative} />
@@ -2844,11 +2921,14 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   );
 }
 
-function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
+function CockpitQuarterHighlights({ lastQuarter, highlights }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive">
-        <h3 className="def-cockpit-card-title">Last Quarter Summary</h3>
+        <div className="def-cockpit-lq-head">
+          <h3 className="def-cockpit-card-title">Last Quarter Summary</h3>
+          <span className="def-cockpit-lq-label">{lastQuarter.label}</span>
+        </div>
         <div className="def-cockpit-lq-grid">
           <div className="def-cockpit-lq-stat on-track">
             <span>On track</span>
@@ -2863,6 +2943,20 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
             <strong>{lastQuarter.offTrackPct}%</strong>
           </div>
         </div>
+        <div className="def-cockpit-lq-meta">
+          <div className="def-cockpit-lq-meta-item">
+            <span>Initiatives</span>
+            <strong>{lastQuarter.totalInitiatives}</strong>
+          </div>
+          <div className="def-cockpit-lq-meta-item">
+            <span>Portfolio Health</span>
+            <strong>{lastQuarter.healthScore}%</strong>
+          </div>
+          <div className="def-cockpit-lq-meta-item">
+            <span>Milestones</span>
+            <strong>{lastQuarter.milestoneCount}</strong>
+          </div>
+        </div>
       </div>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-highlight-panel">
         <h3 className="def-cockpit-card-title">Key Highlights</h3>
@@ -2875,7 +2969,6 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
           ))}
         </ul>
       </div>
-      <TopRisksPanel rows={topRisks} />
     </div>
   );
 }
@@ -3007,15 +3100,14 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           <h2 className="def-cockpit-section-title">Portfolio insights</h2>
         </div>
         <div className="def-cockpit-bottom-row">
-          <OwnershipOverviewTable rows={analytics.ownershipOverview} />
           <UpcomingMilestonesTable
             rows={analytics.upcomingMilestones}
             onOpenInitiative={onOpenInitiative}
           />
+          <TopRisksPanel rows={analytics.topRisks} />
           <CockpitQuarterHighlights
             lastQuarter={analytics.lastQuarterSummary}
             highlights={analytics.keyHighlights}
-            topRisks={analytics.topRisks}
           />
         </div>
       </section>
@@ -10196,6 +10288,62 @@ const STYLES = `
     flex: 1;
     justify-content: flex-start;
   }
+  .def-cockpit-lq-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+  .def-cockpit-lq-head .def-cockpit-card-title {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .def-cockpit-lq-label {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.18);
+    color: #4338ca;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  .def-cockpit-lq-meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(226,232,240,0.9);
+  }
+  .def-cockpit-lq-meta-item {
+    min-width: 0;
+    text-align: center;
+  }
+  .def-cockpit-lq-meta-item span {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--def-muted);
+    margin-bottom: 2px;
+    line-height: 1.25;
+  }
+  .def-cockpit-lq-meta-item strong {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--def-heading);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
   .def-cockpit-lq-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -10250,7 +10398,7 @@ const STYLES = `
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 11px;
   }
   .def-cockpit-highlight-item {
     display: flex;
@@ -10297,6 +10445,11 @@ const STYLES = `
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+  .def-cockpit-top-risks-panel .def-cockpit-top-risks-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
   .def-cockpit-top-risk-list {
     list-style: none;
