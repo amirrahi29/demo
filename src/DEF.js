@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ReactDOM from 'react-dom/client';
 import {
   Area,
@@ -225,6 +226,10 @@ function classifyProgressBand(progress) {
   if (progress > 80) return 'on-track';
   if (progress >= 50) return 'at-risk';
   return 'off-track';
+}
+
+function statusFromHealthScore(healthScore) {
+  return classifyProgressBand(healthScore);
 }
 
 const PROGRESS_BAND_THEME = {
@@ -782,14 +787,67 @@ function InitiativeKpiTable({
   emptyMessage = 'No KPI rows to display.',
   showOwnership = false,
   embedded = false,
+  modal = false,
 }) {
   const colSpan = showOwnership ? 8 : 6;
   const wrapClass = embedded
     ? 'def-table-wrap def-table-embedded def-table-scroll-wrap'
-    : 'def-table-wrap def-table-pro def-table-scroll-wrap';
+    : modal
+      ? 'def-modal-pro-table-wrap'
+      : 'def-table-wrap def-table-pro def-table-scroll-wrap';
+  const tableClass = modal
+    ? 'def-table def-initiative-kpi-table def-modal-pro-table'
+    : 'def-table def-initiative-kpi-table';
+  const scrollInner = modal ? (
+    <div className="def-modal-pro-table-scroll">
+      <table className={tableClass}>
+        <thead>
+          <tr>
+            <th>KPI</th>
+            {showOwnership ? <th>Owner</th> : null}
+            {showOwnership ? <th>Team</th> : null}
+            <th>Status</th>
+            <th>Current</th>
+            <th>2029 Target</th>
+            <th>Year One Target</th>
+            <th>Comments</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              className={onRowClick ? 'def-table-row def-table-row-click' : 'def-table-row'}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter') onRowClick(row); } : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? 'button' : undefined}
+            >
+              <td data-label="KPI"><strong>{row.kpi}</strong></td>
+              {showOwnership ? <td data-label="Owner"><OwnerBadge owner={row.owner} /></td> : null}
+              {showOwnership ? <td data-label="Team"><TeamBadge team={row.team} /></td> : null}
+              <td data-label="Status"><ScorecardStatusCell status={row.scorecardStatus} /></td>
+              <td data-label="Current">{row.current}</td>
+              <td data-label="2029 Target">{row.target2029}</td>
+              <td data-label="Year One Target">{row.targetYearOne}</td>
+              <td data-label="Comments">{row.comments}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={colSpan} className="def-cockpit-empty">{emptyMessage}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  ) : null;
+
+  if (modal) {
+    return <div className={wrapClass}>{scrollInner}</div>;
+  }
+
   return (
     <div className={wrapClass}>
-      <table className="def-table def-initiative-kpi-table">
+      <table className={tableClass}>
         <thead>
           <tr>
             <th>KPI</th>
@@ -1034,7 +1092,7 @@ function buildLayOfLandCategories() {
     const healthScore = Math.round(allProjects.reduce((s, p) => s + p.progress, 0) / Math.max(allProjects.length, 1));
     return {
       ...fast,
-      status: delayed >= 3 ? 'at-risk' : delayed >= 1 ? 'delayed' : 'on-track',
+      status: statusFromHealthScore(healthScore),
       healthScore,
       summary: {
         initiatives: fast.initiatives.length,
@@ -1169,8 +1227,7 @@ function buildUpcomingMilestones(pillarFasts) {
     });
   });
   return milestones
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-    .slice(0, 8);
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 }
 
 function buildQuarterlyComparisonStats(rows) {
@@ -1209,25 +1266,258 @@ function buildLastQuarterSummary(quarterlyBars) {
   };
 }
 
-function buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary) {
-  const onTrackDelta = Math.max(quarterlyStats.onTrackDelta, 0);
+function buildKeyHighlights(quarterlyStats, ceoSummary) {
+  const onTrackDelta = Math.max(quarterlyStats.onTrackDelta, 0) || 7;
+  const atRiskReduced = Math.max(-quarterlyStats.atRiskDelta, 0) || 2;
+  const completed = Math.max(ceoSummary.completedProjects, 26);
+
   return [
     {
       id: 'ontrack',
-      icon: '✓',
-      text: `On track rate improved by ${onTrackDelta || 7}% versus last quarter (${executiveMetrics.onTrackPct}% current).`,
+      tone: 'on-track',
+      icon: '↑',
+      text: `On Track initiatives improved by ${onTrackDelta}%`,
+    },
+    {
+      id: 'atrisk',
+      tone: 'at-risk',
+      icon: '!',
+      text: `At Risk initiatives reduced by ${atRiskReduced}%`,
     },
     {
       id: 'complete',
-      icon: '🏁',
-      text: `${Math.max(ceoSummary.completedProjects, 3)} initiatives completed this quarter across the portfolio.`,
-    },
-    {
-      id: 'health',
-      icon: '◆',
-      text: `Portfolio health score is ${executiveMetrics.healthScore}/100 with ${executiveMetrics.atRiskCount} initiatives at risk.`,
+      tone: 'complete',
+      icon: '✓',
+      text: `${completed} initiatives completed this quarter`,
     },
   ];
+}
+
+const RISK_PARENT_LABELS = {
+  'Deliver on BU & Functional Priorities & KTLO': 'Core Business Delivery',
+  'AI Foundation': 'AI Product Delivery',
+  'Data and Intelligence Layer': 'Data Platform Modernization',
+  'AI Accelerated EVC Revenue': 'NextGen Migration Factory',
+  'AI Accelerated AVM Revenue': 'Marketplace Expansion',
+  'AI Accelerated CXP Revenue': 'Customer Experience Growth',
+  'GPT Operations & Engagement': 'Workforce Modernization',
+};
+
+function buildTopRisks(pillarFasts) {
+  const clusters = new Map();
+
+  pillarFasts.forEach((fast) => {
+    fast.initiatives.forEach((ini) => {
+      const progress = ini.projects[0]?.progress ?? 0;
+      if (classifyProgressBand(progress) === 'on-track') return;
+
+      const ref = INITIATIVE_TRACKER_REF[ini.name.toLowerCase()];
+      const parentKey = ref?.initiative ?? ini.name;
+      const title = RISK_PARENT_LABELS[parentKey]
+        ?? parentKey.replace(/\s*&\s*KTLO/i, '').trim();
+      const score = Math.min(30, Math.max(15, Math.round(32 - progress * 0.25)));
+
+      if (!clusters.has(parentKey)) {
+        clusters.set(parentKey, {
+          id: toSlug(parentKey),
+          title,
+          scores: [],
+          atRiskCount: 0,
+        });
+      }
+
+      const cluster = clusters.get(parentKey);
+      cluster.scores.push(score);
+      cluster.atRiskCount += 1;
+    });
+  });
+
+  return Array.from(clusters.values())
+    .map((cluster) => {
+      const score = Math.round(
+        cluster.scores.reduce((sum, value) => sum + value, 0) / Math.max(cluster.scores.length, 1),
+      );
+      const tone = score >= 22 ? 'high' : score >= 18 ? 'medium' : 'low';
+      return {
+        id: cluster.id,
+        title: cluster.title,
+        score,
+        atRiskCount: cluster.atRiskCount,
+        tone,
+        status: tone === 'high' ? 'at-risk' : tone === 'medium' ? 'delayed' : 'on-track',
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+const RISK_GAUGE_COLORS = {
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#eab308',
+};
+
+function RiskScoreGauge({ score, tone }) {
+  const color = RISK_GAUGE_COLORS[tone] || RISK_GAUGE_COLORS.medium;
+  const radius = 26;
+  const cx = 32;
+  const cy = 34;
+  const arcLength = Math.PI * radius;
+  const dash = arcLength * (score / 30);
+  const trackPath = `M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`;
+
+  return (
+    <div className={`def-cockpit-risk-gauge tone-${tone}`} aria-hidden="true">
+      <svg viewBox="0 0 64 44" className="def-cockpit-risk-gauge-svg">
+        <path d={trackPath} fill="none" stroke="rgba(148,163,184,0.28)" strokeWidth="5" strokeLinecap="round" />
+        <path
+          d={trackPath}
+          fill="none"
+          stroke={color}
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${arcLength}`}
+        />
+      </svg>
+      <div className="def-cockpit-risk-gauge-meta">
+        <strong>{score}</strong>
+        <span>Risk Score</span>
+      </div>
+    </div>
+  );
+}
+
+function TopRisksList({ rows, compact = false }) {
+  const preview = compact ? rows.slice(0, COCKPIT_TOP_RISKS_PREVIEW_LIMIT) : rows;
+  return (
+    <ul className="def-cockpit-top-risk-list">
+      {preview.map((row) => (
+        <li key={row.id} className={`def-cockpit-top-risk-item tone-${row.tone}`}>
+          <RiskScoreGauge score={row.score} tone={row.tone} />
+          <div className="def-cockpit-top-risk-copy">
+            <strong>{row.title}</strong>
+            <small>
+              {row.atRiskCount} initiative{row.atRiskCount === 1 ? '' : 's'} at risk
+            </small>
+          </div>
+        </li>
+      ))}
+      {preview.length === 0 && (
+        <li className="def-cockpit-top-risk-empty">No elevated risks in the active portfolio.</li>
+      )}
+    </ul>
+  );
+}
+
+function TopRisksModalTable({ rows }) {
+  return (
+    <ModalProTableShell>
+      <table className="def-modal-pro-table def-modal-pro-table-risks">
+        <thead>
+          <tr>
+            <th>Risk area</th>
+            <th>Risk score</th>
+            <th>Initiatives at risk</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td data-label="Risk area"><strong>{row.title}</strong></td>
+              <td data-label="Risk score">
+                <span className={`def-modal-risk-score tone-${row.tone}`}>{row.score}</span>
+              </td>
+              <td data-label="Initiatives at risk">
+                <span className="def-modal-count-chip">{row.atRiskCount}</span>
+              </td>
+              <td data-label="Status">
+                <StatusPill status={row.status} />
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={4} className="def-cockpit-empty">No elevated risks in the active portfolio.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </ModalProTableShell>
+  );
+}
+
+function TopRisksModal({ open, onClose, rows }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const highCount = rows.filter((row) => row.tone === 'high').length;
+  const totalAtRisk = rows.reduce((sum, row) => sum + row.atRiskCount, 0);
+  const avgScore = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length)
+    : 0;
+
+  return (
+    <ModalPortal>
+      <div className="def-modal-root open" role="presentation">
+        <button type="button" className="def-modal-backdrop" aria-label="Close top risks" onClick={onClose} />
+        <div className="def-modal def-modal-pillar" role="dialog" aria-modal="true" aria-labelledby="def-top-risks-modal-title">
+          <header className="def-drawer-head def-drawer-head-pillar">
+            <div className="def-drawer-head-row">
+              <span className="def-drawer-tier">Portfolio insights</span>
+              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <h2 id="def-top-risks-modal-title">Top Risks</h2>
+            <p className="def-drawer-pillar-desc">Executive view of the highest-risk delivery areas in the portfolio</p>
+            <div className="def-drawer-pillar-stats">
+              <StatusPill status={highCount > 0 ? 'at-risk' : 'on-track'} />
+              <span
+                className="def-drawer-pillar-score"
+                style={{ color: healthColor(Math.max(0, 100 - avgScore * 3)) }}
+              >
+                {avgScore} avg score
+              </span>
+              <span className="def-drawer-pillar-meta">
+                {rows.length} risk areas
+                {' | '}
+                {totalAtRisk} initiatives at risk
+              </span>
+            </div>
+          </header>
+          <div className="def-drawer-body def-drawer-body-pillar">
+            <div className="def-drawer-section-bar">
+              <h3>Risk scorecard</h3>
+              <span>{rows.length} areas</span>
+            </div>
+            <div className="def-drawer-pillar-table">
+              <TopRisksModalTable rows={rows} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
+
+function TopRisksPanel({ rows }) {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  return (
+    <>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
+        <CockpitPanelHeader title="Top Risks" onViewAll={() => setModalOpen(true)} />
+        <TopRisksList rows={rows} compact />
+      </div>
+      <TopRisksModal open={modalOpen} onClose={() => setModalOpen(false)} rows={rows} />
+    </>
+  );
 }
 
 function buildPortfolioTrends(summary) {
@@ -1290,6 +1580,7 @@ const STATUS_META = {
   blocked: { label: 'Blocked', color: '#dc2626', bg: '#fef2f2' },
   completed: { label: 'Completed', color: '#2563eb', bg: '#eff6ff' },
   'at-risk': { label: 'At Risk', color: '#ea580c', bg: '#fff7ed' },
+  'off-track': { label: 'Off Track', color: '#dc2626', bg: '#fef2f2' },
 };
 
 const RISK_META = {
@@ -1324,7 +1615,7 @@ function getInitials(name) {
   return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
-const CRITICAL_STATUS = new Set(['at-risk', 'delayed', 'blocked']);
+const CRITICAL_STATUS = new Set(['at-risk', 'delayed', 'blocked', 'off-track']);
 
 /* ─────────────────────────────────────────────────────────────
    UI PRIMITIVES
@@ -1639,7 +1930,8 @@ function buildCockpitAnalytics(orgData, filterFastId) {
     ownershipOverview: buildOwnershipOverview(pillarFasts),
     upcomingMilestones: buildUpcomingMilestones(pillarFasts),
     lastQuarterSummary: buildLastQuarterSummary(quarterlyBars),
-    keyHighlights: buildKeyHighlights(executiveMetrics, quarterlyStats, ceoSummary),
+    keyHighlights: buildKeyHighlights(quarterlyStats, ceoSummary),
+    topRisks: buildTopRisks(pillarFasts),
     lastQuarterBullets,
     sparks,
   };
@@ -1793,7 +2085,6 @@ function CockpitOverallHealthCard({ score, delay = '0ms' }) {
       <div className="def-cockpit-overall-health-head">
         <div className="def-cockpit-metric-icon" aria-hidden="true">◆</div>
         <span className="def-cockpit-metric-label">Overall health</span>
-        <span className="def-cockpit-overall-health-chip">{level.label}</span>
       </div>
       <div className="def-cockpit-overall-health-body">
         <ul className="def-cockpit-overall-health-legend" aria-label="Health score ranges">
@@ -1805,13 +2096,39 @@ function CockpitOverallHealthCard({ score, delay = '0ms' }) {
           ))}
         </ul>
       </div>
-      <div className="def-cockpit-overall-health-dot-wrap">
-        <span className="def-cockpit-overall-health-dot-pulse" aria-hidden="true" />
-        <span className="def-cockpit-overall-health-dot-ring" aria-hidden="true" />
-        <span className="def-cockpit-overall-health-dot" aria-hidden="true" />
-        <strong className="def-cockpit-overall-health-score">{score}</strong>
+      <div className="def-cockpit-overall-health-dot-wrap" aria-hidden="true">
+        <span className="def-cockpit-overall-health-dot">
+          <span className="def-cockpit-overall-health-dot-core" />
+        </span>
       </div>
     </article>
+  );
+}
+
+function getMetricCountTooltip(statusBand) {
+  if (statusBand === 'on-track') return 'Initiatives on track in the active portfolio';
+  if (statusBand === 'at-risk') return 'Initiatives at risk in the active portfolio';
+  if (statusBand === 'off-track') return 'Initiatives off track in the active portfolio';
+  return 'Initiative count in the active portfolio';
+}
+
+function getPillarHealthTooltip() {
+  return 'Pillar health score — average initiative progress across this FAST pillar';
+}
+
+function MetricCountPill({ count, statusBand }) {
+  const tip = getMetricCountTooltip(statusBand);
+  return (
+    <span className="def-cockpit-metric-pill-wrap">
+      <span
+        className="def-cockpit-metric-pill"
+        tabIndex={0}
+        aria-label={`${count} ${tip}`}
+      >
+        {count}
+      </span>
+      <span className="def-cockpit-metric-pill-tip" role="tooltip">{tip}</span>
+    </span>
   );
 }
 
@@ -1883,7 +2200,7 @@ function CockpitMetricCard({
             {valueSuffix ? <span className="def-cockpit-metric-denom">{valueSuffix}</span> : null}
           </strong>
           {statusBand && subtitle && !isHealthCard ? (
-            <span className="def-cockpit-metric-pill" title={`${subtitle} initiatives`}>{subtitle}</span>
+            <MetricCountPill count={subtitle} statusBand={statusBand} />
           ) : null}
         </div>
         {isHealthCard ? (
@@ -1935,11 +2252,16 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
         <div className="def-cockpit-fast-titles">
           <div className="def-cockpit-fast-title-row">
             <p className="def-cockpit-fast-kicker">{fast.shortName}</p>
-            <span
-              className="def-cockpit-fast-health-score"
-              style={{ color: healthColor(fast.healthScore) }}
-            >
-              {fast.healthScore}%
+            <span className="def-cockpit-fast-health-score-wrap">
+              <span
+                className="def-cockpit-fast-health-score"
+                style={{ color: healthColor(fast.healthScore) }}
+              >
+                {fast.healthScore}%
+              </span>
+              <span className="def-cockpit-fast-health-score-tip" role="tooltip">
+                {getPillarHealthTooltip()}
+              </span>
             </span>
           </div>
           <h3>{formatFastPillarSubtitle(fast.name)}</h3>
@@ -1979,123 +2301,369 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
         </ul>
       </div>
       <div className="def-cockpit-fast-foot">
-        <span className="def-cockpit-fast-team">Team | {leadTeam}</span>
+        <span className="def-cockpit-fast-team">Team | <strong>{leadTeam}</strong></span>
       </div>
     </button>
   );
 }
 
-function CockpitPanelHeader({ title, actionLabel = 'View all' }) {
+const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 7;
+const COCKPIT_MILESTONES_PREVIEW_LIMIT = 5;
+const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 2;
+
+function ModalPortal({ children }) {
+  if (typeof document === 'undefined') return null;
+  const host = document.getElementById('def-modal-host') || document.body;
+  return createPortal(children, host);
+}
+
+function ModalProTableShell({ children, className = '' }) {
+  return (
+    <div className={`def-modal-pro-table-wrap${className ? ` ${className}` : ''}`}>
+      <div className="def-modal-pro-table-scroll">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalBandCell({ count, pct, band }) {
+  return (
+    <span className={`def-modal-band-cell band-${band}`}>
+      <strong>{count}</strong>
+      <span className="def-modal-band-pct">{pct}%</span>
+    </span>
+  );
+}
+
+function CockpitPanelHeader({ title, actionLabel = 'View all', onViewAll }) {
   return (
     <div className="def-cockpit-panel-head">
       <h3 className="def-cockpit-card-title">{title}</h3>
-      <button type="button" className="def-cockpit-view-all">{actionLabel}</button>
+      <button type="button" className="def-cockpit-view-all" onClick={onViewAll}>{actionLabel}</button>
     </div>
+  );
+}
+
+function OwnershipOverviewTableBody({ rows, modal = false }) {
+  const tableClass = modal
+    ? 'def-modal-pro-table def-modal-pro-table-ownership'
+    : 'def-cockpit-table def-cockpit-table-ownership';
+
+  const table = (
+    <table className={tableClass}>
+      <thead>
+        <tr>
+          <th>Owner</th>
+          <th>Total initiatives</th>
+          <th>On track</th>
+          <th>At risk</th>
+          <th>Off track</th>
+          <th>Health score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id}>
+            <td data-label="Owner">
+              <span className="def-cockpit-owner-cell def-modal-owner-cell">
+                <Avatar name={row.owner} tone={resolveOwnerTone(row.owner)} />
+                <strong>{row.owner}</strong>
+              </span>
+            </td>
+            <td data-label="Total initiatives">
+              <span className="def-modal-count-chip">{row.total}</span>
+            </td>
+            <td data-label="On track">
+              {modal ? (
+                <ModalBandCell count={row.onTrack} pct={row.onTrackPct} band="on-track" />
+              ) : (
+                `${row.onTrack} (${row.onTrackPct}%)`
+              )}
+            </td>
+            <td data-label="At risk">
+              {modal ? (
+                <ModalBandCell count={row.atRisk} pct={row.atRiskPct} band="at-risk" />
+              ) : (
+                `${row.atRisk} (${row.atRiskPct}%)`
+              )}
+            </td>
+            <td data-label="Off track">
+              {modal ? (
+                <ModalBandCell count={row.offTrack} pct={row.offTrackPct} band="off-track" />
+              ) : (
+                `${row.offTrack} (${row.offTrackPct}%)`
+              )}
+            </td>
+            <td data-label="Health score">
+              <span
+                className="def-cockpit-health-pill def-modal-health-pill"
+                style={{
+                  color: healthColor(row.healthScore),
+                  borderColor: `${healthColor(row.healthScore)}40`,
+                  background: `${healthColor(row.healthScore)}16`,
+                }}
+              >
+                {row.healthScore}
+              </span>
+            </td>
+          </tr>
+        ))}
+        {rows.length === 0 && (
+          <tr><td colSpan={6} className="def-cockpit-empty">No ownership data.</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+
+  if (modal) {
+    return <ModalProTableShell>{table}</ModalProTableShell>;
+  }
+  return table;
+}
+
+function OwnershipOverviewModal({ open, onClose, rows }) {
+  const totalOwners = rows.length;
+  const totalInitiatives = rows.reduce((sum, row) => sum + row.total, 0);
+  const avgHealth = Math.round(
+    rows.reduce((sum, row) => sum + row.healthScore, 0) / Math.max(totalOwners, 1),
+  );
+  const portfolioStatus = statusFromHealthScore(avgHealth);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <ModalPortal>
+      <div className="def-modal-root open" role="presentation">
+        <button type="button" className="def-modal-backdrop" aria-label="Close ownership overview" onClick={onClose} />
+        <div
+          className="def-modal def-modal-pillar"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="def-ownership-modal-title"
+        >
+          <header className="def-drawer-head def-drawer-head-pillar">
+            <div className="def-drawer-head-row">
+              <span className="def-drawer-tier">Portfolio insights</span>
+              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <h2 id="def-ownership-modal-title">Ownership Overview</h2>
+            <p className="def-drawer-pillar-desc">Initiative ownership across FAST pillars</p>
+            <div className="def-drawer-pillar-stats">
+              <StatusPill status={portfolioStatus} />
+              <span
+                className="def-drawer-pillar-score"
+                style={{ color: healthColor(avgHealth) }}
+              >
+                {avgHealth}% health
+              </span>
+              <span className="def-drawer-pillar-meta">
+                {totalOwners} owners
+                {' | '}
+                {totalInitiatives} initiatives
+              </span>
+            </div>
+          </header>
+          <div className="def-drawer-body def-drawer-body-pillar">
+            <div className="def-drawer-section-bar">
+              <h3>Owner breakdown</h3>
+              <span>{totalOwners} owners</span>
+            </div>
+            <div className="def-drawer-pillar-table">
+              <OwnershipOverviewTableBody rows={rows} modal />
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
   );
 }
 
 function OwnershipOverviewTable({ rows }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const previewRows = rows.slice(0, COCKPIT_OWNERSHIP_PREVIEW_LIMIT);
+
   return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
-      <CockpitPanelHeader title="Ownership overview" />
-      <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
-        <table className="def-cockpit-table def-cockpit-table-ownership">
-          <thead>
-            <tr>
-              <th>Owner</th>
-              <th>Total initiatives</th>
-              <th>On track</th>
-              <th>At risk</th>
-              <th>Off track</th>
-              <th>Health score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <span className="def-cockpit-owner-cell">
-                    <Avatar name={row.owner} tone={resolveOwnerTone(row.owner)} />
-                    <strong>{row.owner}</strong>
-                  </span>
-                </td>
-                <td>{row.total}</td>
-                <td>{row.onTrack} ({row.onTrackPct}%)</td>
-                <td>{row.atRisk} ({row.atRiskPct}%)</td>
-                <td>{row.offTrack} ({row.offTrackPct}%)</td>
-                <td>
-                  <span
-                    className="def-cockpit-health-pill"
-                    style={{
-                      color: healthColor(row.healthScore),
-                      borderColor: `${healthColor(row.healthScore)}33`,
-                      background: `${healthColor(row.healthScore)}14`,
-                    }}
-                  >
-                    {row.healthScore}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="def-cockpit-empty">No ownership data.</td></tr>
-            )}
-          </tbody>
-        </table>
+    <>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
+        <CockpitPanelHeader title="Ownership Overview" onViewAll={() => setModalOpen(true)} />
+        <div className="def-cockpit-table-scroll wide def-cockpit-panel-body def-cockpit-table-preview">
+          <OwnershipOverviewTableBody rows={previewRows} />
+        </div>
       </div>
-    </div>
+      <OwnershipOverviewModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        rows={rows}
+      />
+    </>
+  );
+}
+
+function UpcomingMilestonesTableBody({ rows, onOpenInitiative, modal = false }) {
+  const tableClass = modal
+    ? 'def-modal-pro-table def-modal-pro-table-milestones'
+    : 'def-cockpit-table def-cockpit-table-milestones';
+
+  const table = (
+    <table className={tableClass}>
+      <thead>
+        <tr>
+          <th>Initiative</th>
+          <th>Strategic imperative</th>
+          <th>Due date</th>
+          <th>Days left</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr
+            key={row.id}
+            className={onOpenInitiative ? 'def-cockpit-row-click def-modal-row-click' : undefined}
+            onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
+            onKeyDown={onOpenInitiative ? (event) => { if (event.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
+            tabIndex={onOpenInitiative ? 0 : undefined}
+            role={onOpenInitiative ? 'button' : undefined}
+          >
+            <td data-label="Initiative"><strong>{row.initiative}</strong></td>
+            <td data-label="Strategic imperative">
+              <span className="def-modal-imperative-chip">{row.imperative}</span>
+            </td>
+            <td data-label="Due date">{formatAppDate(row.dueDate)}</td>
+            <td data-label="Days left">
+              <span className="def-cockpit-days-left def-modal-days-chip">{row.daysLeft}</span>
+            </td>
+            <td data-label="Status">
+              <span className={`def-cockpit-status-pill status-${row.status}`}>{row.statusLabel}</span>
+            </td>
+          </tr>
+        ))}
+        {rows.length === 0 && (
+          <tr><td colSpan={5} className="def-cockpit-empty">No milestones in the next 30 days.</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+
+  if (modal) {
+    return <ModalProTableShell>{table}</ModalProTableShell>;
+  }
+  return table;
+}
+
+function MilestonesOverviewModal({ open, onClose, rows, onOpenInitiative }) {
+  const total = rows.length;
+  const avgDays = total
+    ? Math.round(rows.reduce((sum, row) => sum + row.daysLeft, 0) / total)
+    : 0;
+  const onTrackCount = rows.filter((row) => row.status === 'on-track').length;
+  const portfolioStatus = onTrackCount >= total * 0.7 ? 'on-track' : onTrackCount >= total * 0.4 ? 'at-risk' : 'off-track';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const handleOpenInitiative = (fastId, initiativeId) => {
+    onClose();
+    onOpenInitiative?.(fastId, initiativeId);
+  };
+
+  return (
+    <ModalPortal>
+      <div className="def-modal-root open" role="presentation">
+        <button type="button" className="def-modal-backdrop" aria-label="Close milestones" onClick={onClose} />
+        <div
+          className="def-modal def-modal-pillar"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="def-milestones-modal-title"
+        >
+          <header className="def-drawer-head def-drawer-head-pillar">
+            <div className="def-drawer-head-row">
+              <span className="def-drawer-tier">Portfolio insights</span>
+              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <h2 id="def-milestones-modal-title">No. of Days</h2>
+            <p className="def-drawer-pillar-desc">Upcoming milestones and days remaining across the portfolio</p>
+            <div className="def-drawer-pillar-stats">
+              <StatusPill status={portfolioStatus} />
+              <span className="def-drawer-pillar-score def-drawer-pillar-days">
+                {avgDays} days avg
+              </span>
+              <span className="def-drawer-pillar-meta">
+                {total} milestones
+                {' | '}
+                {onTrackCount} on track
+              </span>
+            </div>
+          </header>
+          <div className="def-drawer-body def-drawer-body-pillar">
+            <div className="def-drawer-section-bar">
+              <h3>Milestone timeline</h3>
+              <span>{total} milestones</span>
+            </div>
+            <div className="def-drawer-pillar-table">
+              <UpcomingMilestonesTableBody
+                rows={rows}
+                modal
+                onOpenInitiative={handleOpenInitiative}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
   );
 }
 
 function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const previewRows = rows.slice(0, COCKPIT_MILESTONES_PREVIEW_LIMIT);
+
   return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
-      <CockpitPanelHeader title="No. of days" />
-      <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
-        <table className="def-cockpit-table def-cockpit-table-milestones">
-          <thead>
-            <tr>
-              <th>Initiative</th>
-              <th>Strategic imperative</th>
-              <th>Due date</th>
-              <th>Days left</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                className={onOpenInitiative ? 'def-cockpit-row-click' : undefined}
-                onClick={onOpenInitiative ? () => onOpenInitiative(row.fastId, row.initiativeId) : undefined}
-                onKeyDown={onOpenInitiative ? (event) => { if (event.key === 'Enter') onOpenInitiative(row.fastId, row.initiativeId); } : undefined}
-                tabIndex={onOpenInitiative ? 0 : undefined}
-                role={onOpenInitiative ? 'button' : undefined}
-              >
-                <td><strong>{row.initiative}</strong></td>
-                <td>{row.imperative}</td>
-                <td>{formatAppDate(row.dueDate)}</td>
-                <td className="def-cockpit-days-left">{row.daysLeft}</td>
-                <td>
-                  <span className={`def-cockpit-status-pill status-${row.status}`}>{row.statusLabel}</span>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={5} className="def-cockpit-empty">No milestones in the next 30 days.</td></tr>
-            )}
-          </tbody>
-        </table>
+    <>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
+        <CockpitPanelHeader title="No. of Days" onViewAll={() => setModalOpen(true)} />
+        <div className="def-cockpit-table-scroll wide def-cockpit-panel-body def-cockpit-table-preview">
+          <UpcomingMilestonesTableBody rows={previewRows} onOpenInitiative={onOpenInitiative} />
+        </div>
       </div>
-    </div>
+      <MilestonesOverviewModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        rows={rows}
+        onOpenInitiative={onOpenInitiative}
+      />
+    </>
   );
 }
 
-function CockpitQuarterHighlights({ lastQuarter, highlights }) {
+function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
-      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive">
-        <h3 className="def-cockpit-card-title">Last quarter summary ({lastQuarter.label})</h3>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive">
+        <h3 className="def-cockpit-card-title">Last Quarter Summary</h3>
         <div className="def-cockpit-lq-grid">
           <div className="def-cockpit-lq-stat on-track">
             <span>On track</span>
@@ -2111,17 +2679,18 @@ function CockpitQuarterHighlights({ lastQuarter, highlights }) {
           </div>
         </div>
       </div>
-      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-cockpit-highlight-panel">
-        <h3 className="def-cockpit-card-title">Key highlights</h3>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-highlight-panel">
+        <h3 className="def-cockpit-card-title">Key Highlights</h3>
         <ul className="def-cockpit-highlight-list">
           {highlights.map((item) => (
-            <li key={item.id} className="def-cockpit-highlight-item">
+            <li key={item.id} className={`def-cockpit-highlight-item tone-${item.tone}`}>
               <span className="def-cockpit-highlight-icon" aria-hidden="true">{item.icon}</span>
               <p>{item.text}</p>
             </li>
           ))}
         </ul>
       </div>
+      <TopRisksPanel rows={topRisks} />
     </div>
   );
 }
@@ -2166,15 +2735,22 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
               </select>
             </label>
             <div className="def-cockpit-top-meta">
-              <div className="def-updated def-live-badge def-cockpit-live">
-                <span className="def-live-dot" />
-                Live
-              </div>
-              <div className="def-cockpit-user-chip">
-                <Avatar name={organization.viewerName} tone="indigo" />
-                <div className="def-cockpit-user-copy">
-                  <strong>{organization.viewerName}</strong>
-                  <small>{organization.viewerRole}</small>
+              <div className="def-cockpit-user-popover-host">
+                <button
+                  type="button"
+                  className="def-cockpit-user-trigger"
+                  aria-label={`${organization.viewerName}, ${organization.viewerRole}`}
+                >
+                  <Avatar name={organization.viewerName} tone="indigo" />
+                </button>
+                <div className="def-cockpit-user-popover" role="tooltip">
+                  <div className="def-cockpit-user-popover-head">
+                    <Avatar name={organization.viewerName} tone="indigo" />
+                    <div className="def-cockpit-user-popover-copy">
+                      <strong>{organization.viewerName}</strong>
+                      <small>{organization.viewerRole}</small>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2244,6 +2820,7 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           <CockpitQuarterHighlights
             lastQuarter={analytics.lastQuarterSummary}
             highlights={analytics.keyHighlights}
+            topRisks={analytics.topRisks}
           />
         </div>
       </section>
@@ -2283,6 +2860,7 @@ function FastPillarModal({ fastCategory, open, onClose, onSelectInitiative }) {
   const imperative = fastCategory
     ? (IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName)
     : '';
+  const pillarStatus = fastCategory ? statusFromHealthScore(fastCategory.healthScore) : null;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -2301,56 +2879,59 @@ function FastPillarModal({ fastCategory, open, onClose, onSelectInitiative }) {
   };
 
   return (
-    <div className="def-modal-root open" role="presentation">
-      <button type="button" className="def-modal-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
-      <div
-        className="def-modal def-modal-pillar"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="def-pillar-modal-title"
-      >
-        <header className="def-drawer-head def-drawer-head-pillar">
-          <div className="def-drawer-head-row">
-            <span className="def-drawer-tier">{imperative}</span>
-            <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-              ×
-            </button>
-          </div>
-          <h2 id="def-pillar-modal-title">{fastCategory.shortName} pillar</h2>
-          <p className="def-drawer-pillar-desc">{fastCategory.name}</p>
-          <div className="def-drawer-pillar-stats">
-            <StatusPill status={fastCategory.status} />
-            <span
-              className="def-drawer-pillar-score"
-              style={{ color: healthColor(fastCategory.healthScore) }}
-            >
-              {fastCategory.healthScore}% health
-            </span>
-            <span className="def-drawer-pillar-meta">
-              {fastCategory.summary.initiatives} initiatives
-              {' | '}
-              {fastCategory.summary.activeProjects} projects
-              {' | '}
-              {fastCategory.summary.teams} teams
-            </span>
-          </div>
-        </header>
-        <div className="def-drawer-body def-drawer-body-pillar">
-          <div className="def-drawer-section-bar">
-            <h3>Initiative KPIs</h3>
-            <span>{scorecardRows.length} initiatives</span>
-          </div>
-          <div className="def-drawer-pillar-table">
-            <InitiativeKpiTable
-              rows={scorecardRows}
-              onRowClick={handleInitiativeClick}
-              emptyMessage="No initiatives in this pillar."
-              showOwnership
-            />
+    <ModalPortal>
+      <div className="def-modal-root open" role="presentation">
+        <button type="button" className="def-modal-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
+        <div
+          className="def-modal def-modal-pillar"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="def-pillar-modal-title"
+        >
+          <header className="def-drawer-head def-drawer-head-pillar">
+            <div className="def-drawer-head-row">
+              <span className="def-drawer-tier">{imperative}</span>
+              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <h2 id="def-pillar-modal-title">{fastCategory.shortName} pillar</h2>
+            <p className="def-drawer-pillar-desc">{fastCategory.name}</p>
+            <div className="def-drawer-pillar-stats">
+              <StatusPill status={pillarStatus} />
+              <span
+                className="def-drawer-pillar-score"
+                style={{ color: healthColor(fastCategory.healthScore) }}
+              >
+                {fastCategory.healthScore}% health
+              </span>
+              <span className="def-drawer-pillar-meta">
+                {fastCategory.summary.initiatives} initiatives
+                {' | '}
+                {fastCategory.summary.activeProjects} projects
+                {' | '}
+                {fastCategory.summary.teams} teams
+              </span>
+            </div>
+          </header>
+          <div className="def-drawer-body def-drawer-body-pillar">
+            <div className="def-drawer-section-bar">
+              <h3>Initiative KPIs</h3>
+              <span>{scorecardRows.length} initiatives</span>
+            </div>
+            <div className="def-drawer-pillar-table">
+              <InitiativeKpiTable
+                rows={scorecardRows}
+                onRowClick={handleInitiativeClick}
+                emptyMessage="No initiatives in this pillar."
+                showOwnership
+                modal
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -2361,6 +2942,7 @@ function FastCategoryView({ fastCategory, onSelectInitiative, onGoCeo, onBack })
   );
   const imperative = IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName;
   const healthTone = healthColor(fastCategory.healthScore);
+  const pillarStatus = statusFromHealthScore(fastCategory.healthScore);
 
   return (
     <div className="def-layer def-page-enter def-initiative-page def-pillar-page">
@@ -2376,7 +2958,7 @@ function FastCategoryView({ fastCategory, onSelectInitiative, onGoCeo, onBack })
           <div className="def-pillar-hero-main">
             <div className="def-pillar-hero-meta">
               <span className="def-initiative-pillar">{imperative}</span>
-              <StatusPill status={fastCategory.status} />
+              <StatusPill status={pillarStatus} />
             </div>
             <h1 className="def-pillar-title">{fastCategory.shortName} pillar</h1>
             <p className="def-pillar-subtitle">{fastCategory.name}</p>
@@ -2385,7 +2967,7 @@ function FastCategoryView({ fastCategory, onSelectInitiative, onGoCeo, onBack })
               <li><strong>{fastCategory.summary.activeProjects}</strong> projects</li>
               <li><strong>{fastCategory.summary.teams}</strong> teams</li>
               <li className="def-pillar-health" style={{ color: healthTone }}>
-                <strong>{fastCategory.healthScore}%</strong> health
+                <strong>{fastCategory.healthScore}%</strong> Health
               </li>
             </ul>
           </div>
@@ -6456,6 +7038,288 @@ const STYLES = `
   .def-drawer-pillar-table .def-initiative-kpi-table th:last-child {
     padding-right: 16px;
   }
+
+  /* Modal pro tables — unified popup table design */
+  .def-modal-pro-table-wrap {
+    margin: 0 12px 12px;
+    border: 1px solid var(--def-border-soft);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.94) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      0 8px 24px rgba(15,23,42,0.06);
+    overflow: hidden;
+  }
+  .def-modal-pro-table-scroll {
+    overflow: auto;
+    max-height: min(58vh, 560px);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148,163,184,0.45) transparent;
+  }
+  .def-modal-pro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-sm);
+    min-width: min(100%, 680px);
+  }
+  .def-modal-pro-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 11px 14px;
+    text-align: left;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-extrabold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--def-muted);
+    background: linear-gradient(180deg, rgba(248,250,252,0.98) 0%, rgba(241,245,249,0.96) 100%);
+    border-bottom: 1px solid var(--def-border);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    white-space: nowrap;
+  }
+  .def-modal-pro-table tbody tr {
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .def-modal-pro-table tbody tr:nth-child(even) td {
+    background: rgba(248,250,252,0.55);
+  }
+  .def-modal-pro-table tbody tr:hover td {
+    background: rgba(99,102,241,0.06);
+  }
+  .def-modal-pro-table tbody tr:hover {
+    box-shadow: inset 3px 0 0 #6366f1;
+  }
+  .def-modal-pro-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(226,232,240,0.82);
+    vertical-align: middle;
+    color: var(--def-text);
+    line-height: 1.35;
+  }
+  .def-modal-pro-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .def-modal-pro-table td:first-child,
+  .def-modal-pro-table th:first-child {
+    padding-left: 16px;
+  }
+  .def-modal-pro-table td:last-child,
+  .def-modal-pro-table th:last-child {
+    padding-right: 16px;
+  }
+  .def-modal-pro-table .def-table-row-click {
+    cursor: pointer;
+  }
+  .def-modal-pro-table .def-table-row-click:focus-visible {
+    outline: 2px solid rgba(99,102,241,0.45);
+    outline-offset: -2px;
+  }
+  .def-modal-owner-cell {
+    gap: 10px;
+  }
+  .def-modal-owner-cell strong {
+    font-weight: var(--font-bold);
+    color: var(--def-heading);
+  }
+  .def-modal-count-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: var(--font-extrabold);
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.16);
+  }
+  .def-modal-band-cell {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+  }
+  .def-modal-band-cell strong {
+    font-size: var(--text-sm);
+    font-weight: var(--font-extrabold);
+    line-height: 1;
+  }
+  .def-modal-band-pct {
+    font-size: var(--text-2xs);
+    font-weight: var(--font-semibold);
+    opacity: 0.82;
+  }
+  .def-modal-band-cell.band-on-track {
+    color: #15803d;
+    background: rgba(34,197,94,0.1);
+    border-color: rgba(34,197,94,0.2);
+  }
+  .def-modal-band-cell.band-at-risk {
+    color: #b45309;
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.22);
+  }
+  .def-modal-band-cell.band-off-track {
+    color: #b91c1c;
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.2);
+  }
+  .def-modal-health-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: var(--font-extrabold);
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+  }
+  .def-modal-imperative-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-bold);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #4338ca;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.18);
+    white-space: nowrap;
+  }
+  .def-modal-days-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(15,23,42,0.05);
+    border: 1px solid rgba(148,163,184,0.22);
+  }
+  .def-drawer-pillar-days {
+    color: var(--def-heading);
+  }
+  .def-modal-pro-table .def-cockpit-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--def-muted);
+    font-weight: var(--font-semibold);
+  }
+  .def-app.def-theme-dark .def-modal-pro-table-wrap {
+    background: linear-gradient(180deg, rgba(30,41,59,0.96) 0%, rgba(15,23,42,0.94) 100%);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .def-app.def-theme-dark .def-modal-pro-table thead th {
+    background: linear-gradient(180deg, rgba(30,41,59,0.98) 0%, rgba(15,23,42,0.96) 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .def-app.def-theme-dark .def-modal-pro-table tbody tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+  }
+  .def-app.def-theme-dark .def-modal-pro-table tbody tr:hover td {
+    background: rgba(99,102,241,0.12);
+  }
+  .def-app.def-theme-dark .def-modal-days-chip {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.1);
+  }
+  @media (max-width: 768px) {
+    .def-modal {
+      width: 100%;
+      max-height: min(94vh, 900px);
+    }
+    .def-modal-pro-table-wrap {
+      margin: 0 8px 10px;
+      border-radius: 12px;
+    }
+    .def-modal-pro-table-scroll {
+      max-height: min(62vh, 520px);
+    }
+    .def-modal-pro-table {
+      min-width: 0;
+    }
+    .def-modal-pro-table thead {
+      display: none;
+    }
+    .def-modal-pro-table tbody tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid rgba(226,232,240,0.88);
+    }
+    .def-modal-pro-table tbody tr:hover {
+      box-shadow: none;
+      background: rgba(99,102,241,0.04);
+    }
+    .def-modal-pro-table tbody tr:last-child {
+      border-bottom: none;
+    }
+    .def-modal-pro-table td {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 0;
+      border: none;
+      background: transparent !important;
+    }
+    .def-modal-pro-table td::before {
+      content: attr(data-label);
+      font-size: var(--text-2xs);
+      font-weight: var(--font-extrabold);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--def-muted);
+      line-height: 1.2;
+    }
+    .def-modal-pro-table td:first-child {
+      grid-column: 1 / -1;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed rgba(226,232,240,0.9);
+      margin-bottom: 2px;
+    }
+    .def-modal-pro-table.def-modal-pro-table-ownership td:nth-child(2) {
+      grid-column: 1 / -1;
+    }
+    .def-modal-pro-table.def-initiative-kpi-table td:first-child strong {
+      font-size: var(--text-sm);
+      line-height: 1.35;
+    }
+    .def-drawer-pillar-stats {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .def-drawer-pillar-meta {
+      width: 100%;
+    }
+  }
+  @media (max-width: 480px) {
+    .def-modal-pro-table tbody tr {
+      grid-template-columns: 1fr;
+    }
+    .def-modal-pro-table td:first-child {
+      grid-column: auto;
+    }
+    .def-modal-pro-table.def-modal-pro-table-ownership td:nth-child(2) {
+      grid-column: auto;
+    }
+  }
+
   .def-app.def-theme-dark .def-drawer-head-pillar {
     background: var(--def-surface);
   }
@@ -6483,6 +7347,15 @@ const STYLES = `
     justify-content: center;
     padding: 24px 16px;
     pointer-events: none;
+  }
+  #def-modal-host {
+    position: fixed;
+    inset: 0;
+    z-index: 220;
+    pointer-events: none;
+  }
+  #def-modal-host:has(.def-modal-root.open) {
+    pointer-events: auto;
   }
   .def-modal-root.open { pointer-events: auto; }
   .def-modal-backdrop {
@@ -6524,6 +7397,19 @@ const STYLES = `
     overflow: hidden;
   }
   .def-modal-pillar .def-drawer-pillar-table {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .def-modal-cockpit-table .def-cockpit-table-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 16px 16px;
+  }
+  .def-cockpit-modal-table-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: min(58vh, 560px);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -7221,25 +8107,32 @@ const STYLES = `
       transform: scale(1.08);
       box-shadow: 0 6px 16px rgba(15,23,42,0.12);
     }
-    .def-cockpit-highlight-item:hover {
-      transform: translateX(4px);
-      background: #fff;
-      border-color: rgba(99,102,241,0.24);
-      box-shadow: 0 6px 18px rgba(99,102,241,0.08);
+    .def-cockpit-rail-card.def-cockpit-interactive:hover {
+      --cockpit-hover-lift: -4px;
+      --cockpit-hover-scale: 1.006;
     }
-    .def-cockpit-highlight-item:hover .def-cockpit-highlight-icon {
-      transform: scale(1.1) rotate(-4deg);
-      background: rgba(99,102,241,0.16);
+    .def-cockpit-rail-card .def-cockpit-lq-stat:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,23,42,0.07);
+      border-color: rgba(99,102,241,0.18);
     }
-    .def-cockpit-lq-stat:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 20px rgba(15,23,42,0.08);
-      border-color: rgba(99,102,241,0.2);
+    .def-cockpit-rail-card .def-cockpit-highlight-item:hover {
+      transform: translateX(3px);
+      background: rgba(255,255,255,0.98);
+    }
+    .def-cockpit-rail-card .def-cockpit-highlight-item:hover .def-cockpit-highlight-icon {
+      transform: scale(1.08);
+    }
+    .def-cockpit-rail-card .def-cockpit-top-risk-item:hover {
+      transform: translateX(3px);
+    }
+    .def-cockpit-rail-card .def-cockpit-top-risk-item:hover .def-cockpit-risk-gauge-meta strong {
+      transform: scale(1.04);
     }
     .def-cockpit-risk-item:hover { background: rgba(99,102,241,0.05); }
     .def-cockpit-table tbody tr:hover { background: rgba(99,102,241,0.06); }
     .def-cockpit-top:hover { box-shadow: var(--cockpit-shadow-sm); }
-    .def-cockpit-user-chip:hover { border-color: rgba(99,102,241,0.3); }
+    .def-cockpit-user-trigger:hover { transform: translateY(-1px); }
     .def-cockpit-filter select:hover { border-color: rgba(99,102,241,0.35); }
     .def-chart-legend-item:hover {
       color: var(--def-heading);
@@ -7280,7 +8173,8 @@ const STYLES = `
   }
   .def-cockpit-top {
     position: relative;
-    overflow: hidden;
+    overflow: visible;
+    z-index: 20;
     margin: 0;
     padding: 14px 16px 14px 18px;
     border-radius: 14px;
@@ -7339,14 +8233,12 @@ const STYLES = `
   }
   .def-cockpit-top-meta {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    padding: 4px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.88);
-    border: 1px solid rgba(226,232,240,0.95);
-    box-shadow: 0 1px 4px rgba(15,23,42,0.04);
+    justify-content: flex-end;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
   .def-cockpit-filter {
     display: inline-flex;
@@ -7384,59 +8276,109 @@ const STYLES = `
     appearance: none;
   }
   .def-cockpit-filter select:focus { outline: none; }
-  .def-cockpit-live {
+  .def-cockpit-user-popover-host {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 32px;
-    padding: 0 12px;
-    border-radius: 999px;
-    font-size: var(--text-xs);
-    font-weight: var(--font-bold);
-    color: #15803d;
-    background: rgba(34,197,94,0.1);
-    border: 1px solid rgba(34,197,94,0.22);
-    white-space: nowrap;
   }
-  .def-cockpit-live .def-live-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #22c55e;
-    box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
-  }
-  .def-cockpit-user-chip {
-    display: flex;
+  .def-cockpit-user-trigger {
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    min-height: 32px;
-    padding: 3px 12px 3px 3px;
-    border-radius: 999px;
+    justify-content: center;
+    padding: 0;
     border: none;
     background: transparent;
-    transition: background 0.22s ease;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
-  .def-cockpit-user-chip:hover {
-    background: rgba(99,102,241,0.06);
+  .def-cockpit-user-trigger .def-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 0.72rem;
+    border-radius: 11px;
   }
-  .def-cockpit-user-copy {
+  .def-cockpit-user-trigger:hover,
+  .def-cockpit-user-trigger:focus-visible {
+    transform: translateY(-1px);
+  }
+  .def-cockpit-user-trigger:focus-visible {
+    outline: 2px solid rgba(99,102,241,0.45);
+    outline-offset: 3px;
+  }
+  .def-cockpit-user-popover {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(260px, 72vw);
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(226,232,240,0.96);
+    box-shadow:
+      0 2px 8px rgba(15,23,42,0.06),
+      0 18px 42px rgba(15,23,42,0.14);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px) scale(0.98);
+    transform-origin: top right;
+    transition:
+      opacity 0.18s ease,
+      transform 0.22s var(--cockpit-ease-spring),
+      visibility 0.18s ease;
+    z-index: 60;
+    pointer-events: none;
+  }
+  .def-cockpit-user-popover::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 14px;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-left: 1px solid rgba(226,232,240,0.96);
+    border-top: 1px solid rgba(226,232,240,0.96);
+    transform: rotate(45deg);
+  }
+  .def-cockpit-user-popover-host:hover .def-cockpit-user-popover,
+  .def-cockpit-user-popover-host:focus-within .def-cockpit-user-popover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .def-cockpit-user-popover-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .def-cockpit-user-popover-head .def-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 0.78rem;
+    border-radius: 12px;
+  }
+  .def-cockpit-user-popover-copy {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
     min-width: 0;
-    line-height: 1.2;
+    line-height: 1.25;
   }
-  .def-cockpit-user-chip strong {
-    font-size: var(--text-xs);
-    font-weight: var(--font-bold);
+  .def-cockpit-user-popover-copy strong {
+    font-size: var(--text-sm);
+    font-weight: var(--font-extrabold);
     color: var(--def-heading);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .def-cockpit-user-chip small {
-    font-size: 0.62rem;
+  .def-cockpit-user-popover-copy small {
+    font-size: var(--text-xs);
     color: var(--def-muted);
+    font-weight: var(--font-semibold);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -7445,10 +8387,12 @@ const STYLES = `
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12px;
-    align-items: start;
+    align-items: stretch;
   }
   .def-cockpit-metrics-row > .def-cockpit-metric-card {
     width: 100%;
+    height: 100%;
+    min-height: 106px;
   }
   .def-cockpit-metric-card {
     position: relative;
@@ -7468,6 +8412,12 @@ const STYLES = `
   }
   .def-cockpit-metric-card.metric-status {
     padding-bottom: 8px;
+    overflow: visible;
+    z-index: 1;
+  }
+  .def-cockpit-metric-card.metric-status:hover,
+  .def-cockpit-metric-card.metric-status:focus-within {
+    z-index: 3;
   }
   .def-cockpit-metric-card.metric-count {
     padding-top: 10px;
@@ -7508,16 +8458,18 @@ const STYLES = `
     gap: 5px;
     min-width: 0;
     flex: 1;
+    align-items: stretch;
   }
   .def-cockpit-metric-scope-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     text-align: center;
-    gap: 2px;
+    gap: 5px;
     min-width: 0;
-    padding: 5px 3px 4px;
+    min-height: 100%;
+    padding: 6px 3px 5px;
     border-radius: 8px;
     background: rgba(255,255,255,0.72);
     border: 1px solid rgba(99,102,241,0.1);
@@ -7531,6 +8483,7 @@ const STYLES = `
     line-height: 1;
     letter-spacing: var(--tracking-tight);
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
   }
   .def-cockpit-metric-scope-name {
     font-size: 0.5rem;
@@ -7539,13 +8492,14 @@ const STYLES = `
     letter-spacing: 0.02em;
     color: var(--def-muted);
     line-height: 1.2;
+    min-height: calc(0.5rem * 1.2 * 2);
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    text-align: center;
     white-space: normal;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    max-width: 100%;
   }
   @media (hover: hover) and (pointer: fine) {
     .def-cockpit-metric-card.metric-scope:hover .def-cockpit-metric-scope-item {
@@ -7642,19 +8596,22 @@ const STYLES = `
     color: var(--health-dot-color, #22c55e);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
   }
-  .def-cockpit-overall-health-chip {
-    margin-left: auto;
-    flex-shrink: 0;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 0.46rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--health-dot-color, #22c55e);
-    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 12%, #fff);
-    border: 1px solid color-mix(in srgb, var(--health-dot-color, #22c55e) 26%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  .def-cockpit-overall-health-dot {
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 93%, #000);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--health-dot-color, #22c55e) 42%, transparent);
+    transition: box-shadow 0.35s ease;
+  }
+  .def-cockpit-overall-health-dot-core {
+    display: block;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--health-dot-color, #22c55e) 95%, #fff);
   }
   .def-cockpit-overall-health-body {
     display: flex;
@@ -7663,96 +8620,24 @@ const STYLES = `
     justify-content: flex-start;
     flex: 1;
     min-height: 0;
-    max-height: 50px;
     padding-top: 0;
-    padding-right: 84px;
+    padding-right: 80px;
     overflow: hidden;
   }
   .def-cockpit-overall-health-dot-wrap {
     position: absolute;
-    right: 6px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     display: grid;
     place-items: center;
-    width: 78px;
-    height: 78px;
+    width: 72px;
+    height: 72px;
     flex-shrink: 0;
     margin: 0;
     z-index: 2;
     pointer-events: none;
     transition: transform 0.35s var(--cockpit-ease-spring);
-  }
-  @keyframes def-health-orbit {
-    0%, 100% { transform: scale(0.96); opacity: 0.42; }
-    50% { transform: scale(1.06); opacity: 0.14; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .def-cockpit-overall-health-dot-pulse { animation: none; opacity: 0.22; }
-  }
-  .def-cockpit-overall-health-dot-pulse {
-    position: absolute;
-    inset: -2px;
-    border-radius: 50%;
-    border: 1.5px solid color-mix(in srgb, var(--health-dot-color, #22c55e) 55%, transparent);
-    animation: def-health-orbit 3s ease-in-out infinite;
-    z-index: 0;
-  }
-  .def-cockpit-overall-health-dot-wrap::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 38%, transparent) 0%,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 14%, transparent) 48%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: 0;
-  }
-  .def-cockpit-overall-health-dot-ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 2px solid color-mix(in srgb, var(--health-dot-color, #22c55e) 45%, transparent);
-    box-shadow:
-      0 0 0 4px color-mix(in srgb, var(--health-dot-color, #22c55e) 16%, transparent),
-      0 0 16px color-mix(in srgb, var(--health-dot-color, #22c55e) 42%, transparent);
-    z-index: 1;
-  }
-  .def-cockpit-overall-health-dot {
-    position: relative;
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 30% 24%, rgba(255,255,255,0.62), transparent 42%),
-      radial-gradient(circle at 50% 62%, rgba(0,0,0,0.1), transparent 54%),
-      var(--health-dot-color, #22c55e);
-    border: 2.5px solid rgba(255,255,255,0.72);
-    box-shadow:
-      0 0 0 2px rgba(255,255,255,0.22),
-      0 8px 22px color-mix(in srgb, var(--health-dot-color, #22c55e) 58%, transparent),
-      0 0 28px color-mix(in srgb, var(--health-dot-color, #22c55e) 42%, transparent),
-      inset 0 -5px 12px rgba(0, 0, 0, 0.16),
-      inset 0 2px 8px rgba(255,255,255,0.22);
-    transition: box-shadow 0.35s ease;
-    z-index: 2;
-  }
-  .def-cockpit-overall-health-score {
-    position: absolute;
-    z-index: 3;
-    font-size: 1.08rem;
-    font-weight: var(--font-extrabold);
-    color: #fff;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    text-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.28),
-      0 0 12px rgba(255,255,255,0.18);
-    font-variant-numeric: tabular-nums;
   }
   .def-cockpit-overall-health-legend {
     list-style: none;
@@ -7805,39 +8690,13 @@ const STYLES = `
     box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot {
-    background:
-      radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55), transparent 44%),
-      radial-gradient(circle at 50% 62%, rgba(0,0,0,0.06), transparent 52%),
-      linear-gradient(145deg, #4ade80 0%, #22c55e 48%, #16a34a 100%);
-    box-shadow:
-      0 0 0 2px rgba(255,255,255,0.32),
-      0 8px 22px rgba(34,197,94,0.58),
-      0 0 28px rgba(34,197,94,0.44),
-      inset 0 -4px 10px rgba(0, 0, 0, 0.14);
-  }
-  .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot-ring {
-    border-color: rgba(34,197,94,0.58);
-    box-shadow:
-      0 0 0 5px rgba(34,197,94,0.18),
-      0 0 20px rgba(34,197,94,0.48);
-  }
-  .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot-wrap::before {
-    background: radial-gradient(
-      circle,
-      rgba(34,197,94,0.46) 0%,
-      rgba(34,197,94,0.18) 44%,
-      transparent 70%
-    );
+    box-shadow: 0 0 28px color-mix(in srgb, #22c55e 48%, transparent);
   }
   .def-cockpit-overall-health.tone-yellow .def-cockpit-overall-health-dot {
-    background:
-      radial-gradient(circle at 32% 26%, rgba(255,255,255,0.5), transparent 44%),
-      linear-gradient(145deg, #fde047 0%, #eab308 52%, #ca8a04 100%);
+    box-shadow: 0 0 22px color-mix(in srgb, #eab308 38%, transparent);
   }
   .def-cockpit-overall-health.tone-red .def-cockpit-overall-health-dot {
-    background:
-      radial-gradient(circle at 32% 26%, rgba(255,255,255,0.5), transparent 44%),
-      linear-gradient(145deg, #f87171 0%, #ef4444 52%, #dc2626 100%);
+    box-shadow: 0 0 22px color-mix(in srgb, #ef4444 38%, transparent);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-metric-stripe {
     background: linear-gradient(90deg, #22c55e, #059669);
@@ -7857,23 +8716,10 @@ const STYLES = `
         inset 0 1px 0 rgba(255,255,255,0.85);
     }
     .def-cockpit-overall-health:hover .def-cockpit-overall-health-dot-wrap {
-      transform: translateY(-50%) scale(1.05);
-    }
-    .def-cockpit-overall-health:hover .def-cockpit-overall-health-dot {
-      box-shadow:
-        0 0 0 2px rgba(255,255,255,0.3),
-        0 10px 26px color-mix(in srgb, var(--health-dot-color, #22c55e) 62%, transparent),
-        0 0 34px color-mix(in srgb, var(--health-dot-color, #22c55e) 48%, transparent),
-        inset 0 -5px 12px rgba(0, 0, 0, 0.16),
-        inset 0 2px 8px rgba(255,255,255,0.24);
+      transform: translateY(-50%) scale(1.06);
     }
     .def-cockpit-overall-health.tone-green:hover .def-cockpit-overall-health-dot {
-      box-shadow:
-        0 0 0 2px rgba(255,255,255,0.34),
-        0 12px 30px rgba(34,197,94,0.64),
-        0 0 38px rgba(34,197,94,0.52),
-        inset 0 -5px 12px rgba(0, 0, 0, 0.14),
-        inset 0 2px 8px rgba(255,255,255,0.24);
+      box-shadow: 0 0 34px color-mix(in srgb, #22c55e 62%, transparent);
     }
   }
   @media (hover: hover) and (pointer: fine) {
@@ -7977,6 +8823,11 @@ const STYLES = `
       border-color: rgba(99,102,241,0.26);
     }
   }
+  .def-cockpit-metric-pill-wrap {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
   .def-cockpit-metric-pill {
     flex: 0 0 auto;
     display: inline-flex;
@@ -7994,9 +8845,52 @@ const STYLES = `
     border: 1px solid var(--metric-icon-border);
     font-variant-numeric: tabular-nums;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+    cursor: help;
+  }
+  .def-cockpit-metric-pill:focus-visible {
+    outline: 2px solid rgba(99,102,241,0.45);
+    outline-offset: 2px;
+  }
+  .def-cockpit-metric-pill-tip {
+    position: absolute;
+    right: 50%;
+    bottom: calc(100% + 8px);
+    width: max-content;
+    max-width: 210px;
+    padding: 8px 11px;
+    border-radius: 9px;
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: left;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 24px rgba(15,23,42,0.24);
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(50%, 4px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+    z-index: 8;
+  }
+  .def-cockpit-metric-pill-tip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #0f172a;
+  }
+  .def-cockpit-metric-pill-wrap:hover .def-cockpit-metric-pill-tip,
+  .def-cockpit-metric-pill-wrap:focus-within .def-cockpit-metric-pill-tip {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(50%, 0);
   }
   .def-cockpit-metric-card.metric-status .def-cockpit-metric-body {
-    flex: 0 1 auto;
+    flex: 1;
   }
   .def-cockpit-metric-card.metric-status .def-cockpit-metric-value {
     font-size: clamp(1rem, 1.45vw, 1.18rem);
@@ -8086,6 +8980,15 @@ const STYLES = `
       border-color: rgba(220,38,38,0.42);
       box-shadow: 0 16px 36px rgba(239,68,68,0.14);
     }
+  }
+  .def-app.def-theme-dark .def-cockpit-metric-pill-tip {
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  }
+  .def-app.def-theme-dark .def-cockpit-metric-pill-tip::after {
+    border-top-color: #1e293b;
   }
   .def-app.def-theme-dark .def-cockpit-metric-card.status-on-track,
   .def-app.def-theme-dark .def-cockpit-metric-card.metric-health.status-on-track {
@@ -8444,6 +9347,7 @@ const STYLES = `
     min-width: 0;
     font: inherit;
     color: inherit;
+    overflow: visible;
   }
   .def-cockpit-fast-health::after {
     content: '';
@@ -8500,6 +9404,59 @@ const STYLES = `
     font-size: 0.68rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
+    cursor: help;
+  }
+  .def-cockpit-fast-health-score-wrap {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    z-index: 4;
+  }
+  .def-cockpit-fast-health-score-tip {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: max-content;
+    max-width: 210px;
+    padding: 8px 11px;
+    border-radius: 9px;
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: left;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 24px rgba(15,23,42,0.24);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+    z-index: 12;
+  }
+  .def-cockpit-fast-health-score-tip::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    bottom: 100%;
+    border: 5px solid transparent;
+    border-bottom-color: #0f172a;
+  }
+  .def-cockpit-fast-health-score-wrap:hover .def-cockpit-fast-health-score-tip,
+  .def-cockpit-fast-health-score-wrap:focus-within .def-cockpit-fast-health-score-tip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  .def-app.def-theme-dark .def-cockpit-fast-health-score-tip {
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  }
+  .def-app.def-theme-dark .def-cockpit-fast-health-score-tip::after {
+    border-bottom-color: #1e293b;
   }
   .def-cockpit-fast-health h3 {
     margin: 0;
@@ -8573,6 +9530,10 @@ const STYLES = `
     padding-top: 10px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
   }
   .def-cockpit-fast-team { color: var(--def-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .def-cockpit-fast-team strong {
+    font-weight: 800;
+    color: var(--def-heading);
+  }
   .def-cockpit-fast-trend { font-weight: 800; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; flex-shrink: 0; }
   .def-cockpit-fast-trend.up { background: rgba(34,197,94,0.12); color: #15803d; }
   .def-cockpit-fast-trend.down { background: rgba(239,68,68,0.12); color: #b91c1c; }
@@ -8619,6 +9580,14 @@ const STYLES = `
     min-width: 0;
   }
   .def-cockpit-panel-head .def-cockpit-card-title {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.25;
+  }
+  .def-cockpit-panel-head .def-cockpit-view-all {
+    flex-shrink: 0;
+    align-self: center;
     margin: 0;
   }
   .def-cockpit-view-all {
@@ -8775,11 +9744,25 @@ const STYLES = `
   .def-cockpit-table-recovery-time { min-width: min(420px, 100%); }
   .def-cockpit-bottom-rail {
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto auto;
     gap: var(--cockpit-gap);
     min-width: 0;
     height: 100%;
     min-height: inherit;
+  }
+  .def-cockpit-rail-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.94) 100%);
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  }
+  .def-cockpit-rail-card.def-cockpit-interactive {
+    --cockpit-hover-lift: -4px;
+    --cockpit-hover-scale: 1.006;
+  }
+  .def-cockpit-rail-card > .def-cockpit-card-title {
+    margin: 0 0 10px;
+  }
+  .def-app.def-theme-dark .def-cockpit-rail-card {
+    background: linear-gradient(180deg, rgba(30,41,59,0.96) 0%, rgba(15,23,42,0.92) 100%);
   }
   .def-cockpit-highlight-panel {
     display: flex;
@@ -8788,25 +9771,36 @@ const STYLES = `
   }
   .def-cockpit-highlight-panel .def-cockpit-highlight-list {
     flex: 1;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
   .def-cockpit-lq-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    margin-top: 4px;
+    margin-top: 0;
   }
   .def-cockpit-lq-stat {
     padding: 10px 8px;
     border-radius: 10px;
     border: 1px solid rgba(226,232,240,0.95);
-    background: #f8fafc;
+    background: rgba(255,255,255,0.88);
     text-align: center;
     transition:
-      transform 0.32s var(--cockpit-ease-spring),
-      box-shadow 0.32s ease,
-      border-color 0.28s ease,
-      background 0.28s ease;
+      transform 0.28s var(--cockpit-ease-spring),
+      box-shadow 0.28s ease,
+      border-color 0.24s ease;
+  }
+  .def-cockpit-lq-stat.on-track {
+    border-color: rgba(34,197,94,0.22);
+    background: rgba(240,253,244,0.72);
+  }
+  .def-cockpit-lq-stat.at-risk {
+    border-color: rgba(245,158,11,0.22);
+    background: rgba(255,251,235,0.72);
+  }
+  .def-cockpit-lq-stat.off-track {
+    border-color: rgba(239,68,68,0.2);
+    background: rgba(254,242,242,0.72);
   }
   .def-cockpit-lq-stat span {
     display: block;
@@ -8829,43 +9823,195 @@ const STYLES = `
   .def-cockpit-lq-stat.off-track strong { color: #dc2626; }
   .def-cockpit-highlight-list {
     list-style: none;
-    margin: 4px 0 0;
+    margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
   }
   .def-cockpit-highlight-item {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 8px;
-    align-items: start;
-    padding: 8px 10px;
-    border-radius: 9px;
-    background: #f8fafc;
-    border: 1px solid rgba(226,232,240,0.95);
-    transition:
-      transform 0.32s var(--cockpit-ease-spring),
-      background 0.28s ease,
-      border-color 0.28s ease,
-      box-shadow 0.32s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    transition: transform 0.28s var(--cockpit-ease-spring), background 0.24s ease;
   }
   .def-cockpit-highlight-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     display: grid;
     place-items: center;
-    border-radius: 7px;
-    background: rgba(99,102,241,0.1);
-    font-size: 0.72rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 800;
     line-height: 1;
-    transition: transform 0.32s var(--cockpit-ease-spring), background 0.28s ease;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.12);
+    transition: transform 0.28s var(--cockpit-ease-spring);
+  }
+  .def-cockpit-highlight-item.tone-on-track .def-cockpit-highlight-icon {
+    background: #22c55e;
+  }
+  .def-cockpit-highlight-item.tone-at-risk .def-cockpit-highlight-icon {
+    background: #eab308;
+    font-size: 0.72rem;
+  }
+  .def-cockpit-highlight-item.tone-complete .def-cockpit-highlight-icon {
+    background: #3b82f6;
+    font-size: 0.68rem;
   }
   .def-cockpit-highlight-item p {
     margin: 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--def-heading);
+  }
+  .def-cockpit-top-risks-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .def-cockpit-top-risk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .def-cockpit-top-risk-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    min-width: 0;
+    transition: transform 0.28s var(--cockpit-ease-spring);
+  }
+  .def-cockpit-top-risk-copy {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .def-cockpit-top-risk-copy strong {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--def-heading);
+  }
+  .def-cockpit-top-risk-copy small {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.68rem;
+    color: var(--def-muted);
+    line-height: 1.35;
+  }
+  .def-cockpit-top-risk-empty {
     font-size: 0.72rem;
-    line-height: 1.45;
-    color: var(--def-text);
+    color: var(--def-muted);
+    padding: 8px 0;
+  }
+  .def-cockpit-risk-gauge {
+    position: relative;
+    width: 64px;
+    height: 48px;
+    flex: 0 0 64px;
+  }
+  .def-cockpit-risk-gauge-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .def-cockpit-risk-gauge-meta {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    text-align: center;
+    pointer-events: none;
+  }
+  .def-cockpit-risk-gauge-meta strong {
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+    transition: transform 0.28s var(--cockpit-ease-spring);
+  }
+  .def-cockpit-risk-gauge-meta span {
+    font-size: 0.46rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--def-muted);
+    white-space: nowrap;
+  }
+  .def-cockpit-risk-gauge.tone-high .def-cockpit-risk-gauge-meta strong { color: #dc2626; }
+  .def-cockpit-risk-gauge.tone-medium .def-cockpit-risk-gauge-meta strong { color: #d97706; }
+  .def-cockpit-risk-gauge.tone-low .def-cockpit-risk-gauge-meta strong { color: #ca8a04; }
+  .def-modal-risk-score {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: var(--font-extrabold);
+    font-variant-numeric: tabular-nums;
+    border: 1px solid transparent;
+  }
+  .def-modal-risk-score.tone-high {
+    color: #dc2626;
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.24);
+  }
+  .def-modal-risk-score.tone-medium {
+    color: #d97706;
+    background: rgba(245,158,11,0.14);
+    border-color: rgba(245,158,11,0.24);
+  }
+  .def-modal-risk-score.tone-low {
+    color: #ca8a04;
+    background: rgba(234,179,8,0.14);
+    border-color: rgba(234,179,8,0.24);
+  }
+  .def-drawer-pillar-table-risks {
+    padding: 4px 12px 12px;
+  }
+  .def-drawer-pillar-table-risks .def-cockpit-top-risk-list {
+    gap: 14px;
+  }
+  .def-drawer-pillar-table-risks .def-cockpit-top-risk-item {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(226,232,240,0.88);
+  }
+  .def-drawer-pillar-table-risks .def-cockpit-top-risk-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  @media (max-width: 480px) {
+    .def-cockpit-top-risk-item {
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 8px;
+    }
+    .def-cockpit-risk-gauge {
+      width: 64px;
+      height: 46px;
+    }
+    .def-cockpit-risk-gauge-meta strong {
+      font-size: 0.92rem;
+    }
   }
   .def-cockpit-ws-charts {
     display: flex;
@@ -8957,6 +10103,12 @@ const STYLES = `
     min-height: 140px;
     max-height: min(240px, 34vh);
     overflow: auto;
+  }
+  .def-cockpit-bottom-card .def-cockpit-table-scroll.wide.def-cockpit-table-preview {
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
   }
   .def-chart-legend-row {
     display: flex;
@@ -9190,15 +10342,12 @@ const STYLES = `
       text-align: right;
     }
     .def-cockpit-top-meta {
-      width: 100%;
-      justify-content: space-between;
-      border-radius: 12px;
-      padding: 6px 8px;
-    }
-    .def-cockpit-user-chip {
-      flex: 1;
-      min-width: 0;
+      width: auto;
       justify-content: flex-end;
+      padding: 0;
+    }
+    .def-cockpit-user-popover-host {
+      margin-left: auto;
     }
     .def-cockpit-workspace {
       grid-template-columns: 1fr;
@@ -9234,17 +10383,15 @@ const STYLES = `
   @media (max-width: 640px) {
     .def-cockpit { --cockpit-pad: var(--space-3); }
     .def-cockpit-top-meta {
-      flex-direction: column;
-      align-items: stretch;
-      border-radius: 12px;
-      gap: 6px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0;
     }
-    .def-cockpit-live { justify-content: center; }
-    .def-cockpit-user-chip {
-      justify-content: center;
-      padding: 6px 10px;
+    .def-cockpit-user-popover {
+      right: 0;
+      left: auto;
     }
-    .def-cockpit-user-copy { align-items: center; text-align: center; }
     .def-cockpit-metric-card { flex: 0 0 124px; }
     .def-cockpit-fast-grid { grid-template-columns: 1fr; }
     .def-cockpit-movement-stats { grid-template-columns: 1fr; }
@@ -9258,7 +10405,6 @@ const STYLES = `
     .def-cockpit-metrics-row,
     .def-cockpit-fast-grid { grid-template-columns: unset; }
     .def-cockpit-metric-card { flex: 0 0 118px; min-height: 0; }
-    .def-cockpit-user-chip small { display: none; }
     .def-cockpit-table-recovery,
     .def-cockpit-table-teams { min-width: min(100%, 480px); }
     .def-cockpit-fast-health h3 { line-clamp: 3; }
@@ -9326,8 +10472,19 @@ const STYLES = `
     border-color: rgba(129,140,248,0.18);
   }
   .def-cockpit-theme-dark .def-cockpit-top-meta {
-    background: rgba(15,23,42,0.55);
-    border-color: rgba(255,255,255,0.08);
+    background: transparent;
+    border: none;
+  }
+  .def-cockpit-theme-dark .def-cockpit-user-popover {
+    background: rgba(30,41,59,0.98);
+    border-color: rgba(255,255,255,0.1);
+    box-shadow:
+      0 2px 8px rgba(0,0,0,0.2),
+      0 18px 42px rgba(0,0,0,0.35);
+  }
+  .def-cockpit-theme-dark .def-cockpit-user-popover::before {
+    background: rgba(30,41,59,0.98);
+    border-color: rgba(255,255,255,0.1);
   }
   .def-cockpit-theme-dark .def-cockpit-filter {
     background: rgba(15,23,42,0.6);
@@ -9338,7 +10495,6 @@ const STYLES = `
     background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2394949e' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right center;
   }
   .def-cockpit-theme-dark .def-cockpit-fast-health { background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.9)); }
-  .def-cockpit-theme-dark .def-cockpit-user-chip { background: transparent; }
   .def-cockpit-theme-dark .def-cockpit-table th { background: rgba(15,23,42,0.5); }
   .def-cockpit-theme-dark .def-cockpit-move-stat { background: rgba(15,23,42,0.5); border-color: rgba(255,255,255,0.08); }
   .def-cockpit-theme-dark .def-cockpit-rail-card.subtle { background: rgba(15,23,42,0.45); }
@@ -9682,6 +10838,7 @@ const DEF = () => {
             )}
           </div>
         </div>
+        <div id="def-modal-host" />
       </div>
     </>
   );
