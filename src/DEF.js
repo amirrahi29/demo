@@ -8773,17 +8773,17 @@ const STYLES = `
   }
   .def-cockpit-overall-health-ambient {
     position: absolute;
-    right: 4px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
-    width: 82px;
-    height: 82px;
+    width: 76px;
+    height: 76px;
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 20%, transparent) 0%,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 6%, transparent) 50%,
-      transparent 72%
+      color-mix(in srgb, var(--health-dot-color, #22c55e) 14%, transparent) 0%,
+      color-mix(in srgb, var(--health-dot-color, #22c55e) 4%, transparent) 42%,
+      transparent 58%
     );
     pointer-events: none;
     z-index: 0;
@@ -8843,13 +8843,13 @@ const STYLES = `
     height: 72px;
     border-radius: 50%;
     background: color-mix(in srgb, var(--health-dot-color, #22c55e) 93%, #000);
-    box-shadow: 0 0 16px color-mix(in srgb, var(--health-dot-color, #22c55e) 32%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--health-dot-color, #22c55e) 22%, transparent);
     transition: box-shadow 0.35s ease;
   }
   .def-cockpit-overall-health-dot-core {
     display: block;
-    width: 54px;
-    height: 54px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: color-mix(in srgb, var(--health-dot-color, #22c55e) 95%, #fff);
   }
@@ -8930,13 +8930,13 @@ const STYLES = `
     box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 18px color-mix(in srgb, #22c55e 36%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, #22c55e 24%, transparent);
   }
   .def-cockpit-overall-health.tone-yellow .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 16px color-mix(in srgb, #eab308 30%, transparent);
+    box-shadow: 0 0 9px color-mix(in srgb, #eab308 20%, transparent);
   }
   .def-cockpit-overall-health.tone-red .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 16px color-mix(in srgb, #ef4444 30%, transparent);
+    box-shadow: 0 0 9px color-mix(in srgb, #ef4444 20%, transparent);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-metric-stripe {
     background: linear-gradient(90deg, #22c55e, #059669);
@@ -8959,7 +8959,7 @@ const STYLES = `
       transform: translateY(-50%) scale(1.06);
     }
     .def-cockpit-overall-health.tone-green:hover .def-cockpit-overall-health-dot {
-      box-shadow: 0 0 22px color-mix(in srgb, #22c55e 44%, transparent);
+      box-shadow: 0 0 12px color-mix(in srgb, #22c55e 28%, transparent);
     }
   }
   @media (hover: hover) and (pointer: fine) {
