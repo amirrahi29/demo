@@ -2383,7 +2383,7 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
 }
 
 const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 8;
-const COCKPIT_MILESTONES_PREVIEW_LIMIT = 6;
+const COCKPIT_MILESTONES_PREVIEW_LIMIT = 9;
 const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 2;
 
 function ModalPortal({ children }) {
@@ -9755,6 +9755,7 @@ const STYLES = `
   }
   .def-cockpit-bottom-row > * {
     min-height: var(--cockpit-bottom-min-h, 0px);
+    min-width: 0;
     height: 100%;
   }
   .def-cockpit-panel {
@@ -9765,6 +9766,7 @@ const STYLES = `
   }
   .def-cockpit-bottom-card {
     min-height: 0;
+    min-width: 0;
   }
   .def-cockpit-panel-head {
     display: flex;
@@ -9929,8 +9931,8 @@ const STYLES = `
   }
   .def-cockpit-row-click { cursor: pointer; }
   .def-cockpit-row-click:hover { background: rgba(99,102,241,0.05); }
-  .def-cockpit-table-ownership { min-width: min(640px, 100%); }
-  .def-cockpit-table-milestones { min-width: min(620px, 100%); }
+  .def-cockpit-table-ownership { min-width: 520px; width: 100%; }
+  .def-cockpit-table-milestones { min-width: 440px; width: 100%; }
   .def-cockpit-table-ownership,
   .def-cockpit-table-milestones {
     font-size: var(--text-xs);
@@ -10006,6 +10008,10 @@ const STYLES = `
     font-weight: 600;
     color: var(--def-heading);
     line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
   }
   .def-cockpit-table-ownership .def-cockpit-owner-cell .def-avatar {
     width: 26px;
@@ -10027,6 +10033,10 @@ const STYLES = `
     font-weight: 600;
     color: var(--def-heading);
     line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
   .def-cockpit-due-date {
     font-size: var(--text-xs);
@@ -10050,6 +10060,28 @@ const STYLES = `
     font-size: 0.625rem;
     padding: 3px 8px;
     font-weight: 700;
+  }
+  .def-cockpit-table-milestones thead th,
+  .def-cockpit-table-milestones tbody td {
+    white-space: nowrap;
+  }
+  .def-cockpit-table-milestones thead th:first-child,
+  .def-cockpit-table-milestones tbody td:first-child {
+    white-space: nowrap;
+    max-width: 180px;
+  }
+  .def-cockpit-table-ownership thead th {
+    white-space: nowrap;
+  }
+  .def-cockpit-table-ownership thead th:first-child,
+  .def-cockpit-table-ownership tbody td:first-child {
+    white-space: normal;
+  }
+  .def-cockpit-table-ownership th:last-child,
+  .def-cockpit-table-ownership td:last-child,
+  .def-cockpit-table-milestones th:last-child,
+  .def-cockpit-table-milestones td:last-child {
+    padding-right: 12px;
   }
   .def-cockpit-days-left {
     font-weight: var(--font-extrabold);
@@ -10426,8 +10458,13 @@ const STYLES = `
   .def-cockpit-bottom-card .def-cockpit-table-scroll.wide.def-cockpit-table-preview {
     flex: 0 0 auto;
     min-height: 0;
+    min-width: 0;
     max-height: none;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148,163,184,0.45) transparent;
   }
   .def-chart-legend-row {
     display: flex;
@@ -10457,6 +10494,7 @@ const STYLES = `
   }
   .def-cockpit-panel .def-cockpit-panel-body {
     flex: 1 1 auto;
+    min-width: 0;
     min-height: 0;
   }
   .def-cockpit-movement-stats {
