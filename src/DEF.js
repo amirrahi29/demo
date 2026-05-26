@@ -8863,10 +8863,10 @@ const STYLES = `
     z-index: 1;
   }
   .def-cockpit-overall-health-body {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--health-dot-size);
     align-items: center;
-    justify-content: space-between;
+    align-content: center;
     gap: 6px;
     flex: 1;
     min-height: 0;
@@ -8880,6 +8880,8 @@ const STYLES = `
     height: var(--health-dot-size);
     flex-shrink: 0;
     margin: 0;
+    justify-self: end;
+    align-self: center;
     z-index: 2;
     pointer-events: none;
     transition: transform 0.35s var(--cockpit-ease-spring);
@@ -8888,7 +8890,6 @@ const STYLES = `
     list-style: none;
     margin: 0;
     padding: 0;
-    flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
