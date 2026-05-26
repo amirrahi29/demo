@@ -2056,11 +2056,6 @@ const TOWER_LEADS_DATA = [
   },
 ];
 
-function computeTowerLeadHealthScore(lead) {
-  const total = Math.max(lead.initiatives, 1);
-  return Math.round((lead.onTrack * 100 + lead.atRisk * 58 + lead.offTrack * 32) / total);
-}
-
 const COCKPIT_METRIC_ICONS = {
   'Strategic Imperatives': '🏛',
   Initiatives: '📊',
@@ -2498,7 +2493,6 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
 
 function TowerLeadHealthCard({ lead, theme, index = 0 }) {
   const vp = useViewport();
-  const healthScore = computeTowerLeadHealthScore(lead);
   const total = Math.max(lead.initiatives, 1);
 
   const data = [
@@ -2520,14 +2514,6 @@ function TowerLeadHealthCard({ lead, theme, index = 0 }) {
         <div className="def-cockpit-fast-titles">
           <div className="def-cockpit-fast-title-row">
             <p className="def-cockpit-fast-kicker">{lead.shortName}</p>
-            <OverlayTooltip tip={getPillarHealthTooltip()} className="def-cockpit-fast-health-score-wrap">
-              <span
-                className="def-cockpit-fast-health-score"
-                style={{ color: healthColor(healthScore) }}
-              >
-                {healthScore}%
-              </span>
-            </OverlayTooltip>
           </div>
           <h3>{lead.name}</h3>
         </div>
@@ -2570,8 +2556,9 @@ function TowerLeadHealthCard({ lead, theme, index = 0 }) {
 }
 
 const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 8;
-const COCKPIT_MILESTONES_PREVIEW_LIMIT = 9;
-const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 6;
+const COCKPIT_MILESTONES_PREVIEW_LIMIT = 5;
+const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 4;
+const COCKPIT_KEY_HIGHLIGHTS_PREVIEW_LIMIT = 3;
 
 function ModalProTableShell({ children, className = '' }) {
   return (
@@ -2925,10 +2912,7 @@ function CockpitQuarterHighlights({ lastQuarter, highlights }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive">
-        <div className="def-cockpit-lq-head">
-          <h3 className="def-cockpit-card-title">Last Quarter Summary</h3>
-          <span className="def-cockpit-lq-label">{lastQuarter.label}</span>
-        </div>
+        <h3 className="def-cockpit-card-title">Last Quarter Summary</h3>
         <div className="def-cockpit-lq-grid">
           <div className="def-cockpit-lq-stat on-track">
             <span>On track</span>
@@ -2943,25 +2927,11 @@ function CockpitQuarterHighlights({ lastQuarter, highlights }) {
             <strong>{lastQuarter.offTrackPct}%</strong>
           </div>
         </div>
-        <div className="def-cockpit-lq-meta">
-          <div className="def-cockpit-lq-meta-item">
-            <span>Initiatives</span>
-            <strong>{lastQuarter.totalInitiatives}</strong>
-          </div>
-          <div className="def-cockpit-lq-meta-item">
-            <span>Portfolio Health</span>
-            <strong>{lastQuarter.healthScore}%</strong>
-          </div>
-          <div className="def-cockpit-lq-meta-item">
-            <span>Milestones</span>
-            <strong>{lastQuarter.milestoneCount}</strong>
-          </div>
-        </div>
       </div>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-highlight-panel">
         <h3 className="def-cockpit-card-title">Key Highlights</h3>
         <ul className="def-cockpit-highlight-list">
-          {highlights.map((item) => (
+          {highlights.slice(0, COCKPIT_KEY_HIGHLIGHTS_PREVIEW_LIMIT).map((item) => (
             <li key={item.id} className={`def-cockpit-highlight-item tone-${item.tone}`}>
               <span className="def-cockpit-highlight-icon" aria-hidden="true">{item.icon}</span>
               <p>{item.text}</p>
