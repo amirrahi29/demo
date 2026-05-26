@@ -433,7 +433,8 @@ const DASHBOARD_STYLES = `
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: clamp(12px, 1.2vw, 16px);
-    margin-top: clamp(14px, 1.5vw, 18px);
+    margin-top: 0;
+    margin-bottom: clamp(14px, 1.5vw, 18px);
     width: 100%;
     min-width: 0;
     align-items: stretch;
@@ -896,7 +897,8 @@ const DASHBOARD_STYLES = `
     }
     .pr-readiness-row {
       grid-template-columns: 1fr;
-      margin-top: 12px;
+      margin-top: 0;
+      margin-bottom: 12px;
       gap: 12px;
     }
     .pr-readiness-row > .pr-readiness-card:last-child {
@@ -1745,8 +1747,8 @@ function DashboardContent({ data }) {
                 </div>
               </div>
 
-              <MonthlyMetricsCards cards={metricCards} />
               <ReadinessThresholdCards cards={readinessCards} />
+              <MonthlyMetricsCards cards={metricCards} />
             </div>
           </section>
 
