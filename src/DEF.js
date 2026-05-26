@@ -639,7 +639,7 @@ function ScorecardStatusCell({ status }) {
     </span>
   );
 }
-
+    
 const OWNER_TONE_MAP = {
   GPT: 'indigo',
   'GPT Strat': 'indigo',
