@@ -8308,7 +8308,6 @@ const STYLES = `
     .def-cockpit-metric-card:hover .def-cockpit-metric-stripe,
     .def-cockpit-metric-card-overlay:hover .def-cockpit-metric-stripe {
       transform: scaleX(1);
-      height: 4px;
       opacity: 1;
     }
     .def-cockpit-fast-health:hover .def-cockpit-fast-icon {
@@ -8653,7 +8652,7 @@ const STYLES = `
   }
   .def-cockpit-metric-card.metric-status {
     padding-bottom: 8px;
-    overflow: visible;
+    overflow: hidden;
     z-index: 1;
   }
   .def-cockpit-metric-card.metric-status:hover,
@@ -8774,16 +8773,16 @@ const STYLES = `
   }
   .def-cockpit-overall-health-ambient {
     position: absolute;
-    right: -18px;
+    right: 4px;
     top: 50%;
     transform: translateY(-50%);
-    width: 108px;
-    height: 108px;
+    width: 82px;
+    height: 82px;
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 24%, transparent) 0%,
-      color-mix(in srgb, var(--health-dot-color, #22c55e) 8%, transparent) 46%,
+      color-mix(in srgb, var(--health-dot-color, #22c55e) 20%, transparent) 0%,
+      color-mix(in srgb, var(--health-dot-color, #22c55e) 6%, transparent) 50%,
       transparent 72%
     );
     pointer-events: none;
@@ -8844,7 +8843,7 @@ const STYLES = `
     height: 72px;
     border-radius: 50%;
     background: color-mix(in srgb, var(--health-dot-color, #22c55e) 93%, #000);
-    box-shadow: 0 0 24px color-mix(in srgb, var(--health-dot-color, #22c55e) 42%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--health-dot-color, #22c55e) 32%, transparent);
     transition: box-shadow 0.35s ease;
   }
   .def-cockpit-overall-health-dot-core {
@@ -8931,13 +8930,13 @@ const STYLES = `
     box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 28px color-mix(in srgb, #22c55e 48%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, #22c55e 36%, transparent);
   }
   .def-cockpit-overall-health.tone-yellow .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 22px color-mix(in srgb, #eab308 38%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, #eab308 30%, transparent);
   }
   .def-cockpit-overall-health.tone-red .def-cockpit-overall-health-dot {
-    box-shadow: 0 0 22px color-mix(in srgb, #ef4444 38%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, #ef4444 30%, transparent);
   }
   .def-cockpit-overall-health.tone-green .def-cockpit-metric-stripe {
     background: linear-gradient(90deg, #22c55e, #059669);
@@ -8960,7 +8959,7 @@ const STYLES = `
       transform: translateY(-50%) scale(1.06);
     }
     .def-cockpit-overall-health.tone-green:hover .def-cockpit-overall-health-dot {
-      box-shadow: 0 0 34px color-mix(in srgb, #22c55e 62%, transparent);
+      box-shadow: 0 0 22px color-mix(in srgb, #22c55e 44%, transparent);
     }
   }
   @media (hover: hover) and (pointer: fine) {
@@ -8991,15 +8990,16 @@ const STYLES = `
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 2px;
     background: var(--metric-band-color, linear-gradient(90deg, #6366f1, #a855f7));
     border-radius: 14px 14px 0 0;
     opacity: 0;
     transform: scaleX(0);
     transform-origin: left center;
+    pointer-events: none;
+    z-index: 1;
     transition:
       transform 0.55s var(--cockpit-ease),
-      height 0.32s var(--cockpit-ease),
       opacity 0.28s ease;
   }
   .def-cockpit-metric-head {
