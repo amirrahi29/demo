@@ -10,62 +10,197 @@ import {
   LabelList,
   Tooltip,
 } from 'recharts';
-import productResiliencyData from './data/productResiliencyData.json';
+
+/** All dashboard data lives here — edit values directly in this file. */
+const DASHBOARD_DATA = {
+  header: {
+    title: 'Product Resiliency: ADP Wide Metrics FYTD March 2026',
+    subtitle: 'Enterprise Operations Dashboard · Real-time Resiliency Intelligence',
+  },
+  colors: {
+    headerOrange: '#0000ab',
+    headerOrangeDark: '#000080',
+    green: '#027a48',
+    red: '#b42318',
+    fy25Line: '#1d2939',
+    fy26Line: '#8b1a1a',
+    goalLine: '#daa520',
+    textDark: '#101828',
+    textMuted: '#667085',
+  },
+  metricsSection: {
+    title: 'Monthly Metrics',
+    subtitle: 'Key resiliency indicators for FYTD March 2026',
+  },
+  metricCards: [
+    {
+      type: 'availability',
+      title: 'Client Availability',
+      description: 'Uptime across all client-facing services',
+      value: 99.9964,
+      decimals: 4,
+      suffix: '%',
+      valueColor: '#027a48',
+      accent: '#027a48',
+      icon: 'shield',
+      thresholdLegend: 'Threshold: Red <99.90%, Yellow 99.90% to <99.99%, Green 99.99%+',
+    },
+    {
+      type: 'count',
+      title: 'Critical Incident Volume',
+      description: 'Total critical incidents reported',
+      value: 29,
+      valueLabel: 'Total Count',
+      accent: '#0000ab',
+      icon: 'alert',
+    },
+    {
+      type: 'count',
+      title: 'Critical Incidents Due to Change',
+      description: 'Incidents triggered by system changes',
+      value: 16,
+      valueLabel: 'Count',
+      accent: '#b42318',
+      icon: 'change',
+    },
+    {
+      type: 'kpi',
+      title: 'SLA Compliance',
+      description: 'SLA adherence over the last four weeks',
+      value: 90,
+      suffix: '%',
+      caption: 'Last Weeks',
+      accent: '#059669',
+      icon: 'compliance',
+    },
+    {
+      type: 'time',
+      title: 'Mean Time to Detect',
+      description: 'Average and median detection time',
+      meanValue: '4.38 Hrs.',
+      medianLabel: 'Median time to Detect',
+      medianValue: '0.85 Hrs.',
+      accent: '#1d4ed8',
+      icon: 'detect',
+    },
+    {
+      type: 'time',
+      title: 'Mean Time to Engage',
+      description: 'Average and median engagement time',
+      meanValue: '1.71 Hrs.',
+      medianLabel: 'Median Time to Engage',
+      medianValue: '0.78 Hrs.',
+      accent: '#7c3aed',
+      icon: 'engage',
+    },
+    {
+      type: 'time',
+      title: 'Mean Time to Resolve',
+      description: 'Average and median resolution time',
+      meanValue: '12.15 Hrs.',
+      medianLabel: 'Median Time to Resolve',
+      medianValue: '7.10 Hrs.',
+      accent: '#0d9488',
+      icon: 'resolve',
+    },
+    {
+      type: 'kpi',
+      title: 'Open Incidents',
+      description: 'Currently open incidents across all services',
+      value: 12,
+      accent: '#dc6803',
+      icon: 'incidents',
+      trend: {
+        direction: 'down',
+        value: '14%',
+        label: 'vs Previous Quarter',
+      },
+    },
+  ],
+  charts: {
+    mttd: {
+      title: 'Mean Time to Detect (hrs)',
+      goal: 7.42,
+      yMax: 18,
+      fytdPercent: '41.39%',
+      fytdColorKey: 'green',
+      headerStats: {
+        fy25: '8.73 hrs',
+        fy25JulMar: '9.47 hrs',
+        fy26Goal: '7.42 hrs',
+        fy26Current: '5.55 hrs',
+      },
+      data: [
+        { month: 'Jul', fy25: 3.85, fy26: 2.77 },
+        { month: 'Aug', fy25: 6.63, fy26: 6.26 },
+        { month: 'Sep', fy25: 7.1, fy26: 4.72 },
+        { month: 'Oct', fy25: 9.91, fy26: 8.39 },
+        { month: 'Nov', fy25: 16.27, fy26: 8.79 },
+        { month: 'Dec', fy25: 10.04, fy26: 4.05 },
+        { month: 'Jan', fy25: 8.24, fy26: 1.65 },
+        { month: 'Feb', fy25: 7.34, fy26: 6.1 },
+        { month: 'Mar', fy25: 4.38, fy26: 3.65 },
+      ],
+    },
+    mtte: {
+      title: 'Mean Time to Engage (hrs)',
+      goal: 2.47,
+      yMax: 18,
+      fytdPercent: '12.46%',
+      fytdColorKey: 'red',
+      headerStats: {
+        fy25: '2.90 hrs',
+        fy25JulMar: '3.53 hrs',
+        fy26Goal: '2.47 hrs',
+        fy26Current: '3.97 hrs',
+      },
+      data: [
+        { month: 'Jul', fy25: 3.08, fy26: 2.17 },
+        { month: 'Aug', fy25: 4.37, fy26: 1.59 },
+        { month: 'Sep', fy25: 6.2, fy26: 0.68 },
+        { month: 'Oct', fy25: 1.23, fy26: 6.2 },
+        { month: 'Nov', fy25: 6.15, fy26: 2.62 },
+        { month: 'Dec', fy25: 3.61, fy26: 2.04 },
+        { month: 'Jan', fy25: 0.83, fy26: 5.43 },
+        { month: 'Feb', fy25: 14.39, fy26: 2.4 },
+        { month: 'Mar', fy25: 1.71, fy26: 7.5 },
+      ],
+    },
+    mttr: {
+      title: 'Mean Time to Restore (hrs)',
+      goal: 19.43,
+      yMax: 36,
+      fytdPercent: '10.21%',
+      fytdColorKey: 'green',
+      headerStats: {
+        fy25: '22.86 hrs',
+        fy25JulMar: '22.88 hrs',
+        fy26Goal: '19.43 hrs',
+        fy26Current: '20.52 hrs',
+      },
+      data: [
+        { month: 'Jul', fy25: 12.26, fy26: 17.97 },
+        { month: 'Aug', fy25: 18.38, fy26: 29.97 },
+        { month: 'Sep', fy25: 10.34, fy26: 13.26 },
+        { month: 'Oct', fy25: 21.6, fy26: 29.18 },
+        { month: 'Nov', fy25: 25.33, fy26: 18.46 },
+        { month: 'Dec', fy25: 18.19, fy26: 19.23 },
+        { month: 'Jan', fy25: 21.1, fy26: 6.15 },
+        { month: 'Feb', fy25: 21.34, fy26: 34.38 },
+        { month: 'Mar', fy25: 12.79, fy26: 22.15 },
+      ],
+    },
+  },
+  footer: {
+    note: 'Gold line represents FY26 Goal; Rose line represents FY26 Current.',
+    goalLabel: 'FY26 Goal',
+    currentLabel: 'FY26 Current',
+    brand: 'ADP',
+  },
+};
 
 const CHART_KEYS = ['mttd', 'mtte', 'mttr'];
 const CHART_DELAYS = { mttd: 450, mtte: 520, mttr: 590 };
-
-// Fallback only when JSON is old/incomplete (e.g. copied without updated metricCards).
-const FALLBACK_KPI_CARDS = [
-  {
-    type: 'kpi',
-    title: 'SLA Compliance',
-    description: 'SLA adherence over the last four weeks',
-    value: 90,
-    suffix: '%',
-    caption: 'Last Weeks',
-    accent: '#059669',
-    icon: 'compliance',
-  },
-  {
-    type: 'kpi',
-    title: 'Open Incidents',
-    description: 'Currently open incidents across all services',
-    value: 12,
-    accent: '#dc6803',
-    icon: 'incidents',
-    trend: {
-      direction: 'down',
-      value: '14%',
-      label: 'vs Previous Quarter',
-    },
-  },
-];
-
-function ensureMetricCards(cards = []) {
-  if (cards.length >= 8) return cards.slice(0, 8);
-
-  const result = [...cards];
-  const titles = new Set(result.map((card) => card.title));
-
-  if (!titles.has('SLA Compliance')) {
-    result.splice(3, 0, FALLBACK_KPI_CARDS[0]);
-    titles.add('SLA Compliance');
-  }
-
-  if (!titles.has('Open Incidents')) {
-    result.push(FALLBACK_KPI_CARDS[1]);
-  }
-
-  return result;
-}
-
-function getDashboardData(source = productResiliencyData) {
-  return {
-    ...source,
-    metricCards: ensureMetricCards(source?.metricCards),
-  };
-}
 
 const DASHBOARD_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -194,6 +329,42 @@ const DASHBOARD_STYLES = `
   .pr-metrics-section .pr-content-inner {
     padding-top: 0;
     padding-bottom: 0;
+    max-width: min(1920px, 100%);
+  }
+
+  .pr-metrics-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: clamp(12px, 2vw, 22px);
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+
+  .pr-metrics-scroll::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .pr-metrics-scroll::-webkit-scrollbar-thumb {
+    background: rgba(102, 112, 133, 0.35);
+    border-radius: 999px;
+  }
+
+  .pr-metrics-grid {
+    display: block;
+    min-width: 0;
+  }
+
+  .pr-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: clamp(8px, 0.85vw, 12px);
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
   }
 
   .pr-metrics-heading {
@@ -237,31 +408,20 @@ const DASHBOARD_STYLES = `
     line-height: 1.4;
   }
 
-  .pr-metrics-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .pr-metrics-row {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    align-items: stretch;
-  }
-
   .pr-metric-card {
     position: relative;
-    padding: 14px 16px;
+    padding: clamp(10px, 1vw, 14px) clamp(10px, 1.05vw, 14px);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: clamp(6px, 0.7vw, 10px);
     border-radius: 12px;
     border: 1px solid #eaecf0;
     background: #fff;
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
-    min-height: 148px;
+    min-height: clamp(118px, 11vw, 138px);
     height: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
     cursor: default;
     animation: pr-strip-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
     transition:
@@ -315,16 +475,16 @@ const DASHBOARD_STYLES = `
   .pr-metric-card-header {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: clamp(6px, 0.65vw, 8px);
     min-width: 0;
     position: relative;
     z-index: 1;
   }
 
   .pr-metric-card-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
+    width: clamp(26px, 2.2vw, 30px);
+    height: clamp(26px, 2.2vw, 30px);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -335,7 +495,7 @@ const DASHBOARD_STYLES = `
     transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
   }
 
-  .pr-metric-card-icon svg { width: 16px; height: 16px; display: block; }
+  .pr-metric-card-icon svg { width: clamp(13px, 1.2vw, 15px); height: clamp(13px, 1.2vw, 15px); display: block; }
 
   .pr-metric-card:hover .pr-metric-card-icon {
     transform: scale(1.08);
@@ -344,11 +504,17 @@ const DASHBOARD_STYLES = `
   }
 
   .pr-metric-card-label {
-    font-size: 11px;
+    font-size: clamp(9px, 0.72vw, 11px);
     font-weight: 600;
     color: #344054;
     line-height: 1.35;
     transition: color 0.25s ease;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .pr-metric-card:hover .pr-metric-card-label { color: #101828; }
@@ -366,8 +532,8 @@ const DASHBOARD_STYLES = `
   .pr-metric-card-footer {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    min-height: 32px;
+    gap: 4px;
+    min-height: 0;
     justify-content: flex-end;
   }
 
@@ -379,12 +545,13 @@ const DASHBOARD_STYLES = `
   }
 
   .pr-metric-card-value {
-    font-size: clamp(22px, 2.4vw, 28px);
+    font-size: clamp(15px, 1.45vw, 22px);
     font-weight: 700;
     color: #101828;
-    letter-spacing: -0.4px;
-    line-height: 1;
+    letter-spacing: -0.35px;
+    line-height: 1.1;
     transition: color 0.22s ease;
+    word-break: break-word;
   }
 
   .pr-metric-card:hover .pr-metric-card-value {
@@ -438,17 +605,27 @@ const DASHBOARD_STYLES = `
   }
 
   .pr-metric-card-caption {
-    font-size: 10px;
+    font-size: clamp(8px, 0.62vw, 10px);
     font-weight: 600;
     color: #667085;
     line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 
   .pr-metric-card-threshold-legend {
-    font-size: 9px;
+    font-size: clamp(7px, 0.58vw, 9px);
     font-weight: 500;
     color: #667085;
-    line-height: 1.4;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 
   .pr-metric-card-value.is-green {
@@ -462,10 +639,11 @@ const DASHBOARD_STYLES = `
   .pr-metric-card-trend {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 10px;
+    gap: 3px;
+    font-size: clamp(8px, 0.62vw, 10px);
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.25;
+    flex-wrap: wrap;
   }
 
   .pr-metric-card-trend.down { color: #027a48; }
@@ -552,34 +730,56 @@ const DASHBOARD_STYLES = `
   }
 
   @media (max-width: 1400px) {
-    .pr-metrics-row { gap: 12px; }
-    .pr-metrics-grid { gap: 12px; }
+    .pr-metrics-row {
+      grid-template-columns: repeat(8, minmax(132px, 1fr));
+      min-width: max(100%, 1120px);
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .pr-metrics-row {
+      grid-template-columns: repeat(8, minmax(148px, 1fr));
+      min-width: max(100%, 1240px);
+    }
   }
 
   @media (max-width: 992px) {
-    .pr-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pr-metrics-row {
+      grid-template-columns: repeat(8, minmax(156px, 1fr));
+      min-width: max(100%, 1300px);
+    }
   }
 
   @media (max-width: 768px) {
     .pr-content-inner { padding: 0 14px; }
     .pr-header-banner { padding: 16px 0; }
     .pr-metrics-section { padding: 12px 0 10px; }
-    .pr-metrics-row { gap: 10px; }
-    .pr-metrics-grid { gap: 10px; }
-    .pr-metric-card { min-height: 136px; padding: 12px 14px; }
+    .pr-metrics-row {
+      gap: 10px;
+      grid-template-columns: repeat(8, minmax(142px, 1fr));
+      min-width: max(100%, 1180px);
+    }
+    .pr-metric-card { min-height: 124px; }
     .pr-footer { flex-direction: column; text-align: center; }
     .pr-footer .pr-content-inner { flex-direction: column; text-align: center; }
     .pr-footer-note { justify-content: center; }
   }
 
   @media (max-width: 576px) {
-    .pr-metrics-row { grid-template-columns: 1fr; }
-    .pr-metric-card-value { font-size: 22px; }
+    .pr-metrics-row {
+      grid-template-columns: repeat(8, minmax(128px, 1fr));
+      min-width: max(100%, 1060px);
+    }
+    .pr-metric-card-value { font-size: 15px; }
   }
 
   @media (max-width: 480px) {
     .pr-content-inner { padding: 0 10px; }
     .pr-header-left h1 { font-size: 14px; }
+    .pr-metrics-row {
+      grid-template-columns: repeat(8, minmax(118px, 1fr));
+      min-width: max(100%, 980px);
+    }
   }
 
   @media (hover: none) {
@@ -1036,7 +1236,9 @@ function AvailabilityCard({ card, delay }) {
 
 function CountCard({ card, delay }) {
   const count = useCountUp(card.value, 900);
-  const displayValue = card.valueLabel ? `${card.valueLabel}: ${count}` : `${count}${card.suffix || ''}`;
+  const displayValue = card.valueLabel
+    ? `${count}`
+    : `${count}${card.suffix || ''}`;
 
   return (
     <MetricCardShell accent={card.accent} delay={delay} title={card.description || card.title}>
@@ -1050,6 +1252,11 @@ function CountCard({ card, delay }) {
         <div className="pr-metric-card-value-row">
           <span className="pr-metric-card-value">{displayValue}</span>
         </div>
+        {card.valueLabel ? (
+          <div className="pr-metric-card-footer">
+            <span className="pr-metric-card-caption">{card.valueLabel}</span>
+          </div>
+        ) : null}
       </div>
     </MetricCardShell>
   );
@@ -1139,21 +1346,15 @@ function MetricCard({ card, delay }) {
 }
 
 function MonthlyMetricsCards({ cards }) {
-  const row1 = cards.slice(0, 4);
-  const row2 = cards.slice(4, 8);
-
-  const renderRow = (rowCards, rowOffset) => (
-    <div className="pr-metrics-row">
-      {rowCards.map((card, index) => (
-        <MetricCard key={card.title} card={card} delay={60 + (rowOffset + index) * 40} />
-      ))}
-    </div>
-  );
-
   return (
-    <div className="pr-metrics-grid">
-      {renderRow(row1, 0)}
-      {renderRow(row2, 4)}
+    <div className="pr-metrics-scroll">
+      <div className="pr-metrics-grid">
+        <div className="pr-metrics-row">
+          {cards.map((card, index) => (
+            <MetricCard key={card.title} card={card} delay={60 + index * 35} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1409,8 +1610,9 @@ function DashboardContent({ data }) {
 const XYZ = () => (
   <>
     <style>{DASHBOARD_STYLES}</style>
-    <DashboardContent data={getDashboardData()} />
+    <DashboardContent data={DASHBOARD_DATA} />
   </>
 );
 
 export default XYZ;
+export { DASHBOARD_DATA };

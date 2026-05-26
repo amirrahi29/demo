@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ComposedChart,
   Bar,
@@ -13,42 +13,84 @@ import {
   LabelList,
 } from 'recharts';
 
-const DATA_SOURCE = 'json';
-const JSON_DATA_URL = `${import.meta.env.BASE_URL}dashboardData.json`;
-const API_DATA_URL = '/api/dashboard';
-
-async function fetchDashboardData() {
-  const url = DATA_SOURCE === 'api' ? API_DATA_URL : JSON_DATA_URL;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      DATA_SOURCE === 'api'
-        ? `API error: ${response.status} (${API_DATA_URL})`
-        : 'Could not load public/dashboardData.json'
-    );
-  }
-
-  const json = await response.json();
-  return validateDashboardData(json);
-}
-
-function validateDashboardData(data) {
-  const missing = [];
-
-  if (!data?.header) missing.push('header');
-  if (!data?.colors) missing.push('colors');
-  if (!Array.isArray(data?.metricCards)) missing.push('metricCards');
-  if (!data?.charts?.dcLocation) missing.push('charts.dcLocation');
-  if (!data?.charts?.bu) missing.push('charts.bu');
-  if (!data?.charts?.monthlyProgress) missing.push('charts.monthlyProgress');
-
-  if (missing.length) {
-    throw new Error(`Invalid dashboard data. Missing: ${missing.join(', ')}`);
-  }
-
-  return data;
-}
+/** All dashboard data lives here — edit values directly in this file. */
+const DASHBOARD_DATA = {
+  header: {
+    title: 'Cloud Migration Dashboard',
+    subtitle: 'Real-time overview of application migration progress & cloud optimization',
+    liveBadge: 'Live Data · May 2026',
+  },
+  colors: {
+    orange: '#e07a3a',
+    orangeLight: '#f09658',
+    line1: '#0b2f6b',
+    line2: '#1d4ed8',
+    line3: '#5b9bd5',
+    line4: '#7ec8e3',
+  },
+  metricCards: [
+    { title: '% Applications Migrated', value: 13, icon: 'migrate', suffix: '%' },
+    { title: 'Cloud Spend Contribution to Total Growth', value: 24, icon: 'cloud', suffix: '%' },
+    { title: '% idle (zombie) Resources', value: 20, icon: 'idle', suffix: '%' },
+    { title: 'Cloud Cost Reduction (%)', value: 16, icon: 'savings', suffix: '%' },
+    { title: 'BF wise Migrations %', value: 13, icon: 'analytics', suffix: '%' },
+  ],
+  charts: {
+    dcLocation: {
+      title: 'Migration Status by DC Location',
+      subtitle: 'Apps count vs completion %',
+      xKey: 'location',
+      barKey: 'apps',
+      barLabel: '# Apps',
+      lineKey: 'completion',
+      lineLabel: '% Completion',
+      yAxisLeft: { domain: [0, 700], label: '# Apps' },
+      yAxisRight: { domain: [0, 120], label: '% Completion' },
+      data: [
+        { location: 'DC1 and 2', apps: 18, completion: 18 },
+        { location: 'DC10 and 11', apps: 587, completion: 20 },
+        { location: 'DC12 and 13', apps: 77, completion: 100 },
+        { location: 'DC14 and 15', apps: 33, completion: 100 },
+        { location: 'DC4 and 5', apps: 44, completion: 55 },
+      ],
+    },
+    bu: {
+      title: 'Migration Status by BU',
+      subtitle: 'Business unit breakdown',
+      xKey: 'bu',
+      barKey: 'apps',
+      barLabel: '# Apps',
+      lineKey: 'completion',
+      lineLabel: '% Completion',
+      yAxisLeft: { domain: [0, 50], label: '# Apps' },
+      yAxisRight: { domain: [0, 120], label: '% Completion' },
+      data: [
+        { bu: 'SM...', apps: 6, completion: 4 },
+        { bu: 'AD...', apps: 33, completion: 44 },
+        { bu: 'NAS', apps: 21, completion: 12 },
+        { bu: 'ESI', apps: 33, completion: 100 },
+        { bu: 'Out...', apps: 44, completion: 55 },
+      ],
+    },
+    monthlyProgress: {
+      title: '% Monthly Migrated App Progress',
+      subtitle: 'Trend over Jan – Apr 2026',
+      yDomain: [0, 100],
+      lines: [
+        { key: 'appMigrated', name: '% APP Migrated', colorKey: 'line1' },
+        { key: 'bfWise', name: 'BF Wise Migration%', colorKey: 'line2' },
+        { key: 'cloudSpend', name: 'Cloud Spent count to Total Growth', colorKey: 'line3' },
+        { key: 'costReduction', name: 'Cloud Cost Reduction', colorKey: 'line4' },
+      ],
+      data: [
+        { month: 'Jan-26', appMigrated: 8, bfWise: 6, cloudSpend: 12, costReduction: 5 },
+        { month: 'Feb-26', appMigrated: 18, bfWise: 14, cloudSpend: 22, costReduction: 12 },
+        { month: 'Mar-26', appMigrated: 32, bfWise: 26, cloudSpend: 38, costReduction: 22 },
+        { month: 'Apr-26', appMigrated: 48, bfWise: 40, cloudSpend: 55, costReduction: 35 },
+      ],
+    },
+  },
+};
 
 const DASHBOARD_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -556,93 +598,10 @@ const DASHBOARD_STYLES = `
       transition-duration: 0.01ms !important;
     }
   }
-
-  .md-state-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(160deg, #f8fafc 0%, #eef2f6 100%);
-    padding: 24px;
-    text-align: center;
-    animation: mdFadeIn 0.5s ease both;
-  }
-  .md-state-card {
-    background: #fff;
-    border: 1px solid #e4e7ec;
-    border-radius: 16px;
-    padding: 36px 32px;
-    box-shadow: 0 20px 60px rgba(16, 24, 40, 0.1);
-    max-width: 420px;
-    width: 100%;
-    animation: mdScaleIn 0.6s ease both;
-  }
-  .md-spinner {
-    width: 44px;
-    height: 44px;
-    border: 3px solid #c8d9ea;
-    border-top-color: #1a3a6b;
-    border-radius: 50%;
-    animation: mdSpin 0.8s linear infinite;
-    margin-bottom: 16px;
-  }
-  @keyframes mdSpin {
-    to { transform: rotate(360deg); }
-  }
-  .md-state-title {
-    color: #1a3a6b;
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 6px;
-  }
-  .md-state-text {
-    color: #5a7291;
-    font-size: 13px;
-  }
-  .md-retry-btn {
-    margin-top: 16px;
-    padding: 10px 20px;
-    background: #1a3a6b;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease;
-  }
-  .md-retry-btn:hover {
-    background: #254d85;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(26, 58, 107, 0.25);
-  }
 `;
 
 function DashboardStyles() {
   return <style>{DASHBOARD_STYLES}</style>;
-}
-
-function useDashboardData() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const loadData = useCallback(() => {
-    setLoading(true);
-    setError(null);
-
-    fetchDashboardData()
-      .then(setData)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  return { data, loading, error, reload: loadData };
 }
 
 function useResponsive() {
@@ -845,30 +804,6 @@ function MetricIcon({ type }) {
   }
 }
 
-function LoadingScreen() {
-  return (
-    <div className="md-state-screen">
-      <div className="md-state-card">
-        <div className="md-spinner" />
-        <p className="md-state-title">Loading Dashboard</p>
-        <p className="md-state-text">Loading from {DATA_SOURCE === 'api' ? API_DATA_URL : 'dashboardData.json'}...</p>
-      </div>
-    </div>
-  );
-}
-
-function ErrorScreen({ message, onRetry }) {
-  return (
-    <div className="md-state-screen">
-      <div className="md-state-card">
-        <p className="md-state-title">Failed to Load Data</p>
-        <p className="md-state-text">{message}</p>
-        <button type="button" className="md-retry-btn" onClick={onRetry}>Retry</button>
-      </div>
-    </div>
-  );
-}
-
 function DashboardHeader({ header }) {
   return (
     <div className="md-header">
@@ -1066,16 +1001,13 @@ function DashboardContent({ data }) {
 }
 
 function App() {
-  const { data, loading, error, reload } = useDashboardData();
-
   return (
     <>
       <DashboardStyles />
-      {loading && <LoadingScreen />}
-      {!loading && error && <ErrorScreen message={error} onRetry={reload} />}
-      {!loading && data && <DashboardContent data={data} />}
+      <DashboardContent data={DASHBOARD_DATA} />
     </>
   );
 }
 
 export default App;
+export { DASHBOARD_DATA };

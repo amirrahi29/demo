@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import ReactDOM from 'react-dom/client';
 import {
   Area,
   AreaChart,
@@ -11314,15 +11313,6 @@ const DEF = () => {
     </>
   );
 };
-
-const mountNode = typeof document !== 'undefined' ? document.getElementById('root') : null;
-if (mountNode) {
-  ReactDOM.createRoot(mountNode).render(
-    <React.StrictMode>
-      <DEF />
-    </React.StrictMode>,
-  );
-}
 
 export { useResponsiveChart };
 export default DEF;
