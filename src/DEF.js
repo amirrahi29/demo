@@ -1715,13 +1715,6 @@ function AppSidebar({
                     </span>
                   </div>
                   <div className="def-sidebar-pillar-actions">
-                    <span
-                      className="def-sidebar-score def-sidebar-score-pillar"
-                      style={{ color: healthColor(fast.healthScore) }}
-                      title={`Health score ${fast.healthScore}%`}
-                    >
-                      {fast.healthScore}%
-                    </span>
                     <button
                       type="button"
                       className={`def-sidebar-pillar-expand${isExpanded ? ' open' : ''}`}
