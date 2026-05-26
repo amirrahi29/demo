@@ -1799,7 +1799,7 @@ function AppSidebar({
                   <div className="def-sidebar-pillar-copy">
                     <strong title={fast.shortName}>{fast.shortName}</strong>
                     <span>
-                      {fast.initiatives.length} initiatives | {fast.summary.activeProjects} projects
+                      {fast.initiatives.length} initiatives
                     </span>
                   </div>
                   <div className="def-sidebar-pillar-actions">
@@ -2128,7 +2128,6 @@ function CockpitPortfolioScopeCard({ metrics, delay = '0ms' }) {
   const items = [
     { key: 'imperatives', label: 'Strategic Imperatives', value: metrics.strategicImperatives },
     { key: 'initiatives', label: 'Initiatives', value: metrics.initiatives },
-    { key: 'sub', label: 'Sub-Initiatives', value: metrics.subInitiatives },
   ];
 
   return (
@@ -8818,7 +8817,7 @@ const STYLES = `
   }
   .def-cockpit-metric-scope-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 5px;
     min-width: 0;
     flex: 1;
