@@ -1096,6 +1096,12 @@ function addDaysToIso(iso, days) {
   return d.toISOString().slice(0, 10);
 }
 
+function daysBetweenIso(fromIso, toIso) {
+  const from = new Date(`${fromIso}T00:00:00Z`);
+  const to = new Date(`${toIso}T00:00:00Z`);
+  return Math.round((to - from) / (1000 * 60 * 60 * 24));
+}
+
 function buildOwnershipOverview(pillarFasts) {
   const byOwner = new Map();
   pillarFasts.forEach((fast) => {
@@ -1138,11 +1144,13 @@ function buildUpcomingMilestones(pillarFasts) {
     fast.initiatives.forEach((ini) => {
       const progress = ini.projects[0]?.progress ?? 0;
       const band = classifyProgressBand(progress);
+      const dueDate = addDaysToIso(COCKPIT_ANCHOR_DATE, dueOffsets[offsetIdx % dueOffsets.length]);
       milestones.push({
         id: `${fast.id}-${ini.id}`,
         initiative: ini.name,
         imperative: IMPERATIVE_LABELS[fast.shortName] || fast.shortName,
-        dueDate: addDaysToIso(COCKPIT_ANCHOR_DATE, dueOffsets[offsetIdx % dueOffsets.length]),
+        dueDate,
+        daysLeft: daysBetweenIso(COCKPIT_ANCHOR_DATE, dueDate),
         status: band,
         statusLabel: progressBandLabel(band),
         fastId: fast.id,
@@ -1721,6 +1729,37 @@ function CockpitMetricSpark({ data, stroke, fillId = 'metricSparkFill' }) {
   );
 }
 
+function CockpitPortfolioScopeCard({ metrics, delay = '0ms' }) {
+  const items = [
+    { key: 'imperatives', label: 'Strategic Imperatives', value: metrics.strategicImperatives, icon: '🏛' },
+    { key: 'initiatives', label: 'Initiatives', value: metrics.initiatives, icon: '📊' },
+    { key: 'sub', label: 'Sub-Initiatives', value: metrics.subInitiatives, icon: '📋' },
+  ];
+
+  return (
+    <article
+      className="def-cockpit-metric-card def-cockpit-metric-scope def-cockpit-interactive def-accent-indigo def-stagger-in"
+      style={{ '--stagger': delay }}
+      aria-label="Active portfolio counts"
+    >
+      <span className="def-cockpit-metric-stripe" aria-hidden="true" />
+      <div className="def-cockpit-metric-scope-head">
+        <span className="def-cockpit-metric-label">Active portfolio</span>
+      </div>
+      <div className="def-cockpit-metric-scope-grid">
+        {items.map((item) => (
+          <div key={item.key} className="def-cockpit-metric-scope-item">
+            <span className="def-cockpit-metric-scope-icon" aria-hidden="true">{item.icon}</span>
+            <strong className="def-cockpit-metric-scope-value">{item.value}</strong>
+            <span className="def-cockpit-metric-scope-name">{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <small className="def-cockpit-metric-sub">Active</small>
+    </article>
+  );
+}
+
 function CockpitMetricCard({
   title,
   value,
@@ -1948,7 +1987,7 @@ function OwnershipOverviewTable({ rows }) {
 function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   return (
     <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
-      <CockpitPanelHeader title="Upcoming milestones (next 30 days)" />
+      <CockpitPanelHeader title="No. of days" />
       <div className="def-cockpit-table-scroll wide def-cockpit-panel-body">
         <table className="def-cockpit-table def-cockpit-table-milestones">
           <thead>
@@ -1956,6 +1995,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
               <th>Initiative</th>
               <th>Strategic imperative</th>
               <th>Due date</th>
+              <th>Days left</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -1972,13 +2012,14 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
                 <td><strong>{row.initiative}</strong></td>
                 <td>{row.imperative}</td>
                 <td>{formatAppDate(row.dueDate)}</td>
+                <td className="def-cockpit-days-left">{row.daysLeft}</td>
                 <td>
                   <span className={`def-cockpit-status-pill status-${row.status}`}>{row.statusLabel}</span>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="def-cockpit-empty">No milestones in the next 30 days.</td></tr>
+              <tr><td colSpan={5} className="def-cockpit-empty">No milestones in the next 30 days.</td></tr>
             )}
           </tbody>
         </table>
@@ -2080,39 +2121,16 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
       </header>
 
       <div className="def-cockpit-metrics-row">
-        <CockpitMetricCard
-          title="Strategic Imperatives"
-          value={analytics.executiveMetrics.strategicImperatives}
-          subtitle="Active"
-          spark={analytics.sparks.pillars}
+        <CockpitPortfolioScopeCard
+          metrics={analytics.executiveMetrics}
           delay="0ms"
-          accent="def-accent-indigo"
-          iconRight
-        />
-        <CockpitMetricCard
-          title="Initiatives"
-          value={analytics.executiveMetrics.initiatives}
-          subtitle="Active"
-          spark={analytics.sparks.initiatives}
-          delay="40ms"
-          accent="def-accent-indigo"
-          iconRight
-        />
-        <CockpitMetricCard
-          title="Sub-Initiatives"
-          value={analytics.executiveMetrics.subInitiatives}
-          subtitle="Active"
-          spark={analytics.sparks.mix}
-          delay="80ms"
-          accent="def-accent-indigo"
-          iconRight
         />
         <CockpitMetricCard
           title="On Track"
           value={`${analytics.executiveMetrics.onTrackPct}%`}
           subtitle={`${analytics.executiveMetrics.onTrackCount}`}
           spark={analytics.sparks.onTrack}
-          delay="120ms"
+          delay="40ms"
           showSpark
           statusBand="on-track"
         />
@@ -2121,7 +2139,7 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           value={`${analytics.executiveMetrics.atRiskPct}%`}
           subtitle={`${analytics.executiveMetrics.atRiskCount}`}
           spark={analytics.sparks.atRisk}
-          delay="160ms"
+          delay="80ms"
           showSpark
           statusBand="at-risk"
         />
@@ -2130,7 +2148,7 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           value={`${analytics.executiveMetrics.offTrackPct}%`}
           subtitle={`${analytics.executiveMetrics.offTrackCount}`}
           spark={analytics.sparks.offTrack}
-          delay="200ms"
+          delay="120ms"
           showSpark
           statusBand="off-track"
         />
@@ -2140,7 +2158,7 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
           valueSuffix="/100"
           subtitle="last quarter"
           spark={analytics.sparks.health}
-          delay="240ms"
+          delay="160ms"
           statusBand={healthBand}
         />
       </div>
@@ -2198,7 +2216,7 @@ function buildFastScorecardRows(fastCategory) {
   });
 }
 
-function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
+function FastPillarModal({ fastCategory, open, onClose, onSelectInitiative }) {
   const scorecardRows = useMemo(
     () => (fastCategory ? buildFastScorecardRows(fastCategory) : []),
     [fastCategory],
@@ -2206,6 +2224,15 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
   const imperative = fastCategory
     ? (IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName)
     : '';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
 
   if (!open || !fastCategory) return null;
 
@@ -2215,13 +2242,13 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
   };
 
   return (
-    <div className="def-drawer-root open" role="presentation">
-      <button type="button" className="def-drawer-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
-      <aside
-        className="def-drawer def-drawer-pro def-drawer-pillar"
+    <div className="def-modal-root open" role="presentation">
+      <button type="button" className="def-modal-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
+      <div
+        className="def-modal def-modal-pillar"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="def-pillar-drawer-title"
+        aria-labelledby="def-pillar-modal-title"
       >
         <header className="def-drawer-head def-drawer-head-pillar">
           <div className="def-drawer-head-row">
@@ -2230,7 +2257,7 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
               ×
             </button>
           </div>
-          <h2 id="def-pillar-drawer-title">{fastCategory.shortName} pillar</h2>
+          <h2 id="def-pillar-modal-title">{fastCategory.shortName} pillar</h2>
           <p className="def-drawer-pillar-desc">{fastCategory.name}</p>
           <div className="def-drawer-pillar-stats">
             <StatusPill status={fastCategory.status} />
@@ -2263,7 +2290,7 @@ function FastPillarDrawer({ fastCategory, open, onClose, onSelectInitiative }) {
             />
           </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }
@@ -6387,6 +6414,86 @@ const STYLES = `
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
   }
+
+  .def-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    pointer-events: none;
+  }
+  .def-modal-root.open { pointer-events: auto; }
+  .def-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: rgba(15,23,42,0.42);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    animation: defDrawerFadeIn 0.24s ease both;
+  }
+  .def-app.def-theme-dark .def-modal-backdrop {
+    background: rgba(0,0,0,0.68);
+  }
+  .def-modal {
+    position: relative;
+    z-index: 1;
+    width: min(920px, 100%);
+    max-height: min(88vh, 860px);
+    display: flex;
+    flex-direction: column;
+    background: var(--def-surface);
+    border: 1px solid var(--def-border);
+    border-radius: 16px;
+    box-shadow:
+      0 24px 48px rgba(15,39,68,0.2),
+      0 8px 24px rgba(99,102,241,0.1);
+    overflow: hidden;
+    animation: defModalPopIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .def-modal-pillar {
+    background: linear-gradient(180deg, var(--def-surface) 0%, color-mix(in srgb, var(--def-surface) 94%, #eef2ff) 100%);
+  }
+  .def-modal-pillar .def-drawer-body-pillar {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .def-modal-pillar .def-drawer-pillar-table {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  @keyframes defModalPopIn {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @media (max-width: 768px) {
+    .def-modal-root {
+      padding: 12px;
+      align-items: center;
+    }
+    .def-modal {
+      width: 100%;
+      max-height: min(92vh, 900px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .def-modal {
+      animation: none;
+    }
+  }
+
   .def-drawer-head-pro {
     position: relative;
     flex-shrink: 0;
@@ -7277,9 +7384,12 @@ const STYLES = `
   }
   .def-cockpit-metrics-row {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 10px;
     align-items: stretch;
+  }
+  .def-cockpit-metrics-row > .def-cockpit-metric-card {
+    width: 100%;
   }
   .def-cockpit-metric-card {
     position: relative;
@@ -7307,6 +7417,90 @@ const STYLES = `
     border-color: rgba(99,102,241,0.16);
     --cockpit-hover-lift: -7px;
     --cockpit-hover-scale: 1.016;
+  }
+  .def-cockpit-metric-card.metric-scope {
+    min-height: 112px;
+    padding: 12px 13px 10px;
+    background: linear-gradient(180deg, #ffffff 0%, rgba(99,102,241,0.045) 100%);
+    border-color: rgba(99,102,241,0.16);
+    --cockpit-hover-lift: -7px;
+    --cockpit-hover-scale: 1.016;
+  }
+  .def-cockpit-metric-card.metric-scope::after {
+    content: '';
+    position: absolute;
+    inset: auto -18px -18px auto;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 72%);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.75;
+    transition: transform 0.45s var(--cockpit-ease-spring), opacity 0.35s ease;
+  }
+  .def-cockpit-metric-scope-head {
+    min-width: 0;
+  }
+  .def-cockpit-metric-scope-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .def-cockpit-metric-scope-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+    padding: 0;
+  }
+  .def-cockpit-metric-scope-icon {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.14);
+    font-size: 0.68rem;
+    line-height: 1;
+  }
+  .def-cockpit-metric-scope-value {
+    font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+    font-weight: var(--font-extrabold);
+    color: var(--def-heading);
+    line-height: 1.05;
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+  }
+  .def-cockpit-metric-scope-name {
+    font-size: 0.52rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--def-muted);
+    line-height: 1.25;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    max-width: 100%;
+    min-height: 2.5em;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .def-cockpit-metric-card.metric-scope:hover {
+      border-color: rgba(99,102,241,0.42);
+      box-shadow: var(--cockpit-shadow-lg);
+    }
+    .def-cockpit-metric-card.metric-scope:hover::after {
+      opacity: 1;
+      transform: scale(1.35);
+    }
   }
   .def-cockpit-metric-card.metric-health {
     min-height: 112px;
@@ -8120,7 +8314,13 @@ const STYLES = `
   .def-cockpit-row-click { cursor: pointer; }
   .def-cockpit-row-click:hover { background: rgba(99,102,241,0.05); }
   .def-cockpit-table-ownership { min-width: min(640px, 100%); }
-  .def-cockpit-table-milestones { min-width: min(560px, 100%); }
+  .def-cockpit-table-milestones { min-width: min(620px, 100%); }
+  .def-cockpit-days-left {
+    font-weight: var(--font-extrabold);
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+    white-space: nowrap;
+  }
   .def-cockpit-table-recovery-time { min-width: min(420px, 100%); }
   .def-cockpit-bottom-rail {
     display: grid;
@@ -8507,7 +8707,7 @@ const STYLES = `
       mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
     }
     .def-cockpit-metric-card {
-      flex: 0 0 clamp(148px, 42vw, 168px);
+      flex: 0 0 clamp(148px, 18vw, 168px);
       scroll-snap-align: start;
     }
   }
@@ -9022,7 +9222,7 @@ const DEF = () => {
             )}
 
             {layer === 'ceo' && (
-              <FastPillarDrawer
+              <FastPillarModal
                 fastCategory={fastPillarDrawer}
                 open={Boolean(fastPillarDrawerId && fastPillarDrawer)}
                 onClose={() => setFastPillarDrawerId(null)}
