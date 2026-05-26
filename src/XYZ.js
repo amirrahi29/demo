@@ -29,8 +29,7 @@ const DASHBOARD_DATA = {
     textMuted: '#667085',
   },
   metricsSection: {
-    title: 'Monthly Metrics',
-    subtitle: 'Key resiliency indicators for FYTD March 2026',
+    title: 'Metrics',
   },
   metricCards: [
     {
@@ -115,6 +114,35 @@ const DASHBOARD_DATA = {
         value: '14%',
         label: 'vs Previous Quarter',
       },
+    },
+  ],
+  readinessCards: [
+    {
+      title: 'Resilience Readiness',
+      accent: '#0000ab',
+      rows: [
+        { condition: '≥90% coverage', status: 'On Track', tone: 'on-track' },
+        { condition: '75–89%', status: 'At Risk', tone: 'at-risk' },
+        { condition: '<75%', status: 'Off Track', tone: 'off-track' },
+      ],
+    },
+    {
+      title: 'Recovery Performance',
+      accent: '#1d4ed8',
+      rows: [
+        { condition: '≥95% objectives met', status: 'On Track', tone: 'on-track' },
+        { condition: '85–94%', status: 'At Risk', tone: 'at-risk' },
+        { condition: '<85%', status: 'Off Track', tone: 'off-track' },
+      ],
+    },
+    {
+      title: 'Protection Compliance',
+      accent: '#0d9488',
+      rows: [
+        { condition: '≥95% compliant', status: 'On Track', tone: 'on-track' },
+        { condition: '85–94%', status: 'At Risk', tone: 'at-risk' },
+        { condition: '<85%', status: 'Off Track', tone: 'off-track' },
+      ],
     },
   ],
   charts: {
@@ -319,7 +347,7 @@ const DASHBOARD_STYLES = `
   }
 
   .pr-metrics-section {
-    padding: 16px 0 14px;
+    padding: 16px 0 20px;
     border-bottom: 1px solid #eaecf0;
     background: #fff;
     width: 100%;
@@ -401,11 +429,111 @@ const DASHBOARD_STYLES = `
     flex-shrink: 0;
   }
 
-  .pr-metrics-heading-left p {
-    margin: 2px 0 0 11px;
-    font-size: 11px;
-    color: #667085;
-    line-height: 1.4;
+  .pr-readiness-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(12px, 1.2vw, 16px);
+    margin-top: clamp(14px, 1.5vw, 18px);
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .pr-readiness-card {
+    position: relative;
+    border: 1px solid #eaecf0;
+    border-radius: 12px;
+    background: #fff;
+    padding: clamp(14px, 1.2vw, 18px) clamp(14px, 1.3vw, 20px);
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+    min-width: 0;
+    animation: pr-strip-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    --accent: #0000ab;
+    overflow: hidden;
+  }
+
+  .pr-readiness-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: 0.85;
+  }
+
+  .pr-readiness-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 28%, #eaecf0);
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .pr-readiness-card-title {
+    margin: 0 0 clamp(10px, 1vw, 12px);
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eef2f6;
+    font-size: clamp(12px, 1.05vw, 14px);
+    font-weight: 700;
+    color: #101828;
+    letter-spacing: -0.15px;
+    line-height: 1.35;
+  }
+
+  .pr-readiness-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(7px, 0.75vw, 10px);
+  }
+
+  .pr-readiness-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .pr-readiness-condition {
+    font-size: clamp(10px, 0.82vw, 12px);
+    font-weight: 500;
+    color: #344054;
+    line-height: 1.35;
+    min-width: 0;
+  }
+
+  .pr-readiness-status {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: clamp(9px, 0.72vw, 10px);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .pr-readiness-status.on-track {
+    background: #ecfdf3;
+    color: #027a48;
+    border: 1px solid #abefc6;
+  }
+
+  .pr-readiness-status.at-risk {
+    background: #fffaeb;
+    color: #b54708;
+    border: 1px solid #fedf89;
+  }
+
+  .pr-readiness-status.off-track {
+    background: #fef3f2;
+    color: #b42318;
+    border: 1px solid #fecdca;
   }
 
   .pr-metric-card {
@@ -734,12 +862,19 @@ const DASHBOARD_STYLES = `
       grid-template-columns: repeat(8, minmax(132px, 1fr));
       min-width: max(100%, 1120px);
     }
+    .pr-readiness-row { gap: 12px; }
   }
 
   @media (max-width: 1200px) {
     .pr-metrics-row {
       grid-template-columns: repeat(8, minmax(148px, 1fr));
       min-width: max(100%, 1240px);
+    }
+    .pr-readiness-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .pr-readiness-row > .pr-readiness-card:last-child {
+      grid-column: 1 / -1;
     }
   }
 
@@ -753,11 +888,19 @@ const DASHBOARD_STYLES = `
   @media (max-width: 768px) {
     .pr-content-inner { padding: 0 14px; }
     .pr-header-banner { padding: 16px 0; }
-    .pr-metrics-section { padding: 12px 0 10px; }
+    .pr-metrics-section { padding: 12px 0 16px; }
     .pr-metrics-row {
       gap: 10px;
       grid-template-columns: repeat(8, minmax(142px, 1fr));
       min-width: max(100%, 1180px);
+    }
+    .pr-readiness-row {
+      grid-template-columns: 1fr;
+      margin-top: 12px;
+      gap: 12px;
+    }
+    .pr-readiness-row > .pr-readiness-card:last-child {
+      grid-column: auto;
     }
     .pr-metric-card { min-height: 124px; }
     .pr-footer { flex-direction: column; text-align: center; }
@@ -1525,6 +1668,30 @@ function TrendChart({ config, colors, delay = 0, chartKey }) {
   );
 }
 
+function ReadinessThresholdCards({ cards }) {
+  return (
+    <div className="pr-readiness-row">
+      {cards.map((card, index) => (
+        <article
+          key={card.title}
+          className="pr-readiness-card"
+          style={{ '--accent': card.accent, animationDelay: `${320 + index * 60}ms` }}
+        >
+          <h3 className="pr-readiness-card-title">{card.title}</h3>
+          <ul className="pr-readiness-list">
+            {card.rows.map((row) => (
+              <li key={`${card.title}-${row.condition}`}>
+                <span className="pr-readiness-condition">{row.condition}</span>
+                <span className={`pr-readiness-status ${row.tone}`}>{row.status}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function TrendingCharts({ charts, colors }) {
   return (
     <section className="pr-charts-section">
@@ -1553,7 +1720,7 @@ function TrendingCharts({ charts, colors }) {
 }
 
 function DashboardContent({ data }) {
-  const { header, colors, metricsSection, metricCards, charts, footer } = data;
+  const { header, colors, metricsSection, metricCards, readinessCards, charts, footer } = data;
 
   return (
     <div className="pr-root">
@@ -1575,11 +1742,11 @@ function DashboardContent({ data }) {
               <div className="pr-metrics-heading">
                 <div className="pr-metrics-heading-left">
                   <h2>{metricsSection.title}</h2>
-                  <p>{metricsSection.subtitle}</p>
                 </div>
               </div>
 
               <MonthlyMetricsCards cards={metricCards} />
+              <ReadinessThresholdCards cards={readinessCards} />
             </div>
           </section>
 
