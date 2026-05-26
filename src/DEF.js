@@ -306,25 +306,6 @@ function countProjectsByProgressBand(projects) {
   return counts;
 }
 
-function SidebarInitiativeStatus() {
-  const progress = 0;
-  const band = classifyProgressBand(progress);
-  const theme = getProgressBandTheme(band);
-  return (
-    <span
-      className={`def-sidebar-ini-status status-${band}`}
-      style={{
-        color: theme?.color,
-        borderColor: theme?.border,
-        background: theme?.iconBg,
-      }}
-      title={`${progressBandLabel(band)} | ${progress}%`}
-    >
-      {progress}%
-    </span>
-  );
-}
-
 const IMPERATIVE_LABELS = {
   FOCUS: 'Focus',
   ACCELERATE: 'Accelerate',
@@ -1400,56 +1381,92 @@ function TopRisksList({ rows, compact = false }) {
   );
 }
 
-function TopRisksTable({ rows, embedded = false }) {
-  const table = (
-    <table className={`def-modal-pro-table def-modal-pro-table-risks${embedded ? ' def-top-risks-page-table' : ''}`}>
-      <thead>
-        <tr>
-          <th>Risk Area</th>
-          <th>Risk Score</th>
-          <th>Initiatives at Risk</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.id}>
-            <td data-label="Risk area"><strong>{row.title}</strong></td>
-            <td data-label="Risk score">
-              <span className={`def-modal-risk-score tone-${row.tone}`}>{row.score}</span>
-            </td>
-            <td data-label="Initiatives at risk">
-              <span className="def-modal-count-chip">{row.atRiskCount}</span>
-            </td>
-            <td data-label="Status">
-              <StatusPill status={row.status} />
-            </td>
+function TopRisksTable({ rows }) {
+  return (
+    <ModalProTableShell>
+      <table className="def-modal-pro-table def-modal-pro-table-risks">
+        <thead>
+          <tr>
+            <th>Risk Area</th>
+            <th>Risk Score</th>
+            <th>Initiatives at Risk</th>
+            <th>Status</th>
           </tr>
-        ))}
-        {rows.length === 0 && (
-          <tr><td colSpan={4} className="def-cockpit-empty">No elevated risks in the active portfolio.</td></tr>
-        )}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td data-label="Risk area"><strong>{row.title}</strong></td>
+              <td data-label="Risk score">
+                <span className={`def-modal-risk-score tone-${row.tone}`}>{row.score}</span>
+              </td>
+              <td data-label="Initiatives at risk">
+                <span className="def-modal-count-chip">{row.atRiskCount}</span>
+              </td>
+              <td data-label="Status">
+                <StatusPill status={row.status} />
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={4} className="def-cockpit-empty">No elevated risks in the active portfolio.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </ModalProTableShell>
   );
-
-  if (embedded) {
-    return (
-      <div className="def-table-wrap def-table-pro def-table-scroll-wrap def-table-embedded">
-        {table}
-      </div>
-    );
-  }
-
-  return <ModalProTableShell>{table}</ModalProTableShell>;
 }
 
-function TopRisksPanel({ rows, onViewAll }) {
+function TopRisksDrawer({ open, onClose, rows }) {
+  const highCount = rows.filter((row) => row.tone === 'high').length;
+  const totalAtRisk = rows.reduce((sum, row) => sum + row.atRiskCount, 0);
+  const avgScore = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length)
+    : 0;
+
   return (
-    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
-      <CockpitPanelHeader title="Top Risks" onViewAll={onViewAll} />
-      <TopRisksList rows={rows} compact />
-    </div>
+    <CockpitInsightsDrawer
+      open={open}
+      onClose={onClose}
+      titleId="def-top-risks-drawer-title"
+      closeLabel="Close top risks"
+      title="Top Risks"
+      description="Executive view of the highest-risk delivery areas in the portfolio"
+      sectionTitle="Risk scorecard"
+      sectionCount={`${rows.length} areas`}
+      stats={(
+        <>
+          <StatusPill status={highCount > 0 ? 'at-risk' : 'on-track'} />
+          <span
+            className="def-drawer-pillar-score"
+            style={{ color: healthColor(Math.max(0, 100 - avgScore * 3)) }}
+          >
+            {avgScore} avg score
+          </span>
+          <span className="def-drawer-pillar-meta">
+            {rows.length} risk areas
+            {' | '}
+            {totalAtRisk} initiatives at risk
+          </span>
+        </>
+      )}
+    >
+      <TopRisksTable rows={rows} />
+    </CockpitInsightsDrawer>
+  );
+}
+
+function TopRisksPanel({ rows }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
+        <CockpitPanelHeader title="Top Risks" onViewAll={() => setDrawerOpen(true)} />
+        <TopRisksList rows={rows} compact />
+      </div>
+      <TopRisksDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} rows={rows} />
+    </>
   );
 }
 
@@ -1672,7 +1689,7 @@ function AppSidebar({
         <p className="def-sidebar-label">Executive</p>
         <button
           type="button"
-          className={`def-sidebar-link def-sidebar-link-ceo${layer === 'ceo' || layer === 'top-risks' ? ' active' : ''}`}
+          className={`def-sidebar-link def-sidebar-link-ceo${layer === 'ceo' ? ' active' : ''}`}
           onClick={goCeo}
         >
           <span className="def-sidebar-tier def-sidebar-tier-ceo">CC</span>
@@ -1746,7 +1763,7 @@ function AppSidebar({
                         type="button"
                         className={`def-sidebar-ini-link${isIniActive ? ' active' : ''}`}
                         onClick={() => pickInitiative(fast.id, ini.id)}
-                        aria-label={`${ini.name}, ${ownerLabel}, ${progressBandLabel(classifyProgressBand(ini.projects[0]?.progress ?? 0))}`}
+                        aria-label={`${ini.name}, ${ownerLabel}`}
                       >
                         <span className="def-sidebar-ini-name" title={ini.name}>{ini.name}</span>
                         <span
@@ -1755,7 +1772,6 @@ function AppSidebar({
                         >
                           {ownerLabel} | {teamLabel}
                         </span>
-                        <SidebarInitiativeStatus />
                       </button>
                     );
                   })}
@@ -2700,7 +2716,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   );
 }
 
-function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks, onViewTopRisks }) {
+function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive">
@@ -2731,7 +2747,7 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks, onViewTop
           ))}
         </ul>
       </div>
-      <TopRisksPanel rows={topRisks} onViewAll={onViewTopRisks} />
+      <TopRisksPanel rows={topRisks} />
     </div>
   );
 }
@@ -2740,7 +2756,7 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks, onViewTop
    LAYER VIEWS
 ───────────────────────────────────────────────────────────── */
 
-function CeoView({ theme, onOpenFastPillar, onOpenInitiative, onViewTopRisks }) {
+function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
   const vp = useViewport();
   const analytics = useMemo(
     () => buildCockpitAnalytics(ORG_DATA, null),
@@ -2847,7 +2863,18 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative, onViewTopRisks }) 
         </div>
       </section>
 
-      <section className="def-cockpit-block def-cockpit-interactive def-stagger-in" style={{ '--stagger': '120ms' }}>
+      <section className="def-cockpit-block def-cockpit-block-secondary def-cockpit-interactive def-stagger-in" style={{ '--stagger': '120ms' }}>
+        <div className="def-cockpit-block-head">
+          <h2 className="def-cockpit-section-title">FAST pillars health</h2>
+        </div>
+        <div className="def-cockpit-fast-grid">
+          {ORG_DATA.fastCategories.map((f, i) => (
+            <FastHealthCard key={`${f.id}-secondary`} fast={f} theme={theme} onSelectFast={onOpenFastPillar} index={i} />
+          ))}
+        </div>
+      </section>
+
+      <section className="def-cockpit-block def-cockpit-interactive def-stagger-in" style={{ '--stagger': '180ms' }}>
         <div className="def-cockpit-block-head">
           <h2 className="def-cockpit-section-title">Portfolio insights</h2>
         </div>
@@ -2861,7 +2888,6 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative, onViewTopRisks }) 
             lastQuarter={analytics.lastQuarterSummary}
             highlights={analytics.keyHighlights}
             topRisks={analytics.topRisks}
-            onViewTopRisks={onViewTopRisks}
           />
         </div>
       </section>
@@ -2891,76 +2917,6 @@ function buildFastScorecardRows(fastCategory) {
       comments: summary.comments,
     };
   });
-}
-
-function TopRisksView({ rows, onGoCeo, onBack }) {
-  const highCount = rows.filter((row) => row.tone === 'high').length;
-  const totalAtRisk = rows.reduce((sum, row) => sum + row.atRiskCount, 0);
-  const avgScore = rows.length
-    ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length)
-    : 0;
-  const portfolioStatus = highCount > 0 ? 'at-risk' : 'on-track';
-
-  return (
-    <div className="def-layer def-page-enter def-initiative-page def-pillar-page def-top-risks-page">
-      <HierarchyTrail
-        items={[
-          { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
-          { key: 'risks', tier: 'Portfolio insights', label: 'Top Risks' },
-        ]}
-      />
-
-      <article className="def-pillar-shell">
-        <header className="def-pillar-hero def-top-risks-hero">
-          <div className="def-pillar-hero-main">
-            <div className="def-pillar-hero-meta">
-              <span className="def-initiative-pillar">Portfolio insights</span>
-              <StatusPill status={portfolioStatus} />
-            </div>
-            <h1 className="def-pillar-title">Top Risks</h1>
-            <p className="def-pillar-subtitle">
-              Executive view of the highest-risk delivery areas in the portfolio
-            </p>
-            <ul className="def-pillar-stats" aria-label="Risk summary">
-              <li><strong>{rows.length}</strong> risk areas</li>
-              <li><strong>{totalAtRisk}</strong> initiatives at risk</li>
-              <li className="def-pillar-health" style={{ color: healthColor(Math.max(0, 100 - avgScore * 3)) }}>
-                <strong>{avgScore}</strong> avg score
-              </li>
-            </ul>
-          </div>
-        </header>
-
-        <section className="def-pillar-body" aria-labelledby="def-top-risks-table-title">
-          <div className="def-pillar-section-head">
-            <div>
-              <h2 id="def-top-risks-table-title" className="def-pillar-section-title">Risk scorecard</h2>
-              <p className="def-pillar-section-desc">
-                {rows.length} delivery areas ranked by risk score across FAST pillars
-              </p>
-            </div>
-          </div>
-          <TopRisksTable rows={rows} embedded />
-        </section>
-
-        <section className="def-pillar-body def-top-risks-preview" aria-labelledby="def-top-risks-preview-title">
-          <div className="def-pillar-section-head">
-            <div>
-              <h2 id="def-top-risks-preview-title" className="def-pillar-section-title">Risk overview</h2>
-              <p className="def-pillar-section-desc">Highest-risk areas with live risk scores</p>
-            </div>
-          </div>
-          <TopRisksList rows={rows} />
-        </section>
-
-        <footer className="def-pillar-footer">
-          <button type="button" className="def-back-link" onClick={onBack}>
-            Back to Command Center Cockpit
-          </button>
-        </footer>
-      </article>
-    </div>
-  );
 }
 
 function FastCategoryView({ fastCategory, onSelectInitiative, onGoCeo, onBack }) {
@@ -11055,10 +11011,6 @@ const DEF = () => {
     () => findProject(initiative, drawerProjectId),
     [initiative, drawerProjectId],
   );
-  const topRisksRows = useMemo(
-    () => buildTopRisks(ORG_DATA.fastCategories),
-    [],
-  );
 
   const navigateTo = (target) => {
     if (target === 'ceo') {
@@ -11076,19 +11028,7 @@ const DEF = () => {
     } else if (target === 'team') {
       setLayer('team');
       setDrawerProjectId(null);
-    } else if (target === 'top-risks') {
-      setLayer('top-risks');
-      setFastId(null);
-      setInitiativeId(null);
-      setDrawerProjectId(null);
     }
-  };
-
-  const goTopRisks = () => {
-    setFastId(null);
-    setInitiativeId(null);
-    setDrawerProjectId(null);
-    setLayer('top-risks');
   };
 
   const goFast = (id) => {
@@ -11206,15 +11146,6 @@ const DEF = () => {
               theme={theme}
               onOpenFastPillar={goFast}
               onOpenInitiative={goInitiative}
-              onViewTopRisks={goTopRisks}
-            />
-          )}
-
-          {layer === 'top-risks' && (
-            <TopRisksView
-              rows={topRisksRows}
-              onGoCeo={() => navigateTo('ceo')}
-              onBack={() => navigateTo('ceo')}
             />
           )}
 
