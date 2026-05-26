@@ -11,102 +11,330 @@ import {
   YAxis,
 } from 'recharts';
 
-/** Self-contained Cloud Migration dashboard — consumed by DEF.js only. */
-const DASHBOARD_DATA = {
-  header: {
-    breadcrumbs: ['Dashboard', 'Fast Dashboard', 'Transform / Operational Excellence Program', 'Cloud Migration V2'],
-    title: 'Cloud Migration V2',
-    subtitle: 'Executive Initiative Scorecard - Q2 2026',
-    lastUpdated: '5/26/2026, 9:20:18 PM',
-    brand: 'ADP',
+/* ═══════════════════════════════════════════════════════════
+   GHI_DASHBOARD_JSON — all dashboard data (edit JSON below only)
+   UI/components live below this block in the same file.
+═══════════════════════════════════════════════════════════ */
+const GHI_DASHBOARD_JSON = `{
+  "header": {
+    "breadcrumbs": [
+      "Dashboard",
+      "Fast Dashboard",
+      "Transform / Operational Excellence Program",
+      "Cloud Migration V2"
+    ],
+    "title": "Cloud Migration V2",
+    "subtitle": "Executive Initiative Scorecard - Q2 2026",
+    "lastUpdated": "5/26/2026, 9:13:23 PM",
+    "brand": "ADP"
   },
-  kpiCards: [
+  "kpiCards": [
     {
-      title: 'Migration Progress',
-      value: '16%',
-      valueTone: 'green',
-      icon: 'cloud',
-      iconTone: 'blue',
+      "title": "Migration Progress",
+      "value": "16%",
+      "valueTone": "green",
+      "icon": "cloud",
+      "iconTone": "blue"
     },
     {
-      title: 'Risk and Compliance Score',
-      value: '90',
-      valueTone: 'orange',
-      icon: 'shield',
-      iconTone: 'gold',
+      "title": "Risk and Compliance Score",
+      "value": "90",
+      "valueTone": "orange",
+      "icon": "shield",
+      "iconTone": "gold"
     },
     {
-      title: 'Cloud Efficiency',
-      value: 'With-in Budget',
-      valueTone: 'green',
-      icon: 'list',
-      iconTone: 'green',
+      "title": "Cloud Efficiency",
+      "value": "With-in Budget",
+      "valueTone": "green",
+      "icon": "list",
+      "iconTone": "green"
+    }
+  ],
+  "migrationStats": [
+    {
+      "label": "Small App Migrations",
+      "value": 814
     },
+    {
+      "label": "Medium & Large App Migrations",
+      "value": 280
+    },
+    {
+      "label": "Apps Missing DC Label",
+      "value": 18
+    }
   ],
-  migrationStats: [
-    { label: 'Small App Migrations', value: 814 },
-    { label: 'Medium & Large App Migrations', value: 280 },
-    { label: 'Apps Missing DC Label', value: 18 },
+  "datacenterRows": [
+    {
+      "location": "DC1 and 2",
+      "apps": 597,
+      "compliance": 14
+    },
+    {
+      "location": "DC4 and 5",
+      "apps": 303,
+      "compliance": 8
+    },
+    {
+      "location": "Roseland CDL",
+      "apps": 73,
+      "compliance": 1
+    },
+    {
+      "location": "DC7a and DC7b",
+      "apps": 34,
+      "compliance": 47
+    },
+    {
+      "location": "DC10 and DC11",
+      "apps": 33,
+      "compliance": 27
+    },
+    {
+      "location": "DC12 and DC13",
+      "apps": 23,
+      "compliance": 100
+    },
+    {
+      "location": "",
+      "apps": 18,
+      "compliance": 28
+    },
+    {
+      "location": "DC14 and DC15",
+      "apps": 8,
+      "compliance": 100
+    },
+    {
+      "location": "Not Applicable",
+      "apps": 4,
+      "compliance": 50
+    },
+    {
+      "location": "N/A",
+      "apps": 1,
+      "compliance": 100
+    }
   ],
-  datacenterRows: [
-    { location: 'DC1 and 2', apps: 597, compliance: 14 },
-    { location: 'DC4 and 5', apps: 303, compliance: 8 },
-    { location: 'Roseland CDL', apps: 73, compliance: 1 },
-    { location: 'DC7a and DC7b', apps: 34, compliance: 47 },
-    { location: 'DC10 and DC11', apps: 33, compliance: 27 },
-    { location: 'DC12 and DC13', apps: 23, compliance: 100 },
-    { location: '', apps: 18, compliance: 28 },
-    { location: 'DC14 and DC15', apps: 8, compliance: 100 },
-    { location: 'Not Applicable', apps: 4, compliance: 50 },
-    { location: 'N/A', apps: 1, compliance: 100 },
-  ],
-  datacenterTotal: { apps: 1094, compliance: 16 },
-  chartColors: {
-    atRisk: '#B22222',
-    blank: '#FF0000',
-    complete: '#FFA500',
-    delayed: '#4169E1',
-    notInFlight: '#000000',
-    onTrack: '#00BFFF',
+  "datacenterTotal": {
+    "apps": 1094,
+    "compliance": 16
   },
-  businessUnitLegend: [
-    { key: 'atRisk', label: 'At risk', color: '#B22222' },
-    { key: 'blank', label: 'Blank', color: '#FF0000' },
-    { key: 'complete', label: 'Complete', color: '#FFA500' },
-    { key: 'delayed', label: 'Delayed', color: '#4169E1' },
-    { key: 'notInFlight', label: 'Not in Flight', color: '#000000' },
-    { key: 'onTrack', label: 'On track', color: '#00BFFF' },
-  ],
-  businessUnitTooltipOrder: ['blank', 'atRisk', 'complete', 'delayed', 'notInFlight', 'onTrack'],
-  businessUnitStackOrder: ['atRisk', 'blank', 'complete', 'delayed', 'notInFlight', 'onTrack'],
-  businessUnitXMax: 500,
-  businessUnits: [
-    { name: 'GETS', atRisk: 24, blank: 38, complete: 74, delayed: 46, notInFlight: 112, onTrack: 184 },
-    { name: 'ESI', atRisk: 11, blank: 19, complete: 31, delayed: 22, notInFlight: 47, onTrack: 68 },
-    { name: 'Nationals', atRisk: 0, blank: 33, complete: 7, delayed: 0, notInFlight: 39, onTrack: 1 },
-    { name: 'Majors & Canada', atRisk: 5, blank: 12, complete: 10, delayed: 8, notInFlight: 18, onTrack: 11 },
-    { name: 'SBS/RS/IS', atRisk: 4, blank: 10, complete: 9, delayed: 7, notInFlight: 15, onTrack: 9 },
-    { name: 'Smart Compliance Solutions', atRisk: 3, blank: 8, complete: 7, delayed: 5, notInFlight: 12, onTrack: 7 },
-    { name: 'TBD', atRisk: 2, blank: 7, complete: 5, delayed: 4, notInFlight: 10, onTrack: 5 },
-    { name: 'GSO', atRisk: 2, blank: 6, complete: 5, delayed: 3, notInFlight: 8, onTrack: 4 },
-    { name: 'Shared Applications', atRisk: 1, blank: 5, complete: 4, delayed: 3, notInFlight: 6, onTrack: 3 },
-    { name: 'Finance / Other', atRisk: 1, blank: 4, complete: 3, delayed: 2, notInFlight: 5, onTrack: 2 },
-    { name: 'HRO / PEO', atRisk: 1, blank: 3, complete: 3, delayed: 2, notInFlight: 4, onTrack: 2 },
-    { name: 'Product & Innovation / Data Cloud', atRisk: 0, blank: 3, complete: 2, delayed: 2, notInFlight: 3, onTrack: 2 },
-    { name: 'Service Delivery', atRisk: 0, blank: 2, complete: 2, delayed: 1, notInFlight: 2, onTrack: 1 },
-    { name: 'Employee Financial Solutions', atRisk: 0, blank: 2, complete: 1, delayed: 1, notInFlight: 2, onTrack: 1 },
-  ],
-  monthlyProgress: [
-    { month: 'Jan-26', appMigrated: 20, buWise: 18 },
-    { month: 'Feb-26', appMigrated: 36, buWise: 31 },
-    { month: 'Mar-26', appMigrated: 54, buWise: 47 },
-    { month: 'Apr-26', appMigrated: 72, buWise: 65 },
-  ],
-  lineChartColors: {
-    appMigrated: '#4169E1',
-    buWise: '#00BFFF',
+  "chartColors": {
+    "atRisk": "#B22222",
+    "blank": "#FF0000",
+    "complete": "#FFA500",
+    "delayed": "#4169E1",
+    "notInFlight": "#000000",
+    "onTrack": "#00BFFF"
   },
-};
+  "businessUnitLegend": [
+    {
+      "key": "atRisk",
+      "label": "At risk",
+      "color": "#B22222"
+    },
+    {
+      "key": "blank",
+      "label": "Blank",
+      "color": "#FF0000"
+    },
+    {
+      "key": "complete",
+      "label": "Complete",
+      "color": "#FFA500"
+    },
+    {
+      "key": "delayed",
+      "label": "Delayed",
+      "color": "#4169E1"
+    },
+    {
+      "key": "notInFlight",
+      "label": "Not in Flight",
+      "color": "#000000"
+    },
+    {
+      "key": "onTrack",
+      "label": "On track",
+      "color": "#00BFFF"
+    }
+  ],
+  "businessUnitTooltipOrder": [
+    "blank",
+    "atRisk",
+    "complete",
+    "delayed",
+    "notInFlight",
+    "onTrack"
+  ],
+  "businessUnitStackOrder": [
+    "atRisk",
+    "blank",
+    "complete",
+    "delayed",
+    "notInFlight",
+    "onTrack"
+  ],
+  "businessUnitXMax": 500,
+  "businessUnits": [
+    {
+      "name": "GETS",
+      "atRisk": 48,
+      "blank": 20,
+      "complete": 140,
+      "delayed": 30,
+      "notInFlight": 190,
+      "onTrack": 50
+    },
+    {
+      "name": "ESI",
+      "atRisk": 12,
+      "blank": 18,
+      "complete": 35,
+      "delayed": 45,
+      "notInFlight": 120,
+      "onTrack": 20
+    },
+    {
+      "name": "Nationals",
+      "atRisk": 0,
+      "blank": 33,
+      "complete": 7,
+      "delayed": 0,
+      "notInFlight": 39,
+      "onTrack": 1
+    },
+    {
+      "name": "Majors & Canada",
+      "atRisk": 8,
+      "blank": 14,
+      "complete": 18,
+      "delayed": 6,
+      "notInFlight": 22,
+      "onTrack": 4
+    },
+    {
+      "name": "SBS/RS/IS",
+      "atRisk": 6,
+      "blank": 12,
+      "complete": 16,
+      "delayed": 5,
+      "notInFlight": 18,
+      "onTrack": 3
+    },
+    {
+      "name": "Smart Compliance Solutions",
+      "atRisk": 5,
+      "blank": 10,
+      "complete": 14,
+      "delayed": 4,
+      "notInFlight": 15,
+      "onTrack": 2
+    },
+    {
+      "name": "TBD",
+      "atRisk": 4,
+      "blank": 9,
+      "complete": 12,
+      "delayed": 3,
+      "notInFlight": 12,
+      "onTrack": 2
+    },
+    {
+      "name": "GSO",
+      "atRisk": 3,
+      "blank": 8,
+      "complete": 10,
+      "delayed": 3,
+      "notInFlight": 10,
+      "onTrack": 2
+    },
+    {
+      "name": "Shared Applications",
+      "atRisk": 2,
+      "blank": 7,
+      "complete": 8,
+      "delayed": 2,
+      "notInFlight": 8,
+      "onTrack": 1
+    },
+    {
+      "name": "Finance / Other",
+      "atRisk": 2,
+      "blank": 6,
+      "complete": 7,
+      "delayed": 2,
+      "notInFlight": 6,
+      "onTrack": 1
+    },
+    {
+      "name": "HRO / PEO",
+      "atRisk": 1,
+      "blank": 5,
+      "complete": 6,
+      "delayed": 1,
+      "notInFlight": 5,
+      "onTrack": 1
+    },
+    {
+      "name": "Product & Innovation / Data Cloud",
+      "atRisk": 1,
+      "blank": 4,
+      "complete": 5,
+      "delayed": 1,
+      "notInFlight": 4,
+      "onTrack": 1
+    },
+    {
+      "name": "Service Delivery",
+      "atRisk": 0,
+      "blank": 3,
+      "complete": 4,
+      "delayed": 1,
+      "notInFlight": 3,
+      "onTrack": 1
+    },
+    {
+      "name": "Employee Financial Solutions",
+      "atRisk": 0,
+      "blank": 2,
+      "complete": 3,
+      "delayed": 1,
+      "notInFlight": 2,
+      "onTrack": 1
+    }
+  ],
+  "monthlyProgress": [
+    {
+      "month": "Jan-26",
+      "appMigrated": 20,
+      "bfWise": 19
+    },
+    {
+      "month": "Feb-26",
+      "appMigrated": 45,
+      "bfWise": 43
+    },
+    {
+      "month": "Mar-26",
+      "appMigrated": 60,
+      "bfWise": 58
+    },
+    {
+      "month": "Apr-26",
+      "appMigrated": 75,
+      "bfWise": 73
+    }
+  ],
+  "lineChartColors": {
+    "appMigrated": "#00BFFF",
+    "bfWise": "#4169E1"
+  }
+}`;
+
+const DASHBOARD_DATA = JSON.parse(GHI_DASHBOARD_JSON);
 
 const STATUS_KEYS = DASHBOARD_DATA.businessUnitStackOrder;
 
@@ -309,16 +537,15 @@ function BusinessUnitTooltip({ active, payload, label, legend, tooltipOrder }) {
 }
 
 function BusinessUnitChart({ data, legend, stackOrder, tooltipOrder, xMax }) {
-  const plotHeight = Math.max(420, data.length * 26 + 44);
-  const viewportHeight = Math.min(plotHeight, 520);
-  const yAxisWidth = 132;
+  const plotHeight = Math.max(360, data.length * 22 + 36);
+  const viewportHeight = Math.min(plotHeight, 400);
+  const yAxisWidth = 118;
   const [frameRef, frame] = useChartFrame(plotHeight);
 
   return (
     <section className="ghi-panel ghi-panel-chart">
       <div className="ghi-panel-head">
         <h3 className="ghi-panel-title">Migration Status by Business Unit</h3>
-        <span className="ghi-panel-tag">Hover bars for details</span>
       </div>
       <div className="ghi-chart-viewport" style={{ height: viewportHeight }}>
         <div ref={frameRef} className="ghi-chart-plot" style={{ height: plotHeight }}>
@@ -327,8 +554,8 @@ function BusinessUnitChart({ data, legend, stackOrder, tooltipOrder, xMax }) {
               <BarChart
                 data={data}
                 layout="vertical"
-                margin={{ top: 8, right: 18, left: 8, bottom: 8 }}
-                barCategoryGap="14%"
+                margin={{ top: 4, right: 12, left: 0, bottom: 4 }}
+                barCategoryGap="10%"
               >
                 <CartesianGrid stroke="#e8edf3" horizontal={false} strokeDasharray="3 3" />
                 <XAxis
@@ -408,7 +635,7 @@ function MonthlyProgressTooltip({ active, payload, label }) {
 }
 
 function MonthlyProgressChart({ data, lineColors }) {
-  const chartHeight = 360;
+  const chartHeight = 320;
   const [frameRef, frame] = useChartFrame(chartHeight);
 
   return (
@@ -452,11 +679,11 @@ function MonthlyProgressChart({ data, lineColors }) {
               />
               <Line
                 type="monotone"
-                dataKey="buWise"
-                name="BU Wise Migrations (%)"
-                stroke={lineColors.buWise}
+                dataKey="bfWise"
+                name="BF Wise Migrations (%)"
+                stroke={lineColors.bfWise}
                 strokeWidth={2.5}
-                dot={{ r: 4, fill: lineColors.buWise, stroke: '#fff', strokeWidth: 2 }}
+                dot={{ r: 4, fill: lineColors.bfWise, stroke: '#fff', strokeWidth: 2 }}
                 activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
                 isAnimationActive={false}
               />
@@ -470,8 +697,8 @@ function MonthlyProgressChart({ data, lineColors }) {
           APP Migrated (%)
         </span>
         <span className="ghi-legend-item">
-          <i className="ghi-legend-line" style={{ background: lineColors.buWise }} />
-          BU Wise Migrations (%)
+          <i className="ghi-legend-line" style={{ background: lineColors.bfWise }} />
+          BF Wise Migrations (%)
         </span>
       </div>
     </section>
@@ -614,7 +841,7 @@ const DASHBOARD_STYLES = `
     width: 100%;
     max-width: 1680px;
     margin: 0 auto;
-    padding: 16px 18px 24px;
+    padding: 12px 14px 16px;
     animation: ghi-rise 0.45s ease both;
   }
 
@@ -660,28 +887,28 @@ const DASHBOARD_STYLES = `
   .ghi-kpi-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin: 16px 0 18px;
+    gap: 10px;
+    margin: 12px 0 12px;
   }
 
   .ghi-kpi-card {
     display: flex;
     align-items: center;
-    gap: 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #d8dee8;
-    border-radius: 10px;
-    padding: 16px 18px;
-    min-height: 96px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    padding: 12px 14px;
+    min-height: 78px;
+    box-shadow: none;
+    transition: border-color 0.2s ease;
     animation: ghi-rise 0.5s ease both;
   }
 
   .ghi-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
-    border-color: #c7d2e3;
+    transform: none;
+    box-shadow: none;
+    border-color: #b8c4d9;
   }
 
   .ghi-kpi-icon {
@@ -722,8 +949,8 @@ const DASHBOARD_STYLES = `
 
   .ghi-main-grid {
     display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.25fr) minmax(280px, 0.95fr);
-    gap: 14px;
+    grid-template-columns: minmax(260px, 0.95fr) minmax(300px, 1.2fr) minmax(240px, 0.85fr);
+    gap: 10px;
     align-items: start;
   }
 
@@ -747,8 +974,8 @@ const DASHBOARD_STYLES = `
     width: 100%;
     min-width: 0;
     overflow: auto;
-    border: 1px solid #edf2f7;
-    border-radius: 8px;
+    border: 1px solid #eaecf0;
+    border-radius: 4px;
     background: #fff;
   }
 
@@ -764,13 +991,13 @@ const DASHBOARD_STYLES = `
 
   .ghi-panel {
     background: #fff;
-    border: 1px solid #d8dee8;
-    border-radius: 10px;
-    padding: 14px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    padding: 10px;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+    box-shadow: none;
     animation: ghi-rise 0.55s ease both;
   }
 
@@ -778,14 +1005,14 @@ const DASHBOARD_STYLES = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 6px;
     flex-wrap: wrap;
   }
 
   .ghi-panel-title {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     color: #1e293b;
   }
@@ -809,73 +1036,73 @@ const DASHBOARD_STYLES = `
   }
 
   .ghi-panel-datacenter {
-    padding: 16px;
-    gap: 18px;
+    padding: 10px;
+    gap: 10px;
   }
 
   .ghi-dc-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: 8px;
   }
 
   .ghi-dc-stat-card {
     background: #fff;
-    border: 1px solid #dbe3ef;
-    border-radius: 10px;
-    padding: 14px 14px 16px;
-    min-height: 88px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    padding: 8px 10px 10px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 10px;
+    justify-content: flex-start;
+    gap: 4px;
     animation: ghi-rise 0.45s ease both;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.2s ease;
   }
 
   .ghi-dc-stat-card:hover {
-    border-color: #c7d4e8;
-    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.06);
+    border-color: #b8c4d9;
+    box-shadow: none;
   }
 
   .ghi-dc-stat-label {
     display: block;
-    font-size: 11px;
-    line-height: 1.35;
-    color: #64748b;
+    font-size: 10px;
+    line-height: 1.25;
+    color: #667085;
     font-weight: 500;
-    min-height: 30px;
+    min-height: 0;
   }
 
   .ghi-dc-stat-value {
-    font-size: clamp(28px, 2.8vw, 34px);
+    font-size: 22px;
     line-height: 1;
     color: #2563eb;
     font-weight: 800;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
 
   .ghi-dc-table-section {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
     min-width: 0;
   }
 
   .ghi-dc-table-title {
     margin: 0;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #0f172a;
   }
 
   .ghi-dc-table-shell {
     overflow: auto;
-    border: 1px solid #dbe3ef;
-    border-radius: 10px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
     background: #fff;
   }
 
@@ -883,15 +1110,15 @@ const DASHBOARD_STYLES = `
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    font-size: 12px;
+    font-size: 11px;
     table-layout: fixed;
   }
 
   .ghi-dc-table thead th {
     background: #2563eb;
     color: #fff;
-    padding: 11px 14px;
-    font-size: 12px;
+    padding: 6px 8px;
+    font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
     border-bottom: 1px solid #1d4ed8;
@@ -921,10 +1148,11 @@ const DASHBOARD_STYLES = `
   }
 
   .ghi-dc-table tbody td {
-    padding: 10px 14px;
-    border-bottom: 1px solid #edf2f7;
+    padding: 5px 8px;
+    border-bottom: 1px solid #eaecf0;
     color: #334155;
     vertical-align: middle;
+    line-height: 1.2;
   }
 
   .ghi-dc-table tbody tr:last-child td {
@@ -945,19 +1173,19 @@ const DASHBOARD_STYLES = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 52px;
-    padding: 4px 10px;
+    min-width: 40px;
+    padding: 2px 7px;
     border-radius: 999px;
     font-weight: 700;
-    font-size: 11px;
-    line-height: 1;
+    font-size: 10px;
+    line-height: 1.1;
     font-variant-numeric: tabular-nums;
   }
 
   .ghi-compliance-bold {
-    font-size: 12px;
-    min-width: 56px;
-    padding: 5px 12px;
+    font-size: 10px;
+    min-width: 42px;
+    padding: 2px 7px;
   }
 
   .ghi-compliance-high {
@@ -979,9 +1207,9 @@ const DASHBOARD_STYLES = `
     background: #eef4ff !important;
     font-weight: 800;
     color: #0f172a;
-    border-top: 2px solid #dbeafe;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    border-top: 1px solid #dbeafe;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
   .ghi-dc-table-total td:first-child {
@@ -1003,11 +1231,11 @@ const DASHBOARD_STYLES = `
   .ghi-legend-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-top: 10px;
-    padding-top: 10px;
+    gap: 6px 10px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px solid #edf2f7;
-    font-size: 10px;
+    font-size: 9px;
     color: #475467;
   }
 
@@ -1202,3 +1430,4 @@ const GHI = () => (
 );
 
 export default GHI;
+export { GHI_DASHBOARD_JSON, DASHBOARD_DATA };
