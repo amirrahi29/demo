@@ -1999,6 +1999,15 @@ function ChartLegendRow({ items }) {
   );
 }
 
+function MetricSparkTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="def-cockpit-metric-spark-tip">
+      <strong>{Math.round(payload[0].value)}</strong>
+    </div>
+  );
+}
+
 function CockpitMetricSpark({ data, stroke, fillId = 'metricSparkFill' }) {
   const line = stroke || '#6366f1';
   return (
@@ -2013,6 +2022,11 @@ function CockpitMetricSpark({ data, stroke, fillId = 'metricSparkFill' }) {
           </defs>
           <XAxis dataKey="ix" hide />
           <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
+          <Tooltip
+            content={<MetricSparkTooltip />}
+            cursor={{ stroke: line, strokeWidth: 1, strokeDasharray: '3 3' }}
+            isAnimationActive={false}
+          />
           <Area
             type="monotone"
             dataKey="v"
@@ -2116,11 +2130,12 @@ function getPillarHealthTooltip() {
   return 'Pillar health score — average initiative progress across this FAST pillar';
 }
 
-function OverlayTooltip({ tip, className = '', children }) {
+function OverlayTooltip({ tip, className = '', children, block = false, align = 'end' }) {
   const anchorRef = useRef(null);
   const tipRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState({ top: 0, left: 0, placement: 'top', arrowLeft: 10 });
+  const Wrapper = block ? 'div' : 'span';
 
   const reposition = () => {
     const anchor = anchorRef.current;
@@ -2134,7 +2149,9 @@ function OverlayTooltip({ tip, className = '', children }) {
     const tipWidth = Math.min(tipEl?.offsetWidth || maxWidth, maxWidth);
     const tipHeight = tipEl?.offsetHeight || 44;
 
-    let left = rect.right - tipWidth;
+    let left = align === 'center'
+      ? rect.left + (rect.width - tipWidth) / 2
+      : rect.right - tipWidth;
     left = Math.max(pad, Math.min(left, window.innerWidth - tipWidth - pad));
 
     let placement = 'top';
@@ -2144,7 +2161,8 @@ function OverlayTooltip({ tip, className = '', children }) {
       top = rect.bottom + gap;
     }
 
-    const arrowLeft = Math.max(12, Math.min(rect.right - left - 6, tipWidth - 12));
+    const anchorX = align === 'center' ? rect.left + rect.width / 2 : rect.right - 6;
+    const arrowLeft = Math.max(12, Math.min(anchorX - left, tipWidth - 12));
     setStyle({ top, left, placement, arrowLeft });
   };
 
@@ -2158,11 +2176,11 @@ function OverlayTooltip({ tip, className = '', children }) {
       window.removeEventListener('scroll', handle, true);
       window.removeEventListener('resize', handle);
     };
-  }, [open, tip]);
+  }, [open, tip, align]);
 
   return (
     <>
-      <span
+      <Wrapper
         ref={anchorRef}
         className={className}
         onMouseEnter={() => setOpen(true)}
@@ -2171,7 +2189,7 @@ function OverlayTooltip({ tip, className = '', children }) {
         onBlur={() => setOpen(false)}
       >
         {children}
-      </span>
+      </Wrapper>
       {open && typeof document !== 'undefined' && createPortal(
         <div
           ref={tipRef}
@@ -2197,15 +2215,12 @@ function OverlayTooltip({ tip, className = '', children }) {
 function MetricCountPill({ count, statusBand }) {
   const tip = getMetricCountTooltip(statusBand);
   return (
-    <span className="def-cockpit-metric-pill-wrap">
-      <span
-        className="def-cockpit-metric-pill"
-        tabIndex={0}
-        aria-label={`${count} ${tip}`}
-      >
-        {count}
-      </span>
-      <span className="def-cockpit-metric-pill-tip" role="tooltip">{tip}</span>
+    <span
+      className="def-cockpit-metric-pill"
+      tabIndex={0}
+      aria-label={`${count} ${tip}`}
+    >
+      {count}
     </span>
   );
 }
@@ -2235,8 +2250,11 @@ function CockpitMetricCard({
     ? Math.max(0, Math.min(100, Number.parseInt(String(value), 10) || 0))
     : 0;
   const sparkFillId = `metric-spark-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  const countTip = statusBand && subtitle && !isHealthCard
+    ? getMetricCountTooltip(statusBand)
+    : null;
 
-  return (
+  const card = (
     <article
       className={[
         'def-cockpit-metric-card',
@@ -2301,6 +2319,21 @@ function CockpitMetricCard({
       ) : null}
     </article>
   );
+
+  if (countTip) {
+    return (
+      <OverlayTooltip
+        tip={countTip}
+        className="def-cockpit-metric-card-overlay"
+        block
+        align="center"
+      >
+        {card}
+      </OverlayTooltip>
+    );
+  }
+
+  return card;
 }
 
 function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
@@ -2344,7 +2377,7 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
       </div>
       <div className="def-cockpit-fast-body">
         <div className="def-cockpit-fast-chart">
-          <ResponsiveContainer width="100%" height={96}>
+          <ResponsiveContainer width="100%" height={108}>
             <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <Pie
                 data={data.length ? data : [{ name: 'Empty', value: 1, fill: isDark ? '#334155' : '#e2e8f0' }]}
@@ -8272,7 +8305,8 @@ const STYLES = `
     .def-cockpit-metric-card:hover .def-cockpit-metric-value {
       transform: scale(1.035);
     }
-    .def-cockpit-metric-card:hover .def-cockpit-metric-stripe {
+    .def-cockpit-metric-card:hover .def-cockpit-metric-stripe,
+    .def-cockpit-metric-card-overlay:hover .def-cockpit-metric-stripe {
       transform: scaleX(1);
       height: 4px;
       opacity: 1;
@@ -8280,7 +8314,6 @@ const STYLES = `
     .def-cockpit-fast-health:hover .def-cockpit-fast-icon {
       animation: cockpitIconFloat 0.55s var(--cockpit-ease-spring) both;
     }
-    .def-cockpit-fast-health:hover::after { opacity: 1; height: 3px; }
     .def-cockpit-fast-health:hover .def-cockpit-fast-chart {
       transform: scale(1.04);
     }
@@ -8587,10 +8620,20 @@ const STYLES = `
     gap: 12px;
     align-items: stretch;
   }
-  .def-cockpit-metrics-row > .def-cockpit-metric-card {
+  .def-cockpit-metrics-row > .def-cockpit-metric-card,
+  .def-cockpit-metrics-row > .def-cockpit-metric-card-overlay {
     width: 100%;
     height: 100%;
     min-height: 106px;
+    min-width: 0;
+  }
+  .def-cockpit-metric-card-overlay {
+    display: block;
+    height: 100%;
+    min-width: 0;
+  }
+  .def-cockpit-metric-card-overlay > .def-cockpit-metric-card {
+    height: 100%;
   }
   .def-cockpit-metric-card {
     position: relative;
@@ -8951,10 +8994,11 @@ const STYLES = `
     height: 3px;
     background: var(--metric-band-color, linear-gradient(90deg, #6366f1, #a855f7));
     border-radius: 14px 14px 0 0;
-    opacity: 1;
-    transform: scaleX(1);
+    opacity: 0;
+    transform: scaleX(0);
     transform-origin: left center;
     transition:
+      transform 0.55s var(--cockpit-ease),
       height 0.32s var(--cockpit-ease),
       opacity 0.28s ease;
   }
@@ -9268,6 +9312,20 @@ const STYLES = `
     opacity: 0.92;
     transition: opacity 0.32s ease, transform 0.38s var(--cockpit-ease-spring);
   }
+  .def-cockpit-metric-spark-tip {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    box-shadow: 0 6px 16px rgba(15,23,42,0.18);
+  }
+  .def-cockpit-metric-spark-tip strong {
+    font-weight: 800;
+  }
   .def-cockpit-section {
     background: #fff; border: 1px solid rgba(226,232,240,0.95); border-radius: 12px;
     padding: var(--cockpit-pad) var(--space-3); box-shadow: var(--def-shadow-sm);
@@ -9526,17 +9584,17 @@ const STYLES = `
   .def-cockpit-fast-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-    align-items: start;
+    gap: 12px;
+    align-items: stretch;
   }
   .def-cockpit-fast-health {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px 10px;
-    height: auto;
-    min-height: 0;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    height: 100%;
+    min-height: 200px;
     background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
     border: 1px solid rgba(226,232,240,0.95);
     border-radius: 14px;
@@ -9545,25 +9603,15 @@ const STYLES = `
     min-width: 0;
     font: inherit;
     color: inherit;
-    overflow: visible;
   }
-  .def-cockpit-fast-health::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #6366f1, #22c55e, #a855f7);
-    opacity: 0;
-    transition: opacity 0.38s ease, height 0.32s var(--cockpit-ease);
-    z-index: 3;
+  .def-cockpit-fast-health .def-cockpit-metric-stripe {
+    display: none;
   }
   .def-cockpit-fast-head {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    padding-bottom: 6px;
+    gap: 10px;
+    padding-bottom: 10px;
     border-bottom: 1px solid rgba(226,232,240,0.92);
     overflow: visible;
     position: relative;
@@ -9583,8 +9631,8 @@ const STYLES = `
   }
   .def-cockpit-fast-chart {
     position: relative;
-    width: 96px;
-    height: 96px;
+    width: 108px;
+    height: 108px;
     flex-shrink: 0;
     transition: transform 0.42s var(--cockpit-ease-spring);
   }
@@ -9669,12 +9717,14 @@ const STYLES = `
   }
   .def-cockpit-fast-body {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 108px minmax(0, 1fr);
     align-items: center;
-    gap: 10px;
+    gap: 16px;
+    flex: 1;
     min-width: 0;
+    padding: 2px 0;
   }
-  .def-cockpit-fast-foot { margin-top: 0; }
+  .def-cockpit-fast-foot { margin-top: auto; }
   .def-cockpit-fast-donut-center {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; text-align: center;
@@ -9691,15 +9741,15 @@ const STYLES = `
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 5px;
   }
   .def-cockpit-fast-legend li {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 5px;
-    padding: 3px 6px;
-    border-radius: 6px;
+    gap: 6px;
+    padding: 5px 7px;
+    border-radius: 7px;
     background: rgba(248,250,252,0.95);
     border: 1px solid rgba(226,232,240,0.85);
     font-size: 0.62rem;
@@ -9722,7 +9772,7 @@ const STYLES = `
   }
   .def-cockpit-fast-foot {
     display: flex; justify-content: space-between; align-items: center; gap: 4px;
-    padding-top: 6px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
+    padding-top: 10px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
   }
   .def-cockpit-fast-team { color: var(--def-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .def-cockpit-fast-team strong {
