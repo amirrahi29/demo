@@ -1,5 +1,15 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import XYZ from './XYZ';
+import GHI from './GHI';
+
+/**
+ * DEF.js — Command Center Cockpit (main app).
+ * Embedded initiative dashboards live in separate self-contained files:
+ *   - XYZ.js → Risk and Resiliency
+ *   - GHI.js → Cloud Migration
+ * Import and wire new embedded views here via EMBEDDED_INITIATIVE_VIEWS.
+ */
 import {
   Area,
   AreaChart,
@@ -17,6 +27,17 @@ import {
 
 const APP_LOCALE = 'en-US';
 const EMPTY_VALUE = 'N/A';
+const PRODUCT_RESILIENCY_INITIATIVE_ID = 'risk-and-resiliency';
+const CLOUD_MIGRATION_INITIATIVE_ID = 'cloud-migration';
+
+const EMBEDDED_INITIATIVE_VIEWS = {
+  [PRODUCT_RESILIENCY_INITIATIVE_ID]: XYZ,
+  [CLOUD_MIGRATION_INITIATIVE_ID]: GHI,
+};
+
+function getEmbeddedInitiativeView(initiativeId) {
+  return EMBEDDED_INITIATIVE_VIEWS[initiativeId] ?? null;
+}
 
 function formatAppDate(iso) {
   if (!iso) return EMPTY_VALUE;
@@ -5515,6 +5536,22 @@ const STYLES = `
   }
 
   /* Initiative detail page */
+  .def-main:has(.def-initiative-embed) {
+    padding: 0;
+  }
+  .def-initiative-embed {
+    width: 100%;
+    min-width: 0;
+  }
+  .def-initiative-embed .pr-root,
+  .def-initiative-embed .ghi-root {
+    min-height: auto;
+  }
+  .def-initiative-embed .pr-shell,
+  .def-initiative-embed .ghi-shell {
+    min-height: auto;
+  }
+
   .def-initiative-page {
     display: flex;
     flex-direction: column;
@@ -11109,6 +11146,10 @@ const DEF = () => {
     [fastPillarDrawerId],
   );
   const initiative = useMemo(() => findInitiative(fastCategory, initiativeId), [fastCategory, initiativeId]);
+  const embeddedInitiativeView = useMemo(
+    () => getEmbeddedInitiativeView(initiativeId),
+    [initiativeId],
+  );
   const drawerProject = useMemo(
     () => findProject(initiative, drawerProjectId),
     [initiative, drawerProjectId],
@@ -11263,14 +11304,20 @@ const DEF = () => {
           )}
 
           {layer === 'initiative' && fastCategory && initiative && (
-            <InitiativeView
-              fastCategory={fastCategory}
-              initiative={initiative}
-              onGoCeo={() => navigateTo('ceo')}
-              onGoFast={() => navigateTo('fast')}
-              onGoTeam={() => goTeam(fastCategory.id, initiative.id)}
-              onSelectProject={(prjId) => openProjectDrawer(fastCategory.id, initiative.id, prjId)}
-            />
+            embeddedInitiativeView ? (
+              <div className="def-layer def-page-enter def-initiative-embed">
+                {React.createElement(embeddedInitiativeView)}
+              </div>
+            ) : (
+              <InitiativeView
+                fastCategory={fastCategory}
+                initiative={initiative}
+                onGoCeo={() => navigateTo('ceo')}
+                onGoFast={() => navigateTo('fast')}
+                onGoTeam={() => goTeam(fastCategory.id, initiative.id)}
+                onSelectProject={(prjId) => openProjectDrawer(fastCategory.id, initiative.id, prjId)}
+              />
+            )
           )}
 
           {layer === 'team' && fastCategory && initiative && initiative.team && (
@@ -11286,7 +11333,7 @@ const DEF = () => {
             />
           )}
             </main>
-            <AppFooter compact={layer === 'ceo'} />
+            {!(layer === 'initiative' && embeddedInitiativeView) && <AppFooter compact={layer === 'ceo'} />}
 
             {layer === 'team' && fastCategory && initiative && drawerProject && (
               <ProjectDetailDrawer
@@ -11315,4 +11362,6 @@ const DEF = () => {
 };
 
 export { useResponsiveChart };
+export { default as GHI } from './GHI';
+export { default as XYZ } from './XYZ';
 export default DEF;

@@ -3,12 +3,11 @@ import ReactDOM from 'react-dom/client';
 
 import DEF from './DEF';
 import Abc from './Abc';
-import XYZ from './XYZ';
 import App from './App';
 
 /**
  * Available apps / pages.
- * Add a new entry here when you create another top-level page.
+ * DEF embeds GHI + XYZ internally for initiative views — use ?page=def only.
  */
 export const PAGES = {
   def: {
@@ -21,11 +20,6 @@ export const PAGES = {
     label: 'ABC Dashboard',
     component: Abc,
   },
-  xyz: {
-    id: 'xyz',
-    label: 'Product Resiliency',
-    component: XYZ,
-  },
   aep: {
     id: 'aep',
     label: 'Adobe AEP + Tealium (router)',
@@ -35,9 +29,9 @@ export const PAGES = {
 
 /**
  * Default page when URL has no ?page= param.
- * Options: 'def' | 'abc' | 'xyz' | 'aep'
+ * Options: 'def' | 'abc' | 'aep'
  */
-export const DEFAULT_PAGE = 'xyz';
+export const DEFAULT_PAGE = 'def';
 
 function resolveActivePage() {
   const fromUrl = new URLSearchParams(window.location.search).get('page');

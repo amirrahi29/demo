@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 
 /** All dashboard data lives here — edit values directly in this file. */
+/** Self-contained Product Resiliency dashboard — consumed by DEF.js only. */
 const DASHBOARD_DATA = {
   header: {
     title: 'Product Resiliency: ADP Wide Metrics FYTD March 2026',
@@ -1784,4 +1785,3 @@ const XYZ = () => (
 );
 
 export default XYZ;
-export { DASHBOARD_DATA };
