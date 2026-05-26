@@ -1929,6 +1929,61 @@ const FAST_PILLAR_ICONS = {
   TRANSFORM: '↻',
 };
 
+const TOWER_LEAD_ICONS = {
+  ET: '🏢',
+  BV: '🚀',
+  PD: '⚙',
+  OT: '◫',
+};
+
+const TOWER_LEADS_DATA = [
+  {
+    id: 'enterprise-tech',
+    shortName: 'ET',
+    name: 'Enterprise Tech',
+    subtitle: 'Enterprise technology initiatives',
+    initiatives: 2,
+    onTrack: 2,
+    atRisk: 0,
+    offTrack: 0,
+  },
+  {
+    id: 'breakthrough-ventures',
+    shortName: 'BV',
+    name: 'Breakthrough Ventures',
+    subtitle: 'Ventures and breakthrough bets',
+    initiatives: 3,
+    onTrack: 1,
+    atRisk: 1,
+    offTrack: 1,
+  },
+  {
+    id: 'product-and-development',
+    shortName: 'PD',
+    name: 'Product and Development',
+    subtitle: 'Product and development programs',
+    initiatives: 13,
+    onTrack: 13,
+    atRisk: 0,
+    offTrack: 0,
+  },
+  {
+    id: 'others',
+    shortName: 'OT',
+    name: 'Others',
+    subtitle: 'Other portfolio initiatives',
+    initiatives: 8,
+    onTrack: 8,
+    atRisk: 0,
+    offTrack: 0,
+  },
+];
+
+function computeTowerLeadHealthScore(lead) {
+  const total = Math.max(lead.initiatives, 1);
+  return Math.round((lead.onTrack * 100 + lead.atRisk * 58 + lead.offTrack * 32) / total);
+}
+
 const COCKPIT_METRIC_ICONS = {
   'Strategic Imperatives': '🏛',
   Initiatives: '📊',
@@ -2361,6 +2416,79 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
         </ul>
       </div>
     </button>
+  );
+}
+
+function TowerLeadHealthCard({ lead, theme, index = 0 }) {
+  const vp = useViewport();
+  const healthScore = computeTowerLeadHealthScore(lead);
+  const total = Math.max(lead.initiatives, 1);
+
+  const data = [
+    { name: 'On Track', value: lead.onTrack || 0, fill: '#22c55e' },
+    { name: 'At Risk', value: lead.atRisk, fill: '#f59e0b' },
+    { name: 'Off Track', value: lead.offTrack, fill: '#ef4444' },
+  ].filter((d) => d.value > 0);
+
+  const isDark = theme === 'dark';
+
+  return (
+    <article
+      className="def-cockpit-fast-health def-cockpit-tower-lead-card def-cockpit-interactive def-stagger-in"
+      style={{ '--stagger': `${120 + index * 70}ms` }}
+      aria-label={`${lead.name} tower lead summary`}
+    >
+      <div className="def-cockpit-fast-head">
+        <span className="def-cockpit-fast-icon">{TOWER_LEAD_ICONS[lead.shortName] || '●'}</span>
+        <div className="def-cockpit-fast-titles">
+          <div className="def-cockpit-fast-title-row">
+            <p className="def-cockpit-fast-kicker">{lead.shortName}</p>
+            <OverlayTooltip tip={getPillarHealthTooltip()} className="def-cockpit-fast-health-score-wrap">
+              <span
+                className="def-cockpit-fast-health-score"
+                style={{ color: healthColor(healthScore) }}
+              >
+                {healthScore}%
+              </span>
+            </OverlayTooltip>
+          </div>
+          <h3>{lead.name}</h3>
+        </div>
+      </div>
+      <div className="def-cockpit-fast-body">
+        <div className="def-cockpit-fast-chart">
+          <ResponsiveContainer width="100%" height={vp.fastChartH}>
+            <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <Pie
+                data={data.length ? data : [{ name: 'Empty', value: 1, fill: isDark ? '#334155' : '#e2e8f0' }]}
+                dataKey="value"
+                cx="50%"
+                cy="50%"
+                innerRadius="58%"
+                outerRadius="88%"
+                paddingAngle={3}
+                stroke="none"
+                isAnimationActive
+                animationDuration={800}
+              >
+                {(data.length ? data : [{ fill: isDark ? '#334155' : '#e2e8f0' }]).map((e) => (
+                  <Cell key={e.name || 'empty'} fill={e.fill} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="def-cockpit-fast-donut-center">
+            <strong>{total}</strong>
+            <span>Initiatives</span>
+          </div>
+        </div>
+        <ul className="def-cockpit-fast-legend">
+          <li><i style={{ background: '#22c55e' }} aria-hidden="true" /><span>On track</span><strong>{lead.onTrack}</strong></li>
+          <li><i style={{ background: '#f59e0b' }} aria-hidden="true" /><span>At risk</span><strong>{lead.atRisk}</strong></li>
+          <li><i style={{ background: '#ef4444' }} aria-hidden="true" /><span>Off track</span><strong>{lead.offTrack}</strong></li>
+        </ul>
+      </div>
+    </article>
   );
 }
 
@@ -2865,11 +2993,11 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
 
       <section className="def-cockpit-block def-cockpit-block-secondary def-cockpit-interactive def-stagger-in" style={{ '--stagger': '120ms' }}>
         <div className="def-cockpit-block-head">
-          <h2 className="def-cockpit-section-title">FAST pillars health</h2>
+          <h2 className="def-cockpit-section-title">Tower leads view</h2>
         </div>
         <div className="def-cockpit-fast-grid">
-          {ORG_DATA.fastCategories.map((f, i) => (
-            <FastHealthCard key={`${f.id}-secondary`} fast={f} theme={theme} onSelectFast={onOpenFastPillar} index={i} />
+          {TOWER_LEADS_DATA.map((lead, i) => (
+            <TowerLeadHealthCard key={lead.id} lead={lead} theme={theme} index={i} />
           ))}
         </div>
       </section>
