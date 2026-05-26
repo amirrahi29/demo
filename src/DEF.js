@@ -306,40 +306,8 @@ function countProjectsByProgressBand(projects) {
   return counts;
 }
 
-function summarizeFastStatusCounts(fast) {
-  const projects = fast.initiatives.flatMap((ini) => ini.projects);
-  return countProjectsByProgressBand(projects);
-}
-
-function SidebarFastStatusRow({ fast }) {
-  const counts = summarizeFastStatusCounts(fast);
-  const metrics = [
-    { id: 'ok', label: 'On Track', short: 'Track', count: counts.onTrack, tone: 'ok' },
-    { id: 'risk', label: 'At Risk', short: 'Risk', count: counts.atRisk, tone: 'risk' },
-    { id: 'late', label: 'Off Track', short: 'Off', count: counts.offTrack, tone: 'late' },
-  ];
-
-  return (
-    <div className="def-sidebar-metric-strip" aria-label="Initiative status mix">
-      {metrics.map((metric) => (
-        <div
-          key={metric.id}
-          className={`def-sidebar-metric def-sidebar-metric-${metric.tone}`}
-          aria-label={`${metric.label}: ${metric.count}`}
-        >
-          <strong className="def-sidebar-metric-value">{metric.count}</strong>
-          <span className="def-sidebar-metric-label-row">
-            <span className="def-sidebar-metric-dot" aria-hidden="true" />
-            <span className="def-sidebar-metric-label">{metric.short}</span>
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SidebarInitiativeStatus({ initiative }) {
-  const progress = initiative.projects[0]?.progress ?? 0;
+function SidebarInitiativeStatus() {
+  const progress = 0;
   const band = classifyProgressBand(progress);
   const theme = getProgressBandTheme(band);
   return (
@@ -1158,13 +1126,17 @@ function computePortfolioSummary(fastCategories) {
 }
 
 function computeExecutiveMetrics(fastCategories) {
-  const rows = buildInitiativeTrackerRows(fastCategories);
   const summary = computePortfolioSummary(fastCategories);
+  const initiatives = fastCategories.flatMap((fast) => fast.initiatives);
+  const subInitiatives = initiatives.reduce(
+    (sum, ini) => sum + buildInitiativeScorecard(ini).kpis.length,
+    0,
+  );
 
   return {
-    strategicImperatives: new Set(rows.map((row) => row.initiative)).size,
-    initiatives: summary.totalInitiatives,
-    subInitiatives: rows.length,
+    strategicImperatives: fastCategories.length,
+    initiatives: initiatives.length,
+    subInitiatives,
     onTrackPct: summary.onTrackPct,
     onTrackCount: summary.onTrackProjects,
     atRiskPct: summary.atRiskPct,
@@ -1428,115 +1400,56 @@ function TopRisksList({ rows, compact = false }) {
   );
 }
 
-function TopRisksModalTable({ rows }) {
-  return (
-    <ModalProTableShell>
-      <table className="def-modal-pro-table def-modal-pro-table-risks">
-        <thead>
-          <tr>
-            <th>Risk Area</th>
-            <th>Risk Score</th>
-            <th>Initiatives at Risk</th>
-            <th>Status</th>
+function TopRisksTable({ rows, embedded = false }) {
+  const table = (
+    <table className={`def-modal-pro-table def-modal-pro-table-risks${embedded ? ' def-top-risks-page-table' : ''}`}>
+      <thead>
+        <tr>
+          <th>Risk Area</th>
+          <th>Risk Score</th>
+          <th>Initiatives at Risk</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id}>
+            <td data-label="Risk area"><strong>{row.title}</strong></td>
+            <td data-label="Risk score">
+              <span className={`def-modal-risk-score tone-${row.tone}`}>{row.score}</span>
+            </td>
+            <td data-label="Initiatives at risk">
+              <span className="def-modal-count-chip">{row.atRiskCount}</span>
+            </td>
+            <td data-label="Status">
+              <StatusPill status={row.status} />
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td data-label="Risk area"><strong>{row.title}</strong></td>
-              <td data-label="Risk score">
-                <span className={`def-modal-risk-score tone-${row.tone}`}>{row.score}</span>
-              </td>
-              <td data-label="Initiatives at risk">
-                <span className="def-modal-count-chip">{row.atRiskCount}</span>
-              </td>
-              <td data-label="Status">
-                <StatusPill status={row.status} />
-              </td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr><td colSpan={4} className="def-cockpit-empty">No elevated risks in the active portfolio.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </ModalProTableShell>
+        ))}
+        {rows.length === 0 && (
+          <tr><td colSpan={4} className="def-cockpit-empty">No elevated risks in the active portfolio.</td></tr>
+        )}
+      </tbody>
+    </table>
   );
+
+  if (embedded) {
+    return (
+      <div className="def-table-wrap def-table-pro def-table-scroll-wrap def-table-embedded">
+        {table}
+      </div>
+    );
+  }
+
+  return <ModalProTableShell>{table}</ModalProTableShell>;
 }
 
-function TopRisksModal({ open, onClose, rows }) {
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const highCount = rows.filter((row) => row.tone === 'high').length;
-  const totalAtRisk = rows.reduce((sum, row) => sum + row.atRiskCount, 0);
-  const avgScore = rows.length
-    ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length)
-    : 0;
-
+function TopRisksPanel({ rows, onViewAll }) {
   return (
-    <ModalPortal>
-      <div className="def-modal-root open" role="presentation">
-        <button type="button" className="def-modal-backdrop" aria-label="Close top risks" onClick={onClose} />
-        <div className="def-modal def-modal-pillar" role="dialog" aria-modal="true" aria-labelledby="def-top-risks-modal-title">
-          <header className="def-drawer-head def-drawer-head-pillar">
-            <div className="def-drawer-head-row">
-              <span className="def-drawer-tier">Portfolio insights</span>
-              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <h2 id="def-top-risks-modal-title">Top Risks</h2>
-            <p className="def-drawer-pillar-desc">Executive view of the highest-risk delivery areas in the portfolio</p>
-            <div className="def-drawer-pillar-stats">
-              <StatusPill status={highCount > 0 ? 'at-risk' : 'on-track'} />
-              <span
-                className="def-drawer-pillar-score"
-                style={{ color: healthColor(Math.max(0, 100 - avgScore * 3)) }}
-              >
-                {avgScore} avg score
-              </span>
-              <span className="def-drawer-pillar-meta">
-                {rows.length} risk areas
-                {' | '}
-                {totalAtRisk} initiatives at risk
-              </span>
-            </div>
-          </header>
-          <div className="def-drawer-body def-drawer-body-pillar">
-            <div className="def-drawer-section-bar">
-              <h3>Risk scorecard</h3>
-              <span>{rows.length} areas</span>
-            </div>
-            <div className="def-drawer-pillar-table">
-              <TopRisksModalTable rows={rows} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </ModalPortal>
-  );
-}
-
-function TopRisksPanel({ rows }) {
-  const [modalOpen, setModalOpen] = useState(false);
-
-  return (
-    <>
-      <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
-        <CockpitPanelHeader title="Top Risks" onViewAll={() => setModalOpen(true)} />
-        <TopRisksList rows={rows} compact />
-      </div>
-      <TopRisksModal open={modalOpen} onClose={() => setModalOpen(false)} rows={rows} />
-    </>
+    <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive def-cockpit-top-risks-panel">
+      <CockpitPanelHeader title="Top Risks" onViewAll={onViewAll} />
+      <TopRisksList rows={rows} compact />
+    </div>
   );
 }
 
@@ -1759,7 +1672,7 @@ function AppSidebar({
         <p className="def-sidebar-label">Executive</p>
         <button
           type="button"
-          className={`def-sidebar-link def-sidebar-link-ceo${layer === 'ceo' ? ' active' : ''}`}
+          className={`def-sidebar-link def-sidebar-link-ceo${layer === 'ceo' || layer === 'top-risks' ? ' active' : ''}`}
           onClick={goCeo}
         >
           <span className="def-sidebar-tier def-sidebar-tier-ceo">CC</span>
@@ -1823,7 +1736,6 @@ function AppSidebar({
                     </button>
                   </div>
                 </div>
-                <SidebarFastStatusRow fast={fast} />
               </div>
               {isExpanded && (
                 <div className="def-sidebar-nested">
@@ -1850,7 +1762,7 @@ function AppSidebar({
                         >
                           {ownerLabel} | {teamLabel}
                         </span>
-                        <SidebarInitiativeStatus initiative={ini} />
+                        <SidebarInitiativeStatus />
                       </button>
                     );
                   })}
@@ -2372,7 +2284,6 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
   const projects = fast.initiatives.flatMap((ini) => ini.projects);
   const { onTrack: onCount, atRisk: atCount, offTrack: lateCount } = countProjectsByProgressBand(projects);
   const total = Math.max(projects.length, 1);
-  const leadTeam = fast.initiatives[0]?.team?.name ?? 'Delivery team';
 
   const data = [
     { name: 'On Track', value: onCount || 0, fill: '#22c55e' },
@@ -2440,9 +2351,6 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
           <li><i style={{ background: '#ef4444' }} aria-hidden="true" /><span>Off track</span><strong>{lateCount}</strong></li>
         </ul>
       </div>
-      <div className="def-cockpit-fast-foot">
-        <span className="def-cockpit-fast-team">Team | <strong>{leadTeam}</strong></span>
-      </div>
     </button>
   );
 }
@@ -2450,12 +2358,6 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
 const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 8;
 const COCKPIT_MILESTONES_PREVIEW_LIMIT = 9;
 const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 2;
-
-function ModalPortal({ children }) {
-  if (typeof document === 'undefined') return null;
-  const host = document.getElementById('def-modal-host') || document.body;
-  return createPortal(children, host);
-}
 
 function ModalProTableShell({ children, className = '' }) {
   return (
@@ -2465,6 +2367,76 @@ function ModalProTableShell({ children, className = '' }) {
       </div>
     </div>
   );
+}
+
+function CockpitInsightsDrawer({
+  open,
+  onClose,
+  titleId,
+  closeLabel,
+  title,
+  description,
+  stats,
+  sectionTitle,
+  sectionCount,
+  children,
+}) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const drawer = (
+    <div className="def-drawer-root def-drawer-root-global open" role="presentation">
+      <button type="button" className="def-drawer-backdrop" aria-label={closeLabel} onClick={onClose} />
+      <aside
+        className="def-drawer def-drawer-pillar def-drawer-pro def-cockpit-insights-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <header className="def-drawer-head def-drawer-head-pillar">
+          <div className="def-drawer-head-row">
+            <span className="def-drawer-tier">Portfolio insights</span>
+            <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
+          <h2 id={titleId}>{title}</h2>
+          {description ? <p className="def-drawer-pillar-desc">{description}</p> : null}
+          {stats ? <div className="def-drawer-pillar-stats">{stats}</div> : null}
+        </header>
+        <div className="def-drawer-body def-drawer-body-pillar">
+          <div className="def-drawer-section-bar">
+            <h3>{sectionTitle}</h3>
+            <span>{sectionCount}</span>
+          </div>
+          <div className="def-drawer-pillar-table">
+            {children}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+
+  if (typeof document === 'undefined') return null;
+  const host = document.getElementById('def-drawer-portal-host') || document.body;
+  return createPortal(drawer, host);
 }
 
 function ModalBandCell({ count, pct, band }) {
@@ -2550,7 +2522,7 @@ function OwnershipOverviewTableBody({ rows, modal = false }) {
   return table;
 }
 
-function OwnershipOverviewModal({ open, onClose, rows }) {
+function OwnershipOverviewDrawer({ open, onClose, rows }) {
   const totalOwners = rows.length;
   const totalInitiatives = rows.reduce((sum, row) => sum + row.total, 0);
   const avgHealth = Math.round(
@@ -2558,81 +2530,53 @@ function OwnershipOverviewModal({ open, onClose, rows }) {
   );
   const portfolioStatus = statusFromHealthScore(avgHealth);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <ModalPortal>
-      <div className="def-modal-root open" role="presentation">
-        <button type="button" className="def-modal-backdrop" aria-label="Close ownership overview" onClick={onClose} />
-        <div
-          className="def-modal def-modal-pillar"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="def-ownership-modal-title"
-        >
-          <header className="def-drawer-head def-drawer-head-pillar">
-            <div className="def-drawer-head-row">
-              <span className="def-drawer-tier">Portfolio insights</span>
-              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <h2 id="def-ownership-modal-title">Ownership Overview</h2>
-            <p className="def-drawer-pillar-desc">Initiative ownership across FAST pillars</p>
-            <div className="def-drawer-pillar-stats">
-              <StatusPill status={portfolioStatus} />
-              <span
-                className="def-drawer-pillar-score"
-                style={{ color: healthColor(avgHealth) }}
-              >
-                {avgHealth}% health
-              </span>
-              <span className="def-drawer-pillar-meta">
-                {totalOwners} owners
-                {' | '}
-                {totalInitiatives} initiatives
-              </span>
-            </div>
-          </header>
-          <div className="def-drawer-body def-drawer-body-pillar">
-            <div className="def-drawer-section-bar">
-              <h3>Owner breakdown</h3>
-              <span>{totalOwners} owners</span>
-            </div>
-            <div className="def-drawer-pillar-table">
-              <OwnershipOverviewTableBody rows={rows} modal />
-            </div>
-          </div>
-        </div>
-      </div>
-    </ModalPortal>
+    <CockpitInsightsDrawer
+      open={open}
+      onClose={onClose}
+      titleId="def-ownership-drawer-title"
+      closeLabel="Close ownership overview"
+      title="Ownership Overview"
+      description="Initiative ownership across FAST pillars"
+      sectionTitle="Owner breakdown"
+      sectionCount={`${totalOwners} owners`}
+      stats={(
+        <>
+          <StatusPill status={portfolioStatus} />
+          <span
+            className="def-drawer-pillar-score"
+            style={{ color: healthColor(avgHealth) }}
+          >
+            {avgHealth}% health
+          </span>
+          <span className="def-drawer-pillar-meta">
+            {totalOwners} owners
+            {' | '}
+            {totalInitiatives} initiatives
+          </span>
+        </>
+      )}
+    >
+      <OwnershipOverviewTableBody rows={rows} modal />
+    </CockpitInsightsDrawer>
   );
 }
 
 function OwnershipOverviewTable({ rows }) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const previewRows = rows.slice(0, COCKPIT_OWNERSHIP_PREVIEW_LIMIT);
 
   return (
     <>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '160ms' }}>
-        <CockpitPanelHeader title="Ownership Overview" onViewAll={() => setModalOpen(true)} />
+        <CockpitPanelHeader title="Ownership Overview" onViewAll={() => setDrawerOpen(true)} />
         <div className="def-cockpit-table-scroll wide def-cockpit-panel-body def-cockpit-table-preview">
           <OwnershipOverviewTableBody rows={previewRows} />
         </div>
       </div>
-      <OwnershipOverviewModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
+      <OwnershipOverviewDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         rows={rows}
       />
     </>
@@ -2695,7 +2639,7 @@ function UpcomingMilestonesTableBody({ rows, onOpenInitiative, modal = false }) 
   return table;
 }
 
-function MilestonesOverviewModal({ open, onClose, rows, onOpenInitiative }) {
+function MilestonesOverviewDrawer({ open, onClose, rows, onOpenInitiative }) {
   const total = rows.length;
   const avgDays = total
     ? Math.round(rows.reduce((sum, row) => sum + row.daysLeft, 0) / total)
@@ -2703,87 +2647,59 @@ function MilestonesOverviewModal({ open, onClose, rows, onOpenInitiative }) {
   const onTrackCount = rows.filter((row) => row.status === 'on-track').length;
   const portfolioStatus = onTrackCount >= total * 0.7 ? 'on-track' : onTrackCount >= total * 0.4 ? 'at-risk' : 'off-track';
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   const handleOpenInitiative = (fastId, initiativeId) => {
     onClose();
     onOpenInitiative?.(fastId, initiativeId);
   };
 
   return (
-    <ModalPortal>
-      <div className="def-modal-root open" role="presentation">
-        <button type="button" className="def-modal-backdrop" aria-label="Close milestones" onClick={onClose} />
-        <div
-          className="def-modal def-modal-pillar"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="def-milestones-modal-title"
-        >
-          <header className="def-drawer-head def-drawer-head-pillar">
-            <div className="def-drawer-head-row">
-              <span className="def-drawer-tier">Portfolio insights</span>
-              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <h2 id="def-milestones-modal-title">No. of Days</h2>
-            <p className="def-drawer-pillar-desc">Upcoming milestones and days remaining across the portfolio</p>
-            <div className="def-drawer-pillar-stats">
-              <StatusPill status={portfolioStatus} />
-              <span className="def-drawer-pillar-score def-drawer-pillar-days">
-                {avgDays} days avg
-              </span>
-              <span className="def-drawer-pillar-meta">
-                {total} milestones
-                {' | '}
-                {onTrackCount} on track
-              </span>
-            </div>
-          </header>
-          <div className="def-drawer-body def-drawer-body-pillar">
-            <div className="def-drawer-section-bar">
-              <h3>Milestone timeline</h3>
-              <span>{total} milestones</span>
-            </div>
-            <div className="def-drawer-pillar-table">
-              <UpcomingMilestonesTableBody
-                rows={rows}
-                modal
-                onOpenInitiative={handleOpenInitiative}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </ModalPortal>
+    <CockpitInsightsDrawer
+      open={open}
+      onClose={onClose}
+      titleId="def-milestones-drawer-title"
+      closeLabel="Close milestones"
+      title="Upcoming Milestone"
+      description="Upcoming milestones and days remaining across the portfolio"
+      sectionTitle="Milestone timeline"
+      sectionCount={`${total} milestones`}
+      stats={(
+        <>
+          <StatusPill status={portfolioStatus} />
+          <span className="def-drawer-pillar-score def-drawer-pillar-days">
+            {avgDays} days avg
+          </span>
+          <span className="def-drawer-pillar-meta">
+            {total} milestones
+            {' | '}
+            {onTrackCount} on track
+          </span>
+        </>
+      )}
+    >
+      <UpcomingMilestonesTableBody
+        rows={rows}
+        modal
+        onOpenInitiative={handleOpenInitiative}
+      />
+    </CockpitInsightsDrawer>
   );
 }
 
 function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const previewRows = rows.slice(0, COCKPIT_MILESTONES_PREVIEW_LIMIT);
 
   return (
     <>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-interactive def-stagger-in" style={{ '--stagger': '200ms' }}>
-        <CockpitPanelHeader title="No. of Days" onViewAll={() => setModalOpen(true)} />
+        <CockpitPanelHeader title="Upcoming Milestone" onViewAll={() => setDrawerOpen(true)} />
         <div className="def-cockpit-table-scroll wide def-cockpit-panel-body def-cockpit-table-preview">
           <UpcomingMilestonesTableBody rows={previewRows} onOpenInitiative={onOpenInitiative} />
         </div>
       </div>
-      <MilestonesOverviewModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
+      <MilestonesOverviewDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         rows={rows}
         onOpenInitiative={onOpenInitiative}
       />
@@ -2791,7 +2707,7 @@ function UpcomingMilestonesTable({ rows, onOpenInitiative }) {
   );
 }
 
-function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
+function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks, onViewTopRisks }) {
   return (
     <div className="def-cockpit-bottom-rail def-stagger-in" style={{ '--stagger': '240ms' }}>
       <div className="def-cockpit-table-card def-cockpit-panel def-cockpit-bottom-card def-cockpit-rail-card def-cockpit-interactive">
@@ -2822,7 +2738,7 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
           ))}
         </ul>
       </div>
-      <TopRisksPanel rows={topRisks} />
+      <TopRisksPanel rows={topRisks} onViewAll={onViewTopRisks} />
     </div>
   );
 }
@@ -2831,17 +2747,16 @@ function CockpitQuarterHighlights({ lastQuarter, highlights, topRisks }) {
    LAYER VIEWS
 ───────────────────────────────────────────────────────────── */
 
-function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
+function CeoView({ theme, onOpenFastPillar, onOpenInitiative, onViewTopRisks }) {
   const vp = useViewport();
-  const [portfolioScope, setPortfolioScope] = useState('all');
   const analytics = useMemo(
-    () => buildCockpitAnalytics(ORG_DATA, portfolioScope === 'all' ? null : portfolioScope),
-    [portfolioScope],
+    () => buildCockpitAnalytics(ORG_DATA, null),
+    [],
   );
   const { organization } = ORG_DATA;
-  const filterOptions = useMemo(
-    () => [{ id: 'all', label: 'All FAST pillars' }, ...ORG_DATA.fastCategories.map((f) => ({ id: f.id, label: f.shortName }))],
-    [],
+  const lastUpdatedLabel = useMemo(
+    () => formatAppDateTime(organization.lastUpdated),
+    [organization.lastUpdated],
   );
 
   return (
@@ -2862,14 +2777,10 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
             <h1 className="def-cockpit-title">Command Center Cockpit</h1>
           </div>
           <div className="def-cockpit-top-toolbar">
-            <label className="def-cockpit-filter">
-              <span>Scope</span>
-              <select value={portfolioScope} onChange={(e) => setPortfolioScope(e.target.value)}>
-                {filterOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-              </select>
-            </label>
+            <div className="def-cockpit-last-updated">
+              <span className="def-cockpit-last-updated-label">Last Updated</span>
+              <time dateTime={organization.lastUpdated}>{lastUpdatedLabel}</time>
+            </div>
             <div className="def-cockpit-top-meta">
               <div className="def-cockpit-user-popover-host">
                 <button
@@ -2957,6 +2868,7 @@ function CeoView({ theme, onOpenFastPillar, onOpenInitiative }) {
             lastQuarter={analytics.lastQuarterSummary}
             highlights={analytics.keyHighlights}
             topRisks={analytics.topRisks}
+            onViewTopRisks={onViewTopRisks}
           />
         </div>
       </section>
@@ -2988,86 +2900,73 @@ function buildFastScorecardRows(fastCategory) {
   });
 }
 
-function FastPillarModal({ fastCategory, open, onClose, onSelectInitiative }) {
-  const scorecardRows = useMemo(
-    () => (fastCategory ? buildFastScorecardRows(fastCategory) : []),
-    [fastCategory],
-  );
-  const imperative = fastCategory
-    ? (IMPERATIVE_LABELS[fastCategory.shortName] || fastCategory.shortName)
-    : '';
-  const pillarStatus = fastCategory ? statusFromHealthScore(fastCategory.healthScore) : null;
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open || !fastCategory) return null;
-
-  const handleInitiativeClick = (row) => {
-    onClose();
-    onSelectInitiative(fastCategory.id, row.initiativeId);
-  };
+function TopRisksView({ rows, onGoCeo, onBack }) {
+  const highCount = rows.filter((row) => row.tone === 'high').length;
+  const totalAtRisk = rows.reduce((sum, row) => sum + row.atRiskCount, 0);
+  const avgScore = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length)
+    : 0;
+  const portfolioStatus = highCount > 0 ? 'at-risk' : 'on-track';
 
   return (
-    <ModalPortal>
-      <div className="def-modal-root open" role="presentation">
-        <button type="button" className="def-modal-backdrop" aria-label="Close pillar initiatives" onClick={onClose} />
-        <div
-          className="def-modal def-modal-pillar"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="def-pillar-modal-title"
-        >
-          <header className="def-drawer-head def-drawer-head-pillar">
-            <div className="def-drawer-head-row">
-              <span className="def-drawer-tier">{imperative}</span>
-              <button type="button" className="def-drawer-close" onClick={onClose} aria-label="Close">
-                ×
-              </button>
+    <div className="def-layer def-page-enter def-initiative-page def-pillar-page def-top-risks-page">
+      <HierarchyTrail
+        items={[
+          { key: 'sec', tier: 'Strategic Execution', label: 'Cockpit', onClick: onGoCeo },
+          { key: 'risks', tier: 'Portfolio insights', label: 'Top Risks' },
+        ]}
+      />
+
+      <article className="def-pillar-shell">
+        <header className="def-pillar-hero def-top-risks-hero">
+          <div className="def-pillar-hero-main">
+            <div className="def-pillar-hero-meta">
+              <span className="def-initiative-pillar">Portfolio insights</span>
+              <StatusPill status={portfolioStatus} />
             </div>
-            <h2 id="def-pillar-modal-title">{fastCategory.shortName} pillar</h2>
-            <p className="def-drawer-pillar-desc">{fastCategory.name}</p>
-            <div className="def-drawer-pillar-stats">
-              <StatusPill status={pillarStatus} />
-              <span
-                className="def-drawer-pillar-score"
-                style={{ color: healthColor(fastCategory.healthScore) }}
-              >
-                {fastCategory.healthScore}% health
-              </span>
-              <span className="def-drawer-pillar-meta">
-                {fastCategory.summary.initiatives} initiatives
-                {' | '}
-                {fastCategory.summary.activeProjects} projects
-                {' | '}
-                {fastCategory.summary.teams} teams
-              </span>
-            </div>
-          </header>
-          <div className="def-drawer-body def-drawer-body-pillar">
-            <div className="def-drawer-section-bar">
-              <h3>Initiative KPIs</h3>
-              <span>{scorecardRows.length} initiatives</span>
-            </div>
-            <div className="def-drawer-pillar-table">
-              <InitiativeKpiTable
-                rows={scorecardRows}
-                onRowClick={handleInitiativeClick}
-                emptyMessage="No initiatives in this pillar."
-                showOwnership
-                modal
-              />
+            <h1 className="def-pillar-title">Top Risks</h1>
+            <p className="def-pillar-subtitle">
+              Executive view of the highest-risk delivery areas in the portfolio
+            </p>
+            <ul className="def-pillar-stats" aria-label="Risk summary">
+              <li><strong>{rows.length}</strong> risk areas</li>
+              <li><strong>{totalAtRisk}</strong> initiatives at risk</li>
+              <li className="def-pillar-health" style={{ color: healthColor(Math.max(0, 100 - avgScore * 3)) }}>
+                <strong>{avgScore}</strong> avg score
+              </li>
+            </ul>
+          </div>
+        </header>
+
+        <section className="def-pillar-body" aria-labelledby="def-top-risks-table-title">
+          <div className="def-pillar-section-head">
+            <div>
+              <h2 id="def-top-risks-table-title" className="def-pillar-section-title">Risk scorecard</h2>
+              <p className="def-pillar-section-desc">
+                {rows.length} delivery areas ranked by risk score across FAST pillars
+              </p>
             </div>
           </div>
-        </div>
-      </div>
-    </ModalPortal>
+          <TopRisksTable rows={rows} embedded />
+        </section>
+
+        <section className="def-pillar-body def-top-risks-preview" aria-labelledby="def-top-risks-preview-title">
+          <div className="def-pillar-section-head">
+            <div>
+              <h2 id="def-top-risks-preview-title" className="def-pillar-section-title">Risk overview</h2>
+              <p className="def-pillar-section-desc">Highest-risk areas with live risk scores</p>
+            </div>
+          </div>
+          <TopRisksList rows={rows} />
+        </section>
+
+        <footer className="def-pillar-footer">
+          <button type="button" className="def-back-link" onClick={onBack}>
+            Back to Command Center Cockpit
+          </button>
+        </footer>
+      </article>
+    </div>
   );
 }
 
@@ -4543,67 +4442,6 @@ const STYLES = `
   .def-sidebar-pillar-expand.open {
     transform: rotate(0deg);
   }
-  .def-sidebar-metric-strip {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-top: 1px solid var(--def-sidebar-border);
-    background: linear-gradient(180deg, rgba(248,250,252,0.95), rgba(241,245,249,0.88));
-  }
-  .def-sidebar-metric {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-height: 0;
-    padding: 9px 6px;
-    text-align: center;
-  }
-  .def-sidebar-metric:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    top: 18%;
-    right: 0;
-    width: 1px;
-    height: 64%;
-    background: rgba(148,163,184,0.42);
-  }
-  .def-sidebar-metric-label-row {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    max-width: 100%;
-  }
-  .def-sidebar-metric-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .def-sidebar-metric-ok .def-sidebar-metric-dot { background: #22c55e; }
-  .def-sidebar-metric-risk .def-sidebar-metric-dot { background: #f59e0b; }
-  .def-sidebar-metric-late .def-sidebar-metric-dot { background: #ef4444; }
-  .def-sidebar-metric-ok .def-sidebar-metric-value { color: #059669; }
-  .def-sidebar-metric-risk .def-sidebar-metric-value { color: #d97706; }
-  .def-sidebar-metric-late .def-sidebar-metric-value { color: #dc2626; }
-  .def-sidebar-metric-value {
-    font-size: 0.875rem;
-    font-weight: var(--font-extrabold);
-    line-height: 1;
-    color: var(--def-sidebar-text);
-    font-variant-numeric: tabular-nums;
-  }
-  .def-sidebar-metric-label {
-    font-size: 0.625rem;
-    font-weight: var(--font-bold);
-    color: var(--def-sidebar-muted);
-    letter-spacing: 0.02em;
-    line-height: 1;
-    white-space: nowrap;
-    text-transform: uppercase;
-  }
   .def-app.def-theme-dark .def-sidebar-pillar-card {
     background: rgba(255,255,255,0.04);
     border-color: rgba(255,255,255,0.08);
@@ -4618,12 +4456,6 @@ const STYLES = `
   }
   .def-app.def-theme-dark .def-sidebar-pillar-expand {
     background: rgba(255,255,255,0.06);
-  }
-  .def-app.def-theme-dark .def-sidebar-metric-strip {
-    background: rgba(255,255,255,0.03);
-  }
-  .def-app.def-theme-dark .def-sidebar-metric:not(:last-child)::after {
-    background: rgba(255,255,255,0.08);
   }
   .def-sidebar-link {
     display: grid;
@@ -4917,7 +4749,6 @@ const STYLES = `
       row-gap: 4px;
     }
     .def-sidebar-ini-name { font-size: 0.75rem; }
-    .def-sidebar-metric-label { font-size: 0.58rem; }
     .def-sidebar-link {
       min-height: 48px;
       padding: 10px 11px;
@@ -4928,10 +4759,6 @@ const STYLES = `
       column-gap: 8px;
       padding: 10px;
     }
-    .def-sidebar-metric {
-      padding: 8px 4px;
-    }
-    .def-sidebar-metric-value { font-size: 0.8125rem; }
   }
 
   @media (max-width: 1024px) {
@@ -5688,6 +5515,16 @@ const STYLES = `
     font-weight: 800;
   }
   .def-pillar-health strong { font-weight: 800; }
+  .def-top-risks-page .def-top-risks-hero::before {
+    background: linear-gradient(180deg, #ef4444, #f59e0b);
+  }
+  .def-top-risks-preview {
+    border-top: 1px solid var(--def-border);
+    padding-top: var(--space-4);
+  }
+  .def-top-risks-preview .def-cockpit-top-risk-list {
+    margin: 0;
+  }
   .def-pillar-body {
     padding: var(--space-3) var(--space-4) var(--space-4);
     min-width: 0;
@@ -7025,11 +6862,34 @@ const STYLES = `
   .def-project-row-active { background: rgba(99,102,241,0.06); }
   .def-inline-progress-wide { min-width: 120px; }
 
+  .def-drawer-portal-host {
+    position: fixed;
+    inset: var(--def-topbar-h) 0 0 0;
+    z-index: 300;
+    pointer-events: none;
+  }
+  .def-drawer-portal-host:has(.def-drawer-root.open) {
+    pointer-events: auto;
+  }
+
   .def-drawer-root {
     position: fixed;
     inset: var(--def-topbar-h) 0 0 0;
     z-index: 200;
     pointer-events: none;
+  }
+  .def-drawer-root-global {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    min-height: 100%;
+  }
+  .def-drawer-root-global .def-drawer-backdrop {
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(8px);
+  }
+  .def-app.def-theme-dark .def-drawer-root-global .def-drawer-backdrop {
+    background: rgba(0, 0, 0, 0.72);
   }
   .def-drawer-root.open { pointer-events: auto; }
   .def-drawer-backdrop {
@@ -7189,6 +7049,45 @@ const STYLES = `
   .def-drawer-pillar-table .def-initiative-kpi-table td:last-child,
   .def-drawer-pillar-table .def-initiative-kpi-table th:last-child {
     padding-right: 16px;
+  }
+  .def-cockpit-insights-drawer.def-drawer-pillar {
+    width: min(720px, 100%);
+  }
+  .def-cockpit-insights-drawer.def-drawer {
+    background: #fff;
+    box-shadow: -24px 0 64px rgba(15, 23, 42, 0.22);
+  }
+  .def-cockpit-insights-drawer .def-drawer-head-pillar {
+    background: #fff;
+  }
+  .def-cockpit-insights-drawer .def-drawer-section-bar {
+    background: #f8fafc;
+  }
+  .def-app.def-theme-dark .def-cockpit-insights-drawer.def-drawer,
+  .def-app.def-theme-dark .def-cockpit-insights-drawer .def-drawer-head-pillar {
+    background: #1e293b;
+    border-left-color: rgba(255, 255, 255, 0.1);
+  }
+  .def-app.def-theme-dark .def-cockpit-insights-drawer .def-drawer-section-bar {
+    background: rgba(15, 23, 42, 0.72);
+  }
+  .def-cockpit-insights-drawer .def-modal-pro-table-wrap {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .def-app.def-theme-dark .def-cockpit-insights-drawer .def-modal-pro-table-wrap {
+    background: #1e293b;
+  }
+  .def-cockpit-insights-drawer .def-modal-pro-table-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
   }
 
   /* Modal pro tables — unified popup table design */
@@ -8530,6 +8429,31 @@ const STYLES = `
     border: none;
     box-shadow: none;
   }
+  .def-cockpit-last-updated {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--def-border);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--def-heading);
+    white-space: nowrap;
+  }
+  .def-cockpit-last-updated-label {
+    font-size: var(--text-2xs);
+    font-weight: var(--font-bold);
+    color: var(--def-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .def-cockpit-last-updated time {
+    font-variant-numeric: tabular-nums;
+  }
   .def-cockpit-filter {
     display: inline-flex;
     flex-direction: row;
@@ -9755,7 +9679,6 @@ const STYLES = `
     min-width: 0;
     padding: 2px 0;
   }
-  .def-cockpit-fast-foot { margin-top: auto; }
   .def-cockpit-fast-donut-center {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; text-align: center;
@@ -9800,15 +9723,6 @@ const STYLES = `
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     text-align: right;
-  }
-  .def-cockpit-fast-foot {
-    display: flex; justify-content: space-between; align-items: center; gap: 4px;
-    padding-top: 10px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
-  }
-  .def-cockpit-fast-team { color: var(--def-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .def-cockpit-fast-team strong {
-    font-weight: 800;
-    color: var(--def-heading);
   }
   .def-cockpit-fast-trend { font-weight: 800; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; flex-shrink: 0; }
   .def-cockpit-fast-trend.up { background: rgba(34,197,94,0.12); color: #15803d; }
@@ -10817,14 +10731,9 @@ const STYLES = `
       align-items: stretch;
       gap: 10px;
     }
-    .def-cockpit-filter {
+    .def-cockpit-last-updated {
       width: 100%;
       justify-content: space-between;
-    }
-    .def-cockpit-filter select {
-      flex: 1;
-      max-width: none;
-      text-align: right;
     }
     .def-cockpit-top-meta {
       width: auto;
@@ -10993,6 +10902,10 @@ const STYLES = `
     background: rgba(30,41,59,0.98);
     border-color: rgba(255,255,255,0.1);
   }
+  .def-cockpit-theme-dark .def-cockpit-last-updated {
+    background: rgba(15,23,42,0.6);
+    border-color: rgba(255,255,255,0.1);
+  }
   .def-cockpit-theme-dark .def-cockpit-filter {
     background: rgba(15,23,42,0.6);
     border-color: rgba(255,255,255,0.1);
@@ -11117,7 +11030,6 @@ const DEF = () => {
   const [fastId, setFastId] = useState(null);
   const [initiativeId, setInitiativeId] = useState(null);
   const [drawerProjectId, setDrawerProjectId] = useState(null);
-  const [fastPillarDrawerId, setFastPillarDrawerId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const contentRef = useRef(null);
   const [theme, setTheme] = useState(() => {
@@ -11141,10 +11053,6 @@ const DEF = () => {
   }, [theme]);
 
   const fastCategory = useMemo(() => findFastCategory(fastId), [fastId]);
-  const fastPillarDrawer = useMemo(
-    () => findFastCategory(fastPillarDrawerId),
-    [fastPillarDrawerId],
-  );
   const initiative = useMemo(() => findInitiative(fastCategory, initiativeId), [fastCategory, initiativeId]);
   const embeddedInitiativeView = useMemo(
     () => getEmbeddedInitiativeView(initiativeId),
@@ -11153,6 +11061,10 @@ const DEF = () => {
   const drawerProject = useMemo(
     () => findProject(initiative, drawerProjectId),
     [initiative, drawerProjectId],
+  );
+  const topRisksRows = useMemo(
+    () => buildTopRisks(ORG_DATA.fastCategories),
+    [],
   );
 
   const navigateTo = (target) => {
@@ -11171,7 +11083,19 @@ const DEF = () => {
     } else if (target === 'team') {
       setLayer('team');
       setDrawerProjectId(null);
+    } else if (target === 'top-risks') {
+      setLayer('top-risks');
+      setFastId(null);
+      setInitiativeId(null);
+      setDrawerProjectId(null);
     }
+  };
+
+  const goTopRisks = () => {
+    setFastId(null);
+    setInitiativeId(null);
+    setDrawerProjectId(null);
+    setLayer('top-risks');
   };
 
   const goFast = (id) => {
@@ -11209,7 +11133,6 @@ const DEF = () => {
       else node.scrollTop = 0;
     }
     setSidebarOpen(false);
-    setFastPillarDrawerId(null);
   }, [layer]);
 
   useEffect(() => {
@@ -11218,8 +11141,7 @@ const DEF = () => {
 
   useEffect(() => {
     const lockScroll = (sidebarOpen && window.innerWidth <= 960)
-      || Boolean(drawerProjectId)
-      || Boolean(fastPillarDrawerId);
+      || Boolean(drawerProjectId);
     const content = contentRef.current;
     if (content) {
       content.style.overflow = lockScroll ? 'hidden' : '';
@@ -11227,7 +11149,7 @@ const DEF = () => {
     return () => {
       if (content) content.style.overflow = '';
     };
-  }, [sidebarOpen, drawerProjectId, fastPillarDrawerId]);
+  }, [sidebarOpen, drawerProjectId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -11289,8 +11211,17 @@ const DEF = () => {
           {layer === 'ceo' && (
             <CeoView
               theme={theme}
-              onOpenFastPillar={setFastPillarDrawerId}
+              onOpenFastPillar={goFast}
               onOpenInitiative={goInitiative}
+              onViewTopRisks={goTopRisks}
+            />
+          )}
+
+          {layer === 'top-risks' && (
+            <TopRisksView
+              rows={topRisksRows}
+              onGoCeo={() => navigateTo('ceo')}
+              onBack={() => navigateTo('ceo')}
             />
           )}
 
@@ -11345,17 +11276,9 @@ const DEF = () => {
               />
             )}
 
-            {layer === 'ceo' && (
-              <FastPillarModal
-                fastCategory={fastPillarDrawer}
-                open={Boolean(fastPillarDrawerId && fastPillarDrawer)}
-                onClose={() => setFastPillarDrawerId(null)}
-                onSelectInitiative={goInitiative}
-              />
-            )}
           </div>
         </div>
-        <div id="def-modal-host" />
+        <div id="def-drawer-portal-host" className="def-drawer-portal-host" />
       </div>
     </>
   );
