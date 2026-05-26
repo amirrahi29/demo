@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReactDOM from 'react-dom/client';
 import {
@@ -1414,9 +1414,9 @@ function TopRisksModalTable({ rows }) {
       <table className="def-modal-pro-table def-modal-pro-table-risks">
         <thead>
           <tr>
-            <th>Risk area</th>
-            <th>Risk score</th>
-            <th>Initiatives at risk</th>
+            <th>Risk Area</th>
+            <th>Risk Score</th>
+            <th>Initiatives at Risk</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -2116,6 +2116,84 @@ function getPillarHealthTooltip() {
   return 'Pillar health score — average initiative progress across this FAST pillar';
 }
 
+function OverlayTooltip({ tip, className = '', children }) {
+  const anchorRef = useRef(null);
+  const tipRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [style, setStyle] = useState({ top: 0, left: 0, placement: 'top', arrowLeft: 10 });
+
+  const reposition = () => {
+    const anchor = anchorRef.current;
+    const tipEl = tipRef.current;
+    if (!anchor) return;
+
+    const rect = anchor.getBoundingClientRect();
+    const gap = 8;
+    const pad = 8;
+    const maxWidth = 210;
+    const tipWidth = Math.min(tipEl?.offsetWidth || maxWidth, maxWidth);
+    const tipHeight = tipEl?.offsetHeight || 44;
+
+    let left = rect.right - tipWidth;
+    left = Math.max(pad, Math.min(left, window.innerWidth - tipWidth - pad));
+
+    let placement = 'top';
+    let top = rect.top - gap;
+    if (rect.top - tipHeight - gap < pad) {
+      placement = 'bottom';
+      top = rect.bottom + gap;
+    }
+
+    const arrowLeft = Math.max(12, Math.min(rect.right - left - 6, tipWidth - 12));
+    setStyle({ top, left, placement, arrowLeft });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    reposition();
+    const handle = () => reposition();
+    window.addEventListener('scroll', handle, true);
+    window.addEventListener('resize', handle);
+    return () => {
+      window.removeEventListener('scroll', handle, true);
+      window.removeEventListener('resize', handle);
+    };
+  }, [open, tip]);
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        className={className}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        {children}
+      </span>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={tipRef}
+          className={`def-cockpit-overlay-tip placement-${style.placement}`}
+          role="tooltip"
+          style={{
+            position: 'fixed',
+            top: style.top,
+            left: style.left,
+            transform: style.placement === 'top' ? 'translateY(-100%)' : 'none',
+            zIndex: 10000,
+            '--tip-arrow-left': `${style.arrowLeft}px`,
+          }}
+        >
+          {tip}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 function MetricCountPill({ count, statusBand }) {
   const tip = getMetricCountTooltip(statusBand);
   return (
@@ -2252,24 +2330,21 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
         <div className="def-cockpit-fast-titles">
           <div className="def-cockpit-fast-title-row">
             <p className="def-cockpit-fast-kicker">{fast.shortName}</p>
-            <span className="def-cockpit-fast-health-score-wrap">
+            <OverlayTooltip tip={getPillarHealthTooltip()} className="def-cockpit-fast-health-score-wrap">
               <span
                 className="def-cockpit-fast-health-score"
                 style={{ color: healthColor(fast.healthScore) }}
               >
                 {fast.healthScore}%
               </span>
-              <span className="def-cockpit-fast-health-score-tip" role="tooltip">
-                {getPillarHealthTooltip()}
-              </span>
-            </span>
+            </OverlayTooltip>
           </div>
           <h3>{formatFastPillarSubtitle(fast.name)}</h3>
         </div>
       </div>
       <div className="def-cockpit-fast-body">
         <div className="def-cockpit-fast-chart">
-          <ResponsiveContainer width="100%" height={108}>
+          <ResponsiveContainer width="100%" height={96}>
             <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <Pie
                 data={data.length ? data : [{ name: 'Empty', value: 1, fill: isDark ? '#334155' : '#e2e8f0' }]}
@@ -2307,8 +2382,8 @@ function FastHealthCard({ fast, theme, onSelectFast, index = 0 }) {
   );
 }
 
-const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 7;
-const COCKPIT_MILESTONES_PREVIEW_LIMIT = 5;
+const COCKPIT_OWNERSHIP_PREVIEW_LIMIT = 8;
+const COCKPIT_MILESTONES_PREVIEW_LIMIT = 6;
 const COCKPIT_TOP_RISKS_PREVIEW_LIMIT = 2;
 
 function ModalPortal({ children }) {
@@ -2355,11 +2430,11 @@ function OwnershipOverviewTableBody({ rows, modal = false }) {
       <thead>
         <tr>
           <th>Owner</th>
-          <th>Total initiatives</th>
-          <th>On track</th>
-          <th>At risk</th>
-          <th>Off track</th>
-          <th>Health score</th>
+          <th>Total Initiatives</th>
+          <th>On Track</th>
+          <th>At Risk</th>
+          <th>Off Track</th>
+          <th>Health Score</th>
         </tr>
       </thead>
       <tbody>
@@ -2371,31 +2446,19 @@ function OwnershipOverviewTableBody({ rows, modal = false }) {
                 <strong>{row.owner}</strong>
               </span>
             </td>
-            <td data-label="Total initiatives">
+            <td data-label="Total Initiatives">
               <span className="def-modal-count-chip">{row.total}</span>
             </td>
-            <td data-label="On track">
-              {modal ? (
-                <ModalBandCell count={row.onTrack} pct={row.onTrackPct} band="on-track" />
-              ) : (
-                `${row.onTrack} (${row.onTrackPct}%)`
-              )}
+            <td data-label="On Track">
+              <ModalBandCell count={row.onTrack} pct={row.onTrackPct} band="on-track" />
             </td>
-            <td data-label="At risk">
-              {modal ? (
-                <ModalBandCell count={row.atRisk} pct={row.atRiskPct} band="at-risk" />
-              ) : (
-                `${row.atRisk} (${row.atRiskPct}%)`
-              )}
+            <td data-label="At Risk">
+              <ModalBandCell count={row.atRisk} pct={row.atRiskPct} band="at-risk" />
             </td>
-            <td data-label="Off track">
-              {modal ? (
-                <ModalBandCell count={row.offTrack} pct={row.offTrackPct} band="off-track" />
-              ) : (
-                `${row.offTrack} (${row.offTrackPct}%)`
-              )}
+            <td data-label="Off Track">
+              <ModalBandCell count={row.offTrack} pct={row.offTrackPct} band="off-track" />
             </td>
-            <td data-label="Health score">
+            <td data-label="Health Score">
               <span
                 className="def-cockpit-health-pill def-modal-health-pill"
                 style={{
@@ -2521,9 +2584,9 @@ function UpcomingMilestonesTableBody({ rows, onOpenInitiative, modal = false }) 
       <thead>
         <tr>
           <th>Initiative</th>
-          <th>Strategic imperative</th>
-          <th>Due date</th>
-          <th>Days left</th>
+          <th>Strategic Imperative</th>
+          <th>Due Date</th>
+          <th>Days Left</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -2537,12 +2600,16 @@ function UpcomingMilestonesTableBody({ rows, onOpenInitiative, modal = false }) 
             tabIndex={onOpenInitiative ? 0 : undefined}
             role={onOpenInitiative ? 'button' : undefined}
           >
-            <td data-label="Initiative"><strong>{row.initiative}</strong></td>
-            <td data-label="Strategic imperative">
+            <td data-label="Initiative">
+              <span className="def-cockpit-initiative-name">{row.initiative}</span>
+            </td>
+            <td data-label="Strategic Imperative">
               <span className="def-modal-imperative-chip">{row.imperative}</span>
             </td>
-            <td data-label="Due date">{formatAppDate(row.dueDate)}</td>
-            <td data-label="Days left">
+            <td data-label="Due Date">
+              <span className="def-cockpit-due-date">{formatAppDate(row.dueDate)}</span>
+            </td>
+            <td data-label="Days Left">
               <span className="def-cockpit-days-left def-modal-days-chip">{row.daysLeft}</span>
             </td>
             <td data-label="Status">
@@ -7042,12 +7109,10 @@ const STYLES = `
   /* Modal pro tables — unified popup table design */
   .def-modal-pro-table-wrap {
     margin: 0 12px 12px;
-    border: 1px solid var(--def-border-soft);
-    border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.94) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.9),
-      0 8px 24px rgba(15,23,42,0.06);
+    border: 1px solid rgba(226,232,240,0.95);
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04);
     overflow: hidden;
   }
   .def-modal-pro-table-scroll {
@@ -7059,42 +7124,37 @@ const STYLES = `
   }
   .def-modal-pro-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: var(--text-sm);
+    border-collapse: collapse;
+    font-size: var(--text-xs);
     min-width: min(100%, 680px);
   }
   .def-modal-pro-table thead th {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 11px 14px;
+    padding: 9px 12px;
     text-align: left;
-    font-size: var(--text-2xs);
-    font-weight: var(--font-extrabold);
-    letter-spacing: 0.06em;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: var(--def-muted);
-    background: linear-gradient(180deg, rgba(248,250,252,0.98) 0%, rgba(241,245,249,0.96) 100%);
-    border-bottom: 1px solid var(--def-border);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 1px solid rgba(226,232,240,0.95);
     white-space: nowrap;
   }
   .def-modal-pro-table tbody tr {
-    transition: background 0.2s ease, box-shadow 0.2s ease;
+    transition: background 0.18s ease;
   }
   .def-modal-pro-table tbody tr:nth-child(even) td {
-    background: rgba(248,250,252,0.55);
+    background: rgba(248,250,252,0.65);
   }
   .def-modal-pro-table tbody tr:hover td {
-    background: rgba(99,102,241,0.06);
-  }
-  .def-modal-pro-table tbody tr:hover {
-    box-shadow: inset 3px 0 0 #6366f1;
+    background: rgba(99,102,241,0.05);
   }
   .def-modal-pro-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(226,232,240,0.82);
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(226,232,240,0.88);
     vertical-align: middle;
     color: var(--def-text);
     line-height: 1.35;
@@ -7104,11 +7164,19 @@ const STYLES = `
   }
   .def-modal-pro-table td:first-child,
   .def-modal-pro-table th:first-child {
-    padding-left: 16px;
+    padding-left: 14px;
   }
   .def-modal-pro-table td:last-child,
   .def-modal-pro-table th:last-child {
-    padding-right: 16px;
+    padding-right: 14px;
+  }
+  .def-modal-pro-table.def-modal-pro-table-ownership th:nth-child(n+2),
+  .def-modal-pro-table.def-modal-pro-table-ownership td:nth-child(n+2) {
+    text-align: center;
+  }
+  .def-modal-pro-table.def-modal-pro-table-milestones th:nth-child(n+3),
+  .def-modal-pro-table.def-modal-pro-table-milestones td:nth-child(n+3) {
+    text-align: center;
   }
   .def-modal-pro-table .def-table-row-click {
     cursor: pointer;
@@ -7121,9 +7189,48 @@ const STYLES = `
     gap: 10px;
   }
   .def-modal-owner-cell strong {
-    font-weight: var(--font-bold);
+    font-size: var(--text-xs);
+    font-weight: 600;
     color: var(--def-heading);
   }
+  .def-modal-pro-table .def-modal-count-chip {
+    display: inline;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+  }
+  .def-modal-pro-table .def-modal-band-cell {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 5px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .def-modal-pro-table .def-modal-band-cell strong {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .def-modal-pro-table .def-modal-band-pct {
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--def-muted);
+    opacity: 1;
+  }
+  .def-modal-pro-table .def-modal-band-cell.band-on-track strong { color: #15803d; }
+  .def-modal-pro-table .def-modal-band-cell.band-at-risk strong { color: #b45309; }
+  .def-modal-pro-table .def-modal-band-cell.band-off-track strong { color: #b91c1c; }
   .def-modal-count-chip {
     display: inline-flex;
     align-items: center;
@@ -7172,6 +7279,21 @@ const STYLES = `
     background: rgba(239,68,68,0.1);
     border-color: rgba(239,68,68,0.2);
   }
+  .def-modal-pro-table .def-modal-health-pill,
+  .def-modal-pro-table .def-cockpit-health-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 2px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
   .def-modal-health-pill {
     display: inline-flex;
     align-items: center;
@@ -7184,6 +7306,20 @@ const STYLES = `
     font-variant-numeric: tabular-nums;
     border: 1px solid transparent;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+  }
+  .def-modal-pro-table .def-modal-imperative-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #4338ca;
+    background: rgba(99,102,241,0.07);
+    border: none;
+    white-space: nowrap;
   }
   .def-modal-imperative-chip {
     display: inline-flex;
@@ -7199,6 +7335,59 @@ const STYLES = `
     border: 1px solid rgba(99,102,241,0.18);
     white-space: nowrap;
   }
+  .def-modal-pro-table .def-modal-days-chip,
+  .def-modal-pro-table .def-cockpit-days-left {
+    display: inline;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+  }
+  .def-modal-pro-table .def-cockpit-initiative-name {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--def-heading);
+    line-height: 1.35;
+  }
+  .def-modal-pro-table .def-cockpit-due-date {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-muted);
+  }
+  .def-modal-pro-table .def-cockpit-status-pill {
+    font-size: 0.625rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .def-modal-pro-table.def-modal-pro-table-risks th:nth-child(n+2),
+  .def-modal-pro-table.def-modal-pro-table-risks td:nth-child(n+2) {
+    text-align: center;
+  }
+  .def-modal-pro-table.def-modal-pro-table-risks td strong {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--def-heading);
+  }
+  .def-modal-pro-table .def-modal-risk-score {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent !important;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .def-modal-pro-table .def-modal-risk-score.tone-high { color: #dc2626; }
+  .def-modal-pro-table .def-modal-risk-score.tone-medium { color: #d97706; }
+  .def-modal-pro-table .def-modal-risk-score.tone-low { color: #ca8a04; }
   .def-modal-days-chip {
     display: inline-flex;
     align-items: center;
@@ -7219,13 +7408,13 @@ const STYLES = `
     font-weight: var(--font-semibold);
   }
   .def-app.def-theme-dark .def-modal-pro-table-wrap {
-    background: linear-gradient(180deg, rgba(30,41,59,0.96) 0%, rgba(15,23,42,0.94) 100%);
+    background: rgba(15,23,42,0.92);
     border-color: rgba(255,255,255,0.08);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: none;
   }
   .def-app.def-theme-dark .def-modal-pro-table thead th {
-    background: linear-gradient(180deg, rgba(30,41,59,0.98) 0%, rgba(15,23,42,0.96) 100%);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+    background: rgba(15,23,42,0.98);
+    border-bottom-color: rgba(255,255,255,0.08);
   }
   .def-app.def-theme-dark .def-modal-pro-table tbody tr:nth-child(even) td {
     background: rgba(255,255,255,0.02);
@@ -7233,9 +7422,11 @@ const STYLES = `
   .def-app.def-theme-dark .def-modal-pro-table tbody tr:hover td {
     background: rgba(99,102,241,0.12);
   }
-  .def-app.def-theme-dark .def-modal-days-chip {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.1);
+  .def-app.def-theme-dark .def-modal-pro-table .def-modal-days-chip,
+  .def-app.def-theme-dark .def-modal-pro-table .def-cockpit-days-left {
+    background: transparent;
+    border: none;
+    color: var(--def-heading);
   }
   @media (max-width: 768px) {
     .def-modal {
@@ -7244,7 +7435,7 @@ const STYLES = `
     }
     .def-modal-pro-table-wrap {
       margin: 0 8px 10px;
-      border-radius: 12px;
+      border-radius: 8px;
     }
     .def-modal-pro-table-scroll {
       max-height: min(62vh, 520px);
@@ -7399,6 +7590,9 @@ const STYLES = `
   .def-modal-pillar .def-drawer-pillar-table {
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+  }
+  .def-modal-pillar .def-modal-pro-table-wrap {
+    margin: 10px 12px 12px;
   }
   .def-modal-cockpit-table .def-cockpit-table-modal-body {
     flex: 1;
@@ -8108,26 +8302,30 @@ const STYLES = `
       box-shadow: 0 6px 16px rgba(15,23,42,0.12);
     }
     .def-cockpit-rail-card.def-cockpit-interactive:hover {
-      --cockpit-hover-lift: -4px;
-      --cockpit-hover-scale: 1.006;
+      transform: translateY(-2px) scale(1.003);
+      box-shadow: 0 4px 12px rgba(15,23,42,0.06), 0 1px 3px rgba(99,102,241,0.05);
+      border-color: rgba(99,102,241,0.14);
+    }
+    .def-cockpit-rail-card.def-cockpit-interactive:hover::before {
+      opacity: 0.35;
     }
     .def-cockpit-rail-card .def-cockpit-lq-stat:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(15,23,42,0.07);
-      border-color: rgba(99,102,241,0.18);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(15,23,42,0.05);
+      border-color: rgba(99,102,241,0.12);
     }
     .def-cockpit-rail-card .def-cockpit-highlight-item:hover {
-      transform: translateX(3px);
+      transform: translateX(2px);
       background: rgba(255,255,255,0.98);
     }
     .def-cockpit-rail-card .def-cockpit-highlight-item:hover .def-cockpit-highlight-icon {
-      transform: scale(1.08);
+      transform: scale(1.04);
     }
     .def-cockpit-rail-card .def-cockpit-top-risk-item:hover {
-      transform: translateX(3px);
+      transform: translateX(2px);
     }
     .def-cockpit-rail-card .def-cockpit-top-risk-item:hover .def-cockpit-risk-gauge-meta strong {
-      transform: scale(1.04);
+      transform: scale(1.02);
     }
     .def-cockpit-risk-item:hover { background: rgba(99,102,241,0.05); }
     .def-cockpit-table tbody tr:hover { background: rgba(99,102,241,0.06); }
@@ -9328,17 +9526,17 @@ const STYLES = `
   .def-cockpit-fast-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-    align-items: stretch;
+    gap: 10px;
+    align-items: start;
   }
   .def-cockpit-fast-health {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 16px 12px;
-    height: 100%;
-    min-height: 200px;
+    gap: 8px;
+    padding: 12px 14px 10px;
+    height: auto;
+    min-height: 0;
     background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
     border: 1px solid rgba(226,232,240,0.95);
     border-radius: 14px;
@@ -9364,9 +9562,12 @@ const STYLES = `
   .def-cockpit-fast-head {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding-bottom: 10px;
+    gap: 8px;
+    padding-bottom: 6px;
     border-bottom: 1px solid rgba(226,232,240,0.92);
+    overflow: visible;
+    position: relative;
+    z-index: 1;
   }
   .def-cockpit-fast-icon {
     width: 34px;
@@ -9382,8 +9583,8 @@ const STYLES = `
   }
   .def-cockpit-fast-chart {
     position: relative;
-    width: 108px;
-    height: 108px;
+    width: 96px;
+    height: 96px;
     flex-shrink: 0;
     transition: transform 0.42s var(--cockpit-ease-spring);
   }
@@ -9410,12 +9611,8 @@ const STYLES = `
     position: relative;
     display: inline-flex;
     flex-shrink: 0;
-    z-index: 4;
   }
-  .def-cockpit-fast-health-score-tip {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 8px);
+  .def-cockpit-overlay-tip {
     width: max-content;
     max-width: 210px;
     padding: 8px 11px;
@@ -9428,34 +9625,34 @@ const STYLES = `
     text-align: left;
     letter-spacing: 0.01em;
     box-shadow: 0 10px 24px rgba(15,23,42,0.24);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px);
-    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
     pointer-events: none;
-    z-index: 12;
   }
-  .def-cockpit-fast-health-score-tip::after {
+  .def-cockpit-overlay-tip.placement-top::after {
     content: '';
     position: absolute;
-    right: 10px;
+    left: var(--tip-arrow-left, 10px);
+    top: 100%;
+    border: 5px solid transparent;
+    border-top-color: #0f172a;
+  }
+  .def-cockpit-overlay-tip.placement-bottom::after {
+    content: '';
+    position: absolute;
+    left: var(--tip-arrow-left, 10px);
     bottom: 100%;
     border: 5px solid transparent;
     border-bottom-color: #0f172a;
   }
-  .def-cockpit-fast-health-score-wrap:hover .def-cockpit-fast-health-score-tip,
-  .def-cockpit-fast-health-score-wrap:focus-within .def-cockpit-fast-health-score-tip {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-  }
-  .def-app.def-theme-dark .def-cockpit-fast-health-score-tip {
+  .def-app.def-theme-dark .def-cockpit-overlay-tip {
     background: #1e293b;
     color: #f1f5f9;
     border: 1px solid rgba(255,255,255,0.1);
     box-shadow: 0 10px 24px rgba(0,0,0,0.35);
   }
-  .def-app.def-theme-dark .def-cockpit-fast-health-score-tip::after {
+  .def-app.def-theme-dark .def-cockpit-overlay-tip.placement-top::after {
+    border-top-color: #1e293b;
+  }
+  .def-app.def-theme-dark .def-cockpit-overlay-tip.placement-bottom::after {
     border-bottom-color: #1e293b;
   }
   .def-cockpit-fast-health h3 {
@@ -9472,14 +9669,12 @@ const STYLES = `
   }
   .def-cockpit-fast-body {
     display: grid;
-    grid-template-columns: 108px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
     align-items: center;
-    gap: 16px;
-    flex: 1;
+    gap: 10px;
     min-width: 0;
-    padding: 2px 0;
   }
-  .def-cockpit-fast-foot { margin-top: auto; }
+  .def-cockpit-fast-foot { margin-top: 0; }
   .def-cockpit-fast-donut-center {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; text-align: center;
@@ -9496,15 +9691,15 @@ const STYLES = `
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 3px;
   }
   .def-cockpit-fast-legend li {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 6px;
-    padding: 5px 7px;
-    border-radius: 7px;
+    gap: 5px;
+    padding: 3px 6px;
+    border-radius: 6px;
     background: rgba(248,250,252,0.95);
     border: 1px solid rgba(226,232,240,0.85);
     font-size: 0.62rem;
@@ -9527,7 +9722,7 @@ const STYLES = `
   }
   .def-cockpit-fast-foot {
     display: flex; justify-content: space-between; align-items: center; gap: 4px;
-    padding-top: 10px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
+    padding-top: 6px; border-top: 1px solid rgba(226,232,240,0.92); font-size: 0.62rem;
   }
   .def-cockpit-fast-team { color: var(--def-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .def-cockpit-fast-team strong {
@@ -9594,11 +9789,12 @@ const STYLES = `
     border: none;
     background: transparent;
     color: #2563eb;
-    font-size: 0.72rem;
-    font-weight: var(--font-bold);
+    font-size: 0.625rem;
+    font-weight: 600;
     cursor: pointer;
     padding: 0;
     white-space: nowrap;
+    letter-spacing: 0.01em;
     transition: color 0.22s ease, transform 0.28s var(--cockpit-ease);
   }
   .def-cockpit-quarter-trends {
@@ -9735,6 +9931,126 @@ const STYLES = `
   .def-cockpit-row-click:hover { background: rgba(99,102,241,0.05); }
   .def-cockpit-table-ownership { min-width: min(640px, 100%); }
   .def-cockpit-table-milestones { min-width: min(620px, 100%); }
+  .def-cockpit-table-ownership,
+  .def-cockpit-table-milestones {
+    font-size: var(--text-xs);
+  }
+  .def-cockpit-table-ownership thead th,
+  .def-cockpit-table-milestones thead th {
+    padding: 7px 10px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: rgba(248,250,252,0.98);
+    border-bottom: 1px solid rgba(226,232,240,0.95);
+    white-space: nowrap;
+  }
+  .def-cockpit-table-ownership tbody td,
+  .def-cockpit-table-milestones tbody td {
+    padding: 8px 10px;
+    font-size: var(--text-xs);
+    line-height: 1.35;
+    color: var(--def-text);
+    vertical-align: middle;
+  }
+  .def-cockpit-table-ownership tbody tr:last-child td,
+  .def-cockpit-table-milestones tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .def-cockpit-table-ownership tbody tr:nth-child(even) td,
+  .def-cockpit-table-milestones tbody tr:nth-child(even) td {
+    background: rgba(248,250,252,0.55);
+  }
+  .def-cockpit-table-ownership td:nth-child(2),
+  .def-cockpit-table-ownership td:nth-child(3),
+  .def-cockpit-table-ownership td:nth-child(4),
+  .def-cockpit-table-ownership td:nth-child(5),
+  .def-cockpit-table-ownership td:nth-child(6),
+  .def-cockpit-table-ownership th:nth-child(2),
+  .def-cockpit-table-ownership th:nth-child(3),
+  .def-cockpit-table-ownership th:nth-child(4),
+  .def-cockpit-table-ownership th:nth-child(5),
+  .def-cockpit-table-ownership th:nth-child(6) {
+    text-align: center;
+  }
+  .def-cockpit-table-ownership .def-modal-band-cell,
+  .def-cockpit-table-ownership .def-modal-count-chip,
+  .def-cockpit-table-ownership .def-cockpit-health-pill {
+    margin-inline: auto;
+  }
+  .def-cockpit-table-ownership .def-modal-band-cell {
+    padding: 3px 7px;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .def-cockpit-table-ownership .def-modal-band-cell strong {
+    font-size: var(--text-xs);
+  }
+  .def-cockpit-table-ownership .def-modal-band-pct {
+    font-size: 0.625rem;
+  }
+  .def-cockpit-table-ownership .def-modal-count-chip {
+    min-width: 26px;
+    padding: 2px 7px;
+    font-size: 0.625rem;
+  }
+  .def-cockpit-table-ownership .def-cockpit-health-pill {
+    min-width: 32px;
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+  }
+  .def-cockpit-table-ownership .def-cockpit-owner-cell strong {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--def-heading);
+    line-height: 1.3;
+  }
+  .def-cockpit-table-ownership .def-cockpit-owner-cell .def-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 0.54rem;
+  }
+  .def-cockpit-table-milestones td:nth-child(3),
+  .def-cockpit-table-milestones td:nth-child(4),
+  .def-cockpit-table-milestones td:nth-child(5),
+  .def-cockpit-table-milestones th:nth-child(3),
+  .def-cockpit-table-milestones th:nth-child(4),
+  .def-cockpit-table-milestones th:nth-child(5) {
+    text-align: center;
+    white-space: nowrap;
+  }
+  .def-cockpit-initiative-name {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--def-heading);
+    line-height: 1.35;
+  }
+  .def-cockpit-due-date {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-muted);
+  }
+  .def-cockpit-table-milestones .def-modal-imperative-chip {
+    font-size: 0.625rem;
+    padding: 2px 7px;
+  }
+  .def-cockpit-table-milestones .def-modal-days-chip {
+    min-width: 28px;
+    padding: 2px 8px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--def-heading);
+  }
+  .def-cockpit-table-milestones .def-cockpit-status-pill {
+    font-size: 0.625rem;
+    padding: 3px 8px;
+    font-weight: 700;
+  }
   .def-cockpit-days-left {
     font-weight: var(--font-extrabold);
     font-variant-numeric: tabular-nums;
@@ -9755,8 +10071,11 @@ const STYLES = `
     box-shadow: 0 1px 2px rgba(15,23,42,0.04);
   }
   .def-cockpit-rail-card.def-cockpit-interactive {
-    --cockpit-hover-lift: -4px;
-    --cockpit-hover-scale: 1.006;
+    --cockpit-hover-lift: -2px;
+    --cockpit-hover-scale: 1.003;
+  }
+  .def-cockpit-rail-card.def-cockpit-interactive::after {
+    display: none;
   }
   .def-cockpit-rail-card > .def-cockpit-card-title {
     margin: 0 0 10px;
